@@ -3,6 +3,7 @@ import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable } from "@workspace/db";
 import { createCalendarEvent, updateCalendarEvent } from "../lib/calendar";
+import { deriveStartDate } from "../lib/scheduleDate";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -364,6 +365,32 @@ router.post("/rituals/:id/chat", async (req, res): Promise<void> => {
   res.json(SendMessageResponse.parse(savedMsg));
 });
 
+function generateFallbackTimes(dayPreference: string, frequency: string): string[] {
+  const base = deriveStartDate(dayPreference || "", frequency);
+  const times: string[] = [base.toISOString()];
+
+  const alt1 = new Date(base);
+  if (frequency === "monthly") {
+    alt1.setDate(alt1.getDate() + 7);
+  } else {
+    alt1.setDate(alt1.getDate() + 1);
+    if (alt1.getDay() === 0) alt1.setDate(alt1.getDate() + 1);
+  }
+  times.push(alt1.toISOString());
+
+  const alt2 = new Date(base);
+  if (frequency === "monthly") {
+    alt2.setDate(alt2.getDate() + 14);
+  } else {
+    alt2.setDate(alt2.getDate() + 7);
+    const hoursShift = base.getHours() < 17 ? 2 : -2;
+    alt2.setHours(alt2.getHours() + hoursShift);
+  }
+  times.push(alt2.toISOString());
+
+  return times;
+}
+
 // GET /api/rituals/:id/suggested-times — auth-required
 router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
@@ -389,27 +416,35 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
     return;
   }
 
+  const existing = (ritual.proposedTimes as string[]) ?? [];
+  if (existing.length > 0) {
+    res.json({ proposedTimes: existing });
+    return;
+  }
+
   const enrichedRitual = {
     ...ritual,
     participants: (ritual.participants as Array<{ name: string; email: string }>) ?? [],
   };
 
+  let times: string[];
   try {
-    const times = await suggestMeetingTimes(sessionUserId, enrichedRitual);
-    if (times.length > 0) {
-      await db.update(ritualsTable).set({ proposedTimes: times }).where(eq(ritualsTable.id, id));
-    }
-    res.json({ proposedTimes: times });
+    times = await suggestMeetingTimes(sessionUserId, enrichedRitual);
   } catch (err) {
-    req.log.error({ err }, "Failed to suggest meeting times");
-    res.status(500).json({ error: "Failed to generate time suggestions" });
+    req.log.warn({ err }, "AI time suggestion failed, using date-math fallback");
+    times = generateFallbackTimes(ritual.dayPreference ?? "", ritual.frequency);
   }
+
+  if (times.length > 0) {
+    await db.update(ritualsTable).set({ proposedTimes: times }).where(eq(ritualsTable.id, id));
+  }
+  res.json({ proposedTimes: times });
 });
 
 // PATCH /api/rituals/:id/proposed-times — auth-required
 const ISOTimestamp = z.string().refine((s) => !isNaN(Date.parse(s)), { message: "Must be a valid ISO timestamp" });
 const ProposedTimesBody = z.object({
-  proposedTimes: z.array(ISOTimestamp).length(3),
+  proposedTimes: z.array(ISOTimestamp).min(1).max(3),
 });
 
 router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {

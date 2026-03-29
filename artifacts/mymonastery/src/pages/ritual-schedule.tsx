@@ -1,26 +1,26 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import { format, parseISO } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Loader2, Sprout, ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
+import { Loader2, Sprout, ArrowLeft, CalendarClock, Plus, X } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-interface ProposedTime {
-  iso: string;
-  label: string;
+function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function parseProposedTimes(times: string[]): ProposedTime[] {
-  return times.map((t) => {
-    const d = parseISO(t);
-    return {
-      iso: t,
-      label: format(d, "EEEE, MMMM d 'at' h:mm a"),
-    };
-  });
+function localInputToISO(value: string): string {
+  return new Date(value).toISOString();
 }
+
+const SLOT_LABELS = [
+  { label: "Your top pick", sublabel: "The time that works best for you", required: true },
+  { label: "First backup", sublabel: "An alternative if guests can't make your top pick", required: false },
+  { label: "Second backup", sublabel: "Another option for maximum flexibility", required: false },
+];
 
 export default function RitualSchedule() {
   const [, params] = useRoute("/ritual/:id/schedule");
@@ -30,11 +30,11 @@ export default function RitualSchedule() {
 
   const ritualId = parseInt(params?.id || "0", 10);
 
-  const [proposedTimes, setProposedTimes] = useState<ProposedTime[]>([]);
   const [ritualName, setRitualName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [times, setTimes] = useState<string[]>(["", "", ""]);
+  const [shownSlots, setShownSlots] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -55,7 +55,11 @@ export default function RitualSchedule() {
         }
         if (timesRes.ok) {
           const data = await timesRes.json();
-          setProposedTimes(parseProposedTimes(data.proposedTimes ?? []));
+          const proposed: string[] = data.proposedTimes ?? [];
+          const filled = proposed.map((t: string) => isoToLocalInput(t));
+          setTimes([filled[0] || "", filled[1] || "", filled[2] || ""]);
+          const visibleCount = Math.max(1, proposed.length);
+          setShownSlots(visibleCount);
         }
       } catch {
         toast({ variant: "destructive", title: "Could not load schedule" });
@@ -66,26 +70,35 @@ export default function RitualSchedule() {
     load();
   }, [ritualId, toast]);
 
-  const handleConfirm = async () => {
-    if (!selectedTime) return;
-    setIsConfirming(true);
+  const handleSave = async () => {
+    const validTimes = times
+      .slice(0, shownSlots)
+      .filter((t) => t.length > 0)
+      .map(localInputToISO);
+
+    if (validTimes.length === 0) {
+      toast({ variant: "destructive", title: "Pick at least one time to continue" });
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      const res = await fetch(`/api/rituals/${ritualId}/confirm-time`, {
-        method: "POST",
+      const res = await fetch(`/api/rituals/${ritualId}/proposed-times`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ confirmedTime: selectedTime }),
+        body: JSON.stringify({ proposedTimes: validTimes }),
       });
-      if (!res.ok) throw new Error("Failed to confirm time");
+      if (!res.ok) throw new Error("Failed to save times");
       toast({
-        title: "Time confirmed",
-        description: "Your circle is set. Eleanor will take it from here.",
+        title: "Times saved",
+        description: "Eleanor will share these options with your circle.",
       });
       setLocation(`/ritual/${ritualId}`);
     } catch {
-      toast({ variant: "destructive", title: "Could not confirm time" });
+      toast({ variant: "destructive", title: "Could not save times" });
     } finally {
-      setIsConfirming(false);
+      setIsSaving(false);
     }
   };
 
@@ -94,9 +107,9 @@ export default function RitualSchedule() {
       <Layout>
         <div className="max-w-2xl mx-auto w-full pt-8 text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-primary/8 text-primary flex items-center justify-center mx-auto">
-            <Sprout size={26} strokeWidth={1.5} className="animate-pulse" />
+            <CalendarClock size={26} strokeWidth={1.5} className="animate-pulse" />
           </div>
-          <p className="text-muted-foreground text-lg">Eleanor is reading your calendar...</p>
+          <p className="text-muted-foreground text-lg">Preparing your schedule...</p>
         </div>
       </Layout>
     );
@@ -104,7 +117,7 @@ export default function RitualSchedule() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto w-full pt-8">
+      <div className="max-w-xl mx-auto w-full pt-8 pb-16">
         <button
           onClick={() => setLocation(`/ritual/${ritualId}`)}
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-8 transition-colors"
@@ -112,63 +125,86 @@ export default function RitualSchedule() {
           <ArrowLeft size={16} /> Back to {ritualName || "circle"}
         </button>
 
-        <div className="mb-10">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Eleanor's Suggestion</p>
-          <h1 className="text-3xl font-serif text-foreground mb-2">Choose a time to gather</h1>
-          <p className="text-muted-foreground">Here's a good time to help this ritual take root. Select one to confirm.</p>
+        <div className="mb-8">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Set gathering times</p>
+          <h1 className="text-3xl font-serif text-foreground mb-3">When can you gather?</h1>
+          <p className="text-muted-foreground leading-relaxed">
+            Pick the time that works best for you. Adding backup options means your circle has flexibility — more people can make it when there's more than one choice.
+          </p>
         </div>
 
-        <AnimatePresence>
-          <div className="space-y-4 mb-10">
-            {proposedTimes.map((pt, i) => {
-              const isSelected = selectedTime === pt.iso;
-              return (
-                <motion.button
-                  key={pt.iso}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08, duration: 0.3 }}
-                  onClick={() => setSelectedTime(pt.iso)}
-                  className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-center justify-between gap-4 ${
-                    isSelected
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
-                  }`}
-                >
-                  <div>
-                    <p className={`font-medium text-lg ${isSelected ? "text-primary" : "text-foreground"}`}>
-                      {pt.label}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {i === 0 ? "Eleanor's top pick" : i === 1 ? "Alternative" : "Backup option"}
-                    </p>
-                  </div>
-                  {isSelected && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    >
-                      <CheckCircle2 size={24} className="text-primary flex-shrink-0" />
-                    </motion.div>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-        </AnimatePresence>
+        <div className="space-y-4 mb-6">
+          {Array.from({ length: shownSlots }).map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.06 }}
+              className="bg-card border border-border rounded-2xl p-5"
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <p className="font-medium text-foreground">{SLOT_LABELS[i].label}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{SLOT_LABELS[i].sublabel}</p>
+                </div>
+                {i > 0 && (
+                  <button
+                    onClick={() => {
+                      const next = [...times];
+                      next[i] = "";
+                      setTimes(next);
+                      setShownSlots(i);
+                    }}
+                    className="text-muted-foreground hover:text-destructive transition-colors mt-0.5 flex-shrink-0"
+                    aria-label="Remove this option"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+              <input
+                type="datetime-local"
+                value={times[i]}
+                onChange={(e) => {
+                  const next = [...times];
+                  next[i] = e.target.value;
+                  setTimes(next);
+                }}
+                className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all text-sm"
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        {shownSlots < 3 && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => setShownSlots((s) => Math.min(s + 1, 3))}
+            className="w-full py-3 border-2 border-dashed border-border rounded-2xl text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all flex items-center justify-center gap-2 text-sm font-medium mb-8"
+          >
+            <Plus size={16} />
+            Add {shownSlots === 1 ? "a backup" : "another backup"} time
+          </motion.button>
+        )}
+
+        {shownSlots === 3 && <div className="mb-8" />}
 
         <button
-          onClick={handleConfirm}
-          disabled={!selectedTime || isConfirming}
+          onClick={handleSave}
+          disabled={isSaving || !times[0]}
           className="w-full py-4 bg-primary text-primary-foreground rounded-full font-medium text-lg hover:bg-primary/90 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_4px_14px_rgba(45,74,62,0.2)] flex items-center justify-center gap-2"
         >
-          {isConfirming ? (
-            <><Loader2 size={20} className="animate-spin" /> Confirming...</>
+          {isSaving ? (
+            <><Loader2 size={20} className="animate-spin" /> Saving...</>
           ) : (
-            <>Confirm this time <Sprout size={20} /></>
+            <><Sprout size={20} /> Save gathering times</>
           )}
         </button>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          Eleanor will use these times when she reaches out to your circle.
+        </p>
       </div>
     </Layout>
   );
