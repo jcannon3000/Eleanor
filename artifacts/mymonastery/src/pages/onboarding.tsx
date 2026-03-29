@@ -17,9 +17,15 @@ export default function Onboarding() {
   }, [user, isLoading, setLocation]);
 
   const handleGoogleSignIn = () => {
-    // Break out of the Replit preview iframe so Google OAuth isn't blocked
-    const target = window.top ?? window;
-    target.location.href = `${window.location.origin}/api/auth/google`;
+    const url = `${window.location.origin}/api/auth/google`;
+    try {
+      // Try to break out of any iframe (works in same-origin iframes)
+      const target = window.top ?? window;
+      target.location.href = url;
+    } catch {
+      // Cross-origin iframe (e.g. Replit preview) — open in a new tab instead
+      window.open(url, "_blank");
+    }
   };
 
   if (isLoading) {
