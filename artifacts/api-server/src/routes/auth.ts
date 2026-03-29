@@ -9,14 +9,18 @@ const router: IRouter = Router();
 const GOOGLE_CONFIGURED =
   !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
 
+const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+const callbackURL = devDomain
+  ? `https://${devDomain}/api/auth/google/callback`
+  : process.env["GOOGLE_REDIRECT_URI"] ?? "http://localhost:8080/api/auth/google/callback";
+
 if (GOOGLE_CONFIGURED) {
   passport.use(
     new GoogleStrategy(
       {
         clientID: process.env["GOOGLE_CLIENT_ID"]!,
         clientSecret: process.env["GOOGLE_CLIENT_SECRET"]!,
-        callbackURL: "/api/auth/google/callback",
-        proxy: true,
+        callbackURL,
         scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
       },
       async (
