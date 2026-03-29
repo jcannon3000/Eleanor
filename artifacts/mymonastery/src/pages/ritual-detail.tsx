@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
-import { Send, CheckCircle2, XCircle, ArrowLeft, MessageSquare, BookOpen, Settings, Sprout } from "lucide-react";
+import { Send, CheckCircle2, XCircle, ArrowLeft, MessageSquare, BookOpen, Settings, Sprout, Clock, Users } from "lucide-react";
 import { clsx } from "clsx";
 import {
   useGetRitual,
@@ -52,12 +52,33 @@ export default function RitualDetail() {
   const [editName, setEditName] = useState("");
   const [editIntention, setEditIntention] = useState("");
 
+  interface ScheduleResponse {
+    guestName: string;
+    chosenTime: string | null;
+    unavailable: boolean;
+  }
+  interface SchedulingData {
+    proposedTimes: string[];
+    confirmedTime: string | null;
+    scheduleToken: string | null;
+    responses: ScheduleResponse[];
+  }
+  const [schedulingData, setSchedulingData] = useState<SchedulingData | null>(null);
+
   useEffect(() => {
     if (ritual && !isEditing) {
       setEditName(ritual.name);
       setEditIntention(ritual.intention || "");
     }
   }, [ritual, isEditing]);
+
+  useEffect(() => {
+    if (!ritualId) return;
+    fetch(`/api/rituals/${ritualId}/schedule-responses`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setSchedulingData(data); })
+      .catch(() => {});
+  }, [ritualId]);
 
   useEffect(() => {
     if (activeTab === "eleanor") {
@@ -183,6 +204,81 @@ export default function RitualDetail() {
             </div>
           </div>
         </div>
+
+        {/* Scheduling Card — shown when confirmedTime is null and proposedTimes exist */}
+        {schedulingData && !schedulingData.confirmedTime && schedulingData.proposedTimes.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex-shrink-0">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock size={16} className="text-amber-700" />
+                <span className="text-sm font-semibold text-amber-800">Scheduling in progress</span>
+              </div>
+              <button
+                onClick={() => setLocation(`/ritual/${ritualId}/schedule`)}
+                className="text-xs px-3 py-1.5 bg-amber-800 text-amber-50 rounded-full font-medium hover:bg-amber-900 transition-colors"
+              >
+                Confirm time
+              </button>
+            </div>
+
+            <div className="space-y-2 mb-3">
+              {schedulingData.proposedTimes.map((t) => {
+                const responsesForTime = schedulingData.responses.filter((r) => r.chosenTime === t);
+                return (
+                  <div key={t} className="flex items-center gap-3">
+                    <span className="text-xs text-amber-700 w-48 shrink-0">
+                      {format(parseISO(t), "EEE, MMM d 'at' h:mm a")}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Users size={12} className="text-amber-600" />
+                      <span className="text-xs text-amber-700">
+                        {responsesForTime.length > 0
+                          ? responsesForTime.map((r) => r.guestName).join(", ")
+                          : "No responses yet"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {schedulingData.responses.filter((r) => r.unavailable).length > 0 && (
+              <p className="text-xs text-amber-700">
+                Unavailable: {schedulingData.responses.filter((r) => r.unavailable).map((r) => r.guestName).join(", ")}
+              </p>
+            )}
+
+            {schedulingData.scheduleToken && (
+              <div className="mt-3 pt-3 border-t border-amber-200">
+                <p className="text-xs text-amber-700">
+                  Guest link:{" "}
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/schedule/${schedulingData.scheduleToken}`;
+                      navigator.clipboard.writeText(url);
+                    }}
+                    className="underline hover:no-underline font-medium"
+                  >
+                    Copy invite link
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirmed time badge */}
+        {schedulingData?.confirmedTime && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6 flex-shrink-0 flex items-center gap-3">
+            <CheckCircle2 size={16} className="text-green-700" />
+            <div>
+              <span className="text-sm font-semibold text-green-800">Time confirmed: </span>
+              <span className="text-sm text-green-700">
+                {format(parseISO(schedulingData.confirmedTime), "EEEE, MMMM d 'at' h:mm a")}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="bg-card rounded-3xl shadow-[var(--shadow-warm-md)] border border-card-border flex-1 flex flex-col min-h-0 overflow-hidden">

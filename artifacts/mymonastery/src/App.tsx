@@ -8,6 +8,8 @@ import Onboarding from "./pages/onboarding";
 import Dashboard from "./pages/dashboard";
 import CreateRitual from "./pages/create";
 import RitualDetail from "./pages/ritual-detail";
+import RitualSchedule from "./pages/ritual-schedule";
+import GuestSchedule from "./pages/guest-schedule";
 import People from "./pages/people";
 import PersonProfile from "./pages/person";
 
@@ -26,7 +28,9 @@ function Router() {
       <Route path="/" component={Onboarding} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateRitual} />
+      <Route path="/ritual/:id/schedule" component={RitualSchedule} />
       <Route path="/ritual/:id" component={RitualDetail} />
+      <Route path="/schedule/:token" component={GuestSchedule} />
       <Route path="/people" component={People} />
       <Route path="/people/:email" component={PersonProfile} />
       <Route component={NotFound} />

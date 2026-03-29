@@ -241,7 +241,7 @@ export default function CreateRitual() {
         title: "Your ritual is taking root",
         description: "Eleanor will help it grow. Keep showing up.",
       });
-      setLocation(`/ritual/${ritual.id}`);
+      setLocation(`/ritual/${ritual.id}/schedule`);
     } catch {
       toast({
         variant: "destructive",

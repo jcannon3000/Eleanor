@@ -13,8 +13,8 @@ export const ritualsTable = pgTable("rituals", {
   intention: text("intention"),
   ownerId: integer("owner_id").notNull().references(() => usersTable.id),
   proposedTimes: jsonb("proposed_times").notNull().default([]),
-  confirmedTime: timestamp("confirmed_time", { withTimezone: true }),
-  schedulingToken: text("scheduling_token").notNull().unique(),
+  confirmedTime: text("confirmed_time"),
+  scheduleToken: text("schedule_token"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
