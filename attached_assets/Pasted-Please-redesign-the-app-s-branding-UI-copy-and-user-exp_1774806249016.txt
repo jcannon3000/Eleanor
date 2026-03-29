@@ -1,0 +1,239 @@
+Please redesign the app’s branding, UI copy, and user experience around a new core metaphor:
+
+The app is named Eleanor.
+Eleanor is a warm, intelligent personal assistant whose role is to help users cultivate community the way a gardener cultivates a garden. The app helps people plant rituals, tend them over time, and grow them into traditions.
+
+## Core brand idea
+This is not a productivity app or a generic scheduling app. It should feel like a gentle, beautiful, modern ritual assistant centered on:
+- cultivating community
+- planting recurring habits
+- tending relationships
+- growing traditions over time
+
+The emotional tone should be:
+- warm
+- calm
+- thoughtful
+- encouraging
+- grounded
+- human
+
+Avoid anything that feels:
+- corporate
+- gamified in a cheap way
+- overly cute or childish
+- productivity-hustle oriented
+
+Think:
+- elegant
+- minimal
+- slightly poetic
+- emotionally resonant
+- modern consumer app
+
+## Product concept
+Users create recurring social rituals with friends, such as:
+- weekly run club
+- monthly dinner
+- Saturday tennis
+- Sunday walk
+- coworking mornings
+
+Eleanor helps them:
+- set the intention
+- choose a cadence
+- coordinate schedules
+- confirm plans
+- keep the ritual going over time
+- track streaks in a way that feels like tending growth, not chasing points
+
+## Reframe the UX around gardening language
+Please update the interface language and experience using a gardening / cultivation metaphor, but do it with restraint and taste. Do not over-theme every single word. It should feel subtle and premium.
+
+Examples of vocabulary shifts:
+- Create group → Plant a Circle
+- Start habit / recurring event → Plant a Ritual
+- Progress → Growth
+- Streak → Bloom or Growth Streak
+- Reminder / nudge → Gentle nudge from Eleanor
+- Goal → What do you want to grow?
+- Community / group → Circle
+- Milestone → In Bloom
+- Activity history → Garden Journal or Growth Log
+- Dashboard / home → Your Garden
+- Setup flow → Planting a new ritual
+- Success state → This ritual is taking root
+- Missed week → Needs tending
+
+Use good judgment. Keep the language beautiful but clear. Do not make the app feel confusing.
+
+## UI/UX direction
+Redesign the interface so it feels like a modern app inspired by the idea of a personal garden for relationships and shared rituals.
+
+### Visual direction
+- clean, calm, premium mobile UI
+- soft organic feeling
+- rounded cards and gentle spacing
+- subtle natural visual cues
+- modern typography
+- restrained use of earthy / natural tones
+- avoid cheesy illustrations unless they are very elegant and minimal
+- light animations can suggest growth, blooming, or tending over time
+
+### Imagery / motifs
+Use subtle motifs like:
+- seeds
+- sprouts
+- growth rings
+- circles
+- sunlight
+- pathways
+- gardens
+- seasonal change
+
+Do not make it look like a children’s gardening app. It should still feel like a serious consumer product for adults.
+
+## Experience changes to implement
+
+### 1. Home screen
+Redesign the home screen as Your Garden.
+
+It should show:
+- active circles / rituals
+- upcoming plans
+- current growth / streaks
+- rituals that need tending
+- encouraging copy from Eleanor
+
+Example tone:
+- “Your Thursday Run Crew is taking root.”
+- “Your monthly dinner has bloomed for 3 months.”
+- “It’s a good week to tend your Sunday walk.”
+
+### 2. Create flow
+Redesign the “create group / recurring event” flow into a guided experience called Plant a Ritual.
+
+Flow should include:
+- What do you want to grow?
+- Choose the type of ritual (run, dinner, tennis, walk, etc.)
+- Who is in your circle?
+- How often should this happen?
+- Preferred days / times
+- Optional location
+- Short intention or note
+
+When completed, the confirmation should feel ceremonial and satisfying, like planting something meaningful.
+
+### 3. Circle detail page
+Each circle should feel like its own living thing.
+
+Show:
+- circle name
+- members
+- next gathering
+- cadence
+- current growth streak
+- attendance / follow-through
+- history of past gatherings
+- notes or memories from previous meetups
+
+Possible language:
+- “Planted 6 weeks ago”
+- “Blooming steadily”
+- “Needs tending this week”
+
+### 4. Streaks and progress
+Replace generic streak visuals with a more meaningful growth system.
+
+Ideas:
+- a ritual slowly sprouts and grows over time
+- milestones unlock visual stages of growth
+- progress is shown as something living and sustained
+- missed gatherings don’t feel punitive, but clearly show that care is needed
+
+This should preserve the motivational power of streaks while making it feel warm and relational.
+
+### 5. Notifications and assistant voice
+Eleanor should feel like a calm guide.
+
+Rewrite notifications and assistant copy in Eleanor’s voice:
+- gentle
+- encouraging
+- never pushy
+- slightly poetic but still practical
+
+Examples:
+- “Your Tuesday run is coming up. Ready to keep it growing?”
+- “It’s been a little while since your circle gathered.”
+- “This ritual is ready to bloom again.”
+
+### 6. Reflection / memory layer
+Add or redesign a lightweight reflection layer after each gathering.
+
+After a ritual, allow users to:
+- mark that they showed up
+- add a note or memory
+- optionally upload a photo
+- reflect on how it felt
+
+This should go into a Garden Journal or similar archive, reinforcing that the app is helping users cultivate a life, not just manage logistics.
+
+## Information architecture
+Please update the app structure and labels to fit the Eleanor concept.
+
+Suggested top-level structure:
+- Your Garden
+- Circles
+- Plant a Ritual
+- Journal
+- Profile / Settings
+
+## Copy system
+Please rewrite all major UI copy to match the brand:
+- onboarding
+- empty states
+- button labels
+- reminders
+- confirmation states
+- error states
+- progress language
+
+The copy should sound like Eleanor is helping the user cultivate something meaningful.
+
+## Onboarding
+Redesign onboarding around the question:
+“What do you want to grow with others?”
+
+Onboarding should communicate that Eleanor helps users turn intentions into traditions by making recurring gatherings easier to sustain.
+
+Core promise:
+- less friction
+- more follow-through
+- stronger rituals
+- deeper community over time
+
+## Technical/product request
+Please implement these changes in the current app by updating:
+1. visual design system
+2. navigation labels
+3. onboarding flow
+4. ritual creation flow
+5. home/dashboard
+6. circle detail screens
+7. streak/progress visualization
+8. notifications copy
+9. post-event reflection flow
+10. overall brand language
+
+## Deliverables
+Please:
+- update the existing UI to reflect this new brand
+- rewrite the UX copy throughout the product
+- suggest any additional UI components needed for the garden metaphor
+- keep the product intuitive and usable
+- prioritize a polished mobile-first experience
+
+Where appropriate, create placeholder visuals, icons, and microinteractions that support the metaphor of cultivating rituals and community over time.
+
+The end result should feel like:
+a beautiful, modern, emotionally intelligent app that helps people plant rituals and grow them into lasting traditions.

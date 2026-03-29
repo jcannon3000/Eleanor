@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth, useLogout } from "@/hooks/useAuth";
-import { LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, Sprout } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -14,14 +14,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className="absolute top-0 w-full z-10 p-6 md:p-8 flex justify-between items-center max-w-7xl mx-auto">
         <Link href="/dashboard" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 22 16 8" /><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-              <path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-              <path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-            </svg>
+            <Sprout size={20} strokeWidth={1.5} />
           </div>
           <span className="font-serif text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
-            MyMonastery
+            Eleanor
           </span>
         </Link>
 

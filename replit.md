@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. This is **MyMonastery** — an AI-powered community coordination platform for recurring social rituals.
+pnpm workspace monorepo using TypeScript. This is **Eleanor** — a warm, AI-powered ritual assistant that helps people cultivate community through recurring social gatherings. Garden/cultivation metaphor throughout the UI. Previously named MyMonastery.
 
 ## Stack
 

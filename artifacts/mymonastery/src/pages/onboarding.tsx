@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sprout } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function Onboarding() {
@@ -19,11 +19,9 @@ export default function Onboarding() {
   const handleGoogleSignIn = () => {
     const url = `${window.location.origin}/api/auth/google`;
     try {
-      // Try to break out of any iframe (works in same-origin iframes)
       const target = window.top ?? window;
       target.location.href = url;
     } catch {
-      // Cross-origin iframe (e.g. Replit preview) — open in a new tab instead
       window.open(url, "_blank");
     }
   };
@@ -38,16 +36,18 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      {/* Subtle organic background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/4 blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-accent/5 blur-3xl" />
+      </div>
+
       <header className="absolute top-0 w-full z-10 p-6 md:p-8 flex items-center max-w-7xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 22 16 8" /><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-              <path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-              <path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z" />
-            </svg>
+            <Sprout size={20} strokeWidth={1.5} />
           </div>
-          <span className="font-serif text-xl tracking-tight text-foreground">MyMonastery</span>
+          <span className="font-serif text-xl tracking-tight text-foreground">Eleanor</span>
         </div>
       </header>
 
@@ -59,25 +59,25 @@ export default function Onboarding() {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="flex-1 text-center md:text-left"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-6">
-              <Sparkles size={14} />
-              <span>Welcome to the village</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 text-primary text-sm font-medium mb-6 border border-primary/15">
+              <Sprout size={13} />
+              <span>A garden for your community</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-serif text-foreground leading-tight mb-6">
-              Maintain your most <br />
-              <span className="text-primary italic">sacred rituals</span>.
+              Grow what matters,{" "}
+              <span className="text-primary italic">together</span>.
             </h1>
 
             <p className="text-lg text-muted-foreground mb-10 max-w-md mx-auto md:mx-0 leading-relaxed">
-              MyMonastery helps you hold space for the people who matter. An AI coordinator
-              manages scheduling, reminders, and streak tracking — so you can focus on the
-              connection.
+              Eleanor helps you turn recurring intentions into lasting traditions —
+              less friction, more follow-through, and gentle nudges that keep your
+              rituals in bloom.
             </p>
 
             {authError && (
               <div className="mb-6 px-4 py-3 rounded-xl bg-destructive/10 text-destructive text-sm border border-destructive/20">
-                Sign-in failed. Please try again.
+                Something went wrong with sign-in. Please try again.
               </div>
             )}
 
@@ -97,8 +97,7 @@ export default function Onboarding() {
             </button>
 
             <p className="mt-4 text-xs text-muted-foreground max-w-sm mx-auto md:mx-0">
-              We request Google Calendar access so the AI coordinator can add ritual meetups
-              to your calendar automatically.
+              Eleanor asks for Google Calendar access so your circles always have a home in your schedule.
             </p>
           </motion.div>
 
@@ -112,10 +111,28 @@ export default function Onboarding() {
               <div className="absolute inset-0 bg-primary/5 mix-blend-multiply pointer-events-none z-10" />
               <img
                 src={`${import.meta.env.BASE_URL}images/onboarding-hero.png`}
-                alt="Abstract connection art"
+                alt="Abstract growth art"
                 className="w-full h-full object-cover"
               />
             </div>
+
+            {/* Floating cards */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8, duration: 0.5 }}
+              className="mt-6 flex gap-3"
+            >
+              {[
+                { label: "Thursday Run Crew", status: "Blooming", weeks: "8 weeks growing" },
+                { label: "Monthly Dinner", status: "Needs tending", weeks: "Just planted" },
+              ].map((c, i) => (
+                <div key={i} className="flex-1 bg-card rounded-2xl px-4 py-3 border border-card-border shadow-[var(--shadow-warm-sm)]">
+                  <p className="font-serif text-sm text-foreground mb-1">{c.label}</p>
+                  <p className="text-xs text-muted-foreground">{c.weeks}</p>
+                </div>
+              ))}
+            </motion.div>
           </motion.div>
         </div>
       </main>
