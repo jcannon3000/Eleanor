@@ -11,7 +11,6 @@ const STEPS = [
   { id: 1, title: "Name" },
   { id: 2, title: "Circle" },
   { id: 3, title: "Rhythm" },
-  { id: 4, title: "Intention" },
 ];
 
 interface ContactSuggestion {
@@ -186,7 +185,6 @@ export default function CreateRitual() {
   const [participants, setParticipants] = useState([{ name: "", email: "" }]);
   const [frequency, setFrequency] = useState<CreateRitualBodyFrequency>("weekly");
   const [dayPreference, setDayPreference] = useState("");
-  const [intention, setIntention] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -232,7 +230,6 @@ export default function CreateRitual() {
           frequency,
           dayPreference: dayPreference.trim(),
           participants: validParticipants,
-          intention: intention.trim() || undefined,
           ownerId: user.id
         }
       });
@@ -242,11 +239,12 @@ export default function CreateRitual() {
         description: "Eleanor will help it grow. Keep showing up.",
       });
       setLocation(`/ritual/${ritual.id}/schedule`);
-    } catch {
+    } catch (err) {
+      console.error("Ritual creation failed:", err);
       toast({
         variant: "destructive",
         title: "Something didn't take root",
-        description: "Please check your details and try again.",
+        description: err instanceof Error ? err.message : "Please check your details and try again.",
       });
     }
   };
@@ -385,24 +383,6 @@ export default function CreateRitual() {
                       />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {step === 4 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-3xl font-serif mb-2">Set your intention</h2>
-                    <p className="text-muted-foreground">
-                      What do you hope to grow through this gathering? Eleanor will keep this in mind.{" "}
-                      <span className="opacity-60">(Optional)</span>
-                    </p>
-                  </div>
-                  <textarea
-                    value={intention}
-                    onChange={e => setIntention(e.target.value)}
-                    placeholder="e.g. Staying close after college, building a creative practice together, simply showing up for each other..."
-                    className="w-full px-4 py-4 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all resize-none h-36"
-                  />
                 </div>
               )}
 
