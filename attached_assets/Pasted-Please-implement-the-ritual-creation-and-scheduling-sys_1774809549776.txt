@@ -1,0 +1,241 @@
+Please implement the ritual creation and scheduling system for the app Eleanor, ensuring all product behavior, UI, and copy align with the core brand narrative:
+
+Eleanor is a personal assistant that helps people cultivate connection by turning one-time gatherings into lasting traditions.
+
+The product should feel:
+- warm, calm, and human  
+- gently guiding, not forceful  
+- elegant and minimal  
+- focused on relationships, not productivity  
+
+---
+
+# 🌿 Core Concept
+
+Users “plant” rituals with others (runs, dinners, tennis, etc.), and Eleanor helps those rituals take root and become recurring traditions.
+
+The most important moment is the first gathering—this is when a ritual begins to feel real.
+
+---
+
+# 🌱 Ritual Creation + First Gathering Flow
+
+## 1. Plant a Ritual
+
+User inputs:
+- ritual name (e.g., “Tuesday Run Crew”)  
+- activity type  
+- invited people (email-based)  
+- cadence (weekly, monthly, etc.)  
+- general preferences (time of day, days of week)  
+- optional location or “virtual”  
+
+Language should feel like:
+- “What would you like to grow together?”
+- “Who is in your circle?”
+- “How often should this ritual happen?”
+
+---
+
+## 2. Eleanor Suggests the First Gathering
+
+After the ritual is created, Eleanor should:
+
+- access the organizer’s connected Google Calendar  
+- analyze availability and preferences  
+- generate:
+  - 1 primary suggested time
+  - 2 alternate options
+
+Example:
+- Primary: Tuesday at 7:00 AM  
+- Option 2: Wednesday at 7:30 AM  
+- Option 3: Thursday at 6:45 PM  
+
+UI copy example:
+- “Here’s a good time to help this ritual take root.”
+- “You can offer a couple of alternatives in case your circle needs them.”
+
+The organizer selects:
+- one primary time  
+- two backup options  
+
+---
+
+# 🌿 Invitation System
+
+## 3. Send Calendar Invite
+
+Eleanor sends a calendar invite to all participants via email.
+
+The invite includes:
+- ritual name  
+- primary proposed time  
+- tone-aligned description  
+- optional location or Zoom link  
+- a unique ritual link for adjusting the time
+
+Example copy inside invite:
+“You’ve been invited to join a new ritual.  
+If this time doesn’t work, you can help find one that does here: [link]”
+
+---
+
+# 🌼 Guest Scheduling Experience (No Login Required)
+
+## 4. Ritual Link Behavior
+
+When a guest clicks the link:
+
+- they land on a lightweight ritual page
+- no login required
+- the experience should feel like a simple, beautiful “garden view” of this ritual
+
+The page shows:
+- ritual name  
+- organizer  
+- proposed first time  
+- alternate options  
+- simple response controls  
+
+---
+
+## 5. Guest Actions
+
+Guests can:
+- accept the main time  
+- choose one of the alternate times  
+- indicate unavailable  
+- optionally choose from a few additional valid times  
+
+IMPORTANT:
+- All additional times must be pre-filtered to match the organizer’s actual availability  
+- Do NOT allow completely open-ended scheduling  
+
+UI tone:
+- “Does this time work for you?”
+- “If not, choose another time that helps this take root.”
+
+---
+
+# 🔒 Calendar & Scheduling Logic (CRITICAL)
+
+## 6. No Direct Calendar Editing
+
+Guests must NEVER directly modify the organizer’s Google Calendar.
+
+Instead:
+
+1. Guest responses are stored inside Eleanor  
+2. Eleanor aggregates all responses  
+3. Eleanor determines the best valid time  
+
+Then:
+
+4. Eleanor updates the calendar event ONCE  
+5. Eleanor sends updated invites if needed  
+
+This ensures:
+- trust  
+- clean calendar behavior  
+- no conflicts  
+
+---
+
+## 7. Time Finalization Logic
+
+Eleanor should finalize a time when:
+- the organizer confirms a selected option  
+OR  
+- a clear majority aligns on a time  
+
+Optional:
+- Eleanor can suggest:  
+  “This time works best for your circle. Would you like to confirm it?”
+
+---
+
+# 🌷 Ritual Page / Circle Page
+
+Once created, each ritual should have a persistent page that includes:
+
+- circle members  
+- cadence  
+- next gathering  
+- current “growth” (streak)  
+- past gatherings  
+
+Language examples:
+- “Planted 2 weeks ago”
+- “This ritual is taking root”
+- “Ready to gather again”
+
+---
+
+# 🌞 Tone & Copy Guidelines
+
+All product language should:
+- reflect cultivation and growth  
+- feel human and emotionally intelligent  
+- avoid corporate or productivity-heavy phrasing  
+
+Examples:
+- “Let’s find a time that works for everyone.”
+- “This is how traditions begin.”
+- “Your circle is finding its rhythm.”
+
+---
+
+# 📱 UX Principles
+
+The experience should feel:
+- effortless  
+- social  
+- calm  
+- intentional  
+
+Avoid:
+- cluttered scheduling interfaces  
+- excessive steps  
+- generic calendar UX  
+
+Prioritize:
+- one-tap confirmations  
+- minimal friction  
+- mobile-first design  
+
+---
+
+# ⚙️ Technical Requirements
+
+Please implement:
+
+1. Google Calendar integration (organizer only)  
+2. availability-based time suggestion system  
+3. primary + alternate time generation  
+4. calendar invite sending system  
+5. unique ritual scheduling links  
+6. no-login guest response page  
+7. response aggregation logic  
+8. controlled calendar update system  
+9. mobile-friendly UI  
+
+---
+
+# 🌿 Desired Outcome
+
+The final experience should feel like:
+
+A user plants a ritual.  
+Eleanor suggests the first time it could happen.  
+The user sends it to their circle instantly.  
+Friends can respond easily without friction.  
+The first gathering gets scheduled smoothly.  
+The ritual begins to take root—and can grow into a tradition.
+
+---
+
+This should not feel like a scheduling tool.
+
+It should feel like:
+a system that helps relationships grow through consistent, shared time.
