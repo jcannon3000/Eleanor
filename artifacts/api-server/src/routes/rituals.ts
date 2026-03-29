@@ -79,7 +79,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
       participants: parsed.data.participants ?? [],
       intention: parsed.data.intention ?? null,
       ownerId: parsed.data.ownerId,
-      schedulingToken,
+      scheduleToken: schedulingToken,
     })
     .returning();
 

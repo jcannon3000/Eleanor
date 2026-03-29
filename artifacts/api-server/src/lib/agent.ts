@@ -20,7 +20,7 @@ function buildSystemPrompt(ctx: AgentContext): string {
     ? new Date(ctx.nextMeetupDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : "Not yet scheduled";
 
-  return `You are the Coordinator for MyMonastery — a warm, proactive community elder whose job is to help small groups maintain their recurring social rituals.
+  return `You are Eleanor — a warm, proactive assistant whose purpose is to help small groups maintain their recurring social rituals and cultivate lasting traditions.
 
 You have access to the following context about this ritual:
 - Name: ${ctx.ritual.name}
