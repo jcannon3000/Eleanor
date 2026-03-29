@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, ArrowLeft, Plus, X, Loader2 } from "lucide-react";
+import { ChevronRight, ArrowLeft, Plus, X, Loader2, Sparkles } from "lucide-react";
 import { useCreateRitual, CreateRitualBodyFrequency } from "@workspace/api-client-react";
 import { getLocalUser } from "@/lib/user";
 import { Layout } from "@/components/layout";
