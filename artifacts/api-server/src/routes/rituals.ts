@@ -23,6 +23,7 @@ import {
 } from "@workspace/api-zod";
 import { computeStreak } from "../lib/streak";
 import { getWelcomeMessage, getCoordinatorResponse } from "../lib/agent";
+import { deriveStartDate } from "../lib/scheduleDate";
 
 const router: IRouter = Router();
 
@@ -96,6 +97,32 @@ router.post("/rituals", async (req, res): Promise<void> => {
     });
   } catch (err) {
     req.log.warn({ err }, "Failed to generate welcome message");
+  }
+
+  // Fire-and-forget: create a recurring Google Calendar event with all participants as attendees.
+  // Always use the authenticated session user's ID for calendar access — never trust client-supplied ownerId.
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (sessionUserId && sessionUserId === ritual.ownerId) {
+    const participantEmails = (parsed.data.participants ?? [])
+      .map(p => p.email)
+      .filter(Boolean);
+
+    const recurrenceRule = parsed.data.frequency === "weekly"
+      ? ["RRULE:FREQ=WEEKLY"]
+      : parsed.data.frequency === "biweekly"
+      ? ["RRULE:FREQ=WEEKLY;INTERVAL=2"]
+      : ["RRULE:FREQ=MONTHLY"];
+
+    // Derive start date from dayPreference (e.g. "Thursday evenings", "Tuesdays at 7pm")
+    const startDate = deriveStartDate(parsed.data.dayPreference ?? "", parsed.data.frequency);
+
+    createCalendarEvent(sessionUserId, {
+      summary: ritual.name,
+      description: ritual.intention ?? `Recurring ritual: ${ritual.name}`,
+      startDate,
+      attendees: participantEmails,
+      recurrence: recurrenceRule,
+    }).catch(err => req.log.warn({ err }, "Failed to create ritual calendar event"));
   }
 
   res.status(201).json(ListRitualsResponse.element.parse(enriched));

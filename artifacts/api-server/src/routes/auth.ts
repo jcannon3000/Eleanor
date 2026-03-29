@@ -21,7 +21,7 @@ if (GOOGLE_CONFIGURED) {
         clientID: process.env["GOOGLE_CLIENT_ID"]!,
         clientSecret: process.env["GOOGLE_CLIENT_SECRET"]!,
         callbackURL,
-        scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
+        scope: ["profile", "email", "https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/contacts.readonly"],
       },
       async (
         accessToken: string,

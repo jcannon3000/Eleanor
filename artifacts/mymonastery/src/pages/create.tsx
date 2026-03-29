@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft, Plus, X, Loader2, Sprout } from "lucide-react";
@@ -13,6 +13,167 @@ const STEPS = [
   { id: 3, title: "Rhythm" },
   { id: 4, title: "Intention" },
 ];
+
+interface ContactSuggestion {
+  name: string;
+  email: string;
+}
+
+function useContactSearch(query: string) {
+  const [suggestions, setSuggestions] = useState<ContactSuggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (!query || query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    timerRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(query)}`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data);
+        } else {
+          setSuggestions([]);
+        }
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [query]);
+
+  return { suggestions, isLoading, clearSuggestions: () => setSuggestions([]) };
+}
+
+interface ParticipantRowProps {
+  participant: { name: string; email: string };
+  index: number;
+  showRemove: boolean;
+  onUpdate: (index: number, field: "name" | "email", value: string) => void;
+  onRemove: (index: number) => void;
+  onSelect: (index: number, contact: ContactSuggestion) => void;
+}
+
+function ParticipantRow({ participant, index, showRemove, onUpdate, onRemove, onSelect }: ParticipantRowProps) {
+  const [activeField, setActiveField] = useState<"name" | "email" | null>(null);
+  const [justSelected, setJustSelected] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const searchQuery = activeField === "name"
+    ? participant.name
+    : activeField === "email"
+    ? participant.email
+    : "";
+
+  const { suggestions, isLoading, clearSuggestions } = useContactSearch(justSelected ? "" : searchQuery);
+
+  const handleSelect = useCallback((contact: ContactSuggestion) => {
+    setJustSelected(true);
+    setActiveField(null);
+    clearSuggestions();
+    onSelect(index, contact);
+    setTimeout(() => setJustSelected(false), 500);
+  }, [index, onSelect, clearSuggestions]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActiveField(null);
+        clearSuggestions();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [clearSuggestions]);
+
+  const showDropdown = suggestions.length > 0 || isLoading;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={participant.name}
+            onChange={e => {
+              setJustSelected(false);
+              onUpdate(index, "name", e.target.value);
+            }}
+            onFocus={() => setActiveField("name")}
+            placeholder="Name"
+            autoComplete="off"
+            className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+          />
+        </div>
+        <div className="relative flex-[1.5]">
+          <input
+            type="email"
+            value={participant.email}
+            onChange={e => {
+              setJustSelected(false);
+              onUpdate(index, "email", e.target.value);
+            }}
+            onFocus={() => setActiveField("email")}
+            placeholder="Email"
+            autoComplete="off"
+            className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+          />
+        </div>
+        {showRemove && (
+          <button
+            onClick={() => onRemove(index)}
+            className="p-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
+
+      {showDropdown && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+          {isLoading ? (
+            <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+              <Loader2 size={14} className="animate-spin" />
+              Searching contacts...
+            </div>
+          ) : (
+            <ul>
+              {suggestions.map((contact, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      handleSelect(contact);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-secondary transition-colors flex flex-col gap-0.5"
+                  >
+                    <span className="text-sm font-medium">{contact.name}</span>
+                    <span className="text-xs text-muted-foreground">{contact.email}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CreateRitual() {
   const [, setLocation] = useLocation();
@@ -43,9 +204,15 @@ export default function CreateRitual() {
     setParticipants(participants.filter((_, i) => i !== index));
   };
 
-  const updateParticipant = (index: number, field: 'name' | 'email', value: string) => {
+  const updateParticipant = (index: number, field: "name" | "email", value: string) => {
     const newP = [...participants];
     newP[index][field] = value;
+    setParticipants(newP);
+  };
+
+  const selectContact = (index: number, contact: ContactSuggestion) => {
+    const newP = [...participants];
+    newP[index] = { name: contact.name, email: contact.email };
     setParticipants(newP);
   };
 
@@ -119,7 +286,7 @@ export default function CreateRitual() {
         </div>
 
         {/* Form Content */}
-        <div className="bg-card rounded-[2rem] p-8 md:p-12 shadow-[var(--shadow-warm-lg)] border border-card-border min-h-[420px] flex flex-col relative overflow-hidden">
+        <div className="bg-card rounded-[2rem] p-8 md:p-12 shadow-[var(--shadow-warm-lg)] border border-card-border min-h-[420px] flex flex-col relative overflow-visible">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -157,30 +324,15 @@ export default function CreateRitual() {
 
                   <div className="space-y-4">
                     {participants.map((p, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <input
-                          type="text"
-                          value={p.name}
-                          onChange={e => updateParticipant(i, 'name', e.target.value)}
-                          placeholder="Name"
-                          className="flex-1 px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-                        />
-                        <input
-                          type="email"
-                          value={p.email}
-                          onChange={e => updateParticipant(i, 'email', e.target.value)}
-                          placeholder="Email"
-                          className="flex-[1.5] px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-                        />
-                        {participants.length > 1 && (
-                          <button
-                            onClick={() => removeParticipant(i)}
-                            className="p-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-                          >
-                            <X size={20} />
-                          </button>
-                        )}
-                      </div>
+                      <ParticipantRow
+                        key={i}
+                        participant={p}
+                        index={i}
+                        showRemove={participants.length > 1}
+                        onUpdate={updateParticipant}
+                        onRemove={removeParticipant}
+                        onSelect={selectContact}
+                      />
                     ))}
                   </div>
 
@@ -206,14 +358,14 @@ export default function CreateRitual() {
                     <div>
                       <label className="block text-sm font-medium mb-3 text-foreground">Cadence</label>
                       <div className="grid grid-cols-3 gap-3">
-                        {(['weekly', 'biweekly', 'monthly'] as CreateRitualBodyFrequency[]).map(freq => (
+                        {(["weekly", "biweekly", "monthly"] as CreateRitualBodyFrequency[]).map(freq => (
                           <button
                             key={freq}
                             onClick={() => setFrequency(freq)}
                             className={`py-3 px-4 rounded-xl border font-medium capitalize transition-all ${
                               frequency === freq
-                                ? 'bg-primary border-primary text-primary-foreground shadow-md'
-                                : 'bg-background border-border text-foreground hover:border-primary/50'
+                                ? "bg-primary border-primary text-primary-foreground shadow-md"
+                                : "bg-background border-border text-foreground hover:border-primary/50"
                             }`}
                           >
                             {freq}

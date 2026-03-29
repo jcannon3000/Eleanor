@@ -35,7 +35,14 @@ async function getAuthedClient(userId: number) {
 
 export async function createCalendarEvent(
   userId: number,
-  opts: { summary: string; description?: string; startDate: Date; endDate?: Date }
+  opts: {
+    summary: string;
+    description?: string;
+    startDate: Date;
+    endDate?: Date;
+    attendees?: string[];
+    recurrence?: string[];
+  }
 ): Promise<string | null> {
   const auth = await getAuthedClient(userId);
   if (!auth) return null;
@@ -44,14 +51,19 @@ export async function createCalendarEvent(
   const start = opts.startDate;
   const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
 
+  const attendeeList = opts.attendees?.map(email => ({ email })) ?? [];
+
   try {
     const event = await calendar.events.insert({
       calendarId: "primary",
+      sendUpdates: attendeeList.length > 0 ? "all" : "none",
       requestBody: {
         summary: opts.summary,
         description: opts.description,
         start: { dateTime: start.toISOString(), timeZone: "UTC" },
         end: { dateTime: end.toISOString(), timeZone: "UTC" },
+        attendees: attendeeList.length > 0 ? attendeeList : undefined,
+        recurrence: opts.recurrence,
         reminders: { useDefault: true },
       },
     });
@@ -71,5 +83,37 @@ export async function deleteCalendarEvent(userId: number, eventId: string): Prom
     await calendar.events.delete({ calendarId: "primary", eventId });
   } catch (err) {
     console.error("Calendar event delete failed:", err);
+  }
+}
+
+export async function searchContacts(userId: number, query: string): Promise<Array<{ name: string; email: string }>> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return [];
+
+  const people = google.people({ version: "v1", auth });
+
+  try {
+    const res = await people.people.searchContacts({
+      query,
+      readMask: "names,emailAddresses",
+      pageSize: 10,
+    });
+
+    const results: Array<{ name: string; email: string }> = [];
+    for (const person of res.data.results ?? []) {
+      const p = person.person;
+      if (!p) continue;
+      const name = p.names?.[0]?.displayName ?? "";
+      for (const emailObj of p.emailAddresses ?? []) {
+        const email = emailObj.value ?? "";
+        if (email) {
+          results.push({ name, email });
+        }
+      }
+    }
+    return results;
+  } catch (err) {
+    console.error("Contacts search failed:", err);
+    return [];
   }
 }
