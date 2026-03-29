@@ -17,7 +17,9 @@ export default function Onboarding() {
   }, [user, isLoading, setLocation]);
 
   const handleGoogleSignIn = () => {
-    window.location.href = "/api/auth/google";
+    // Break out of the Replit preview iframe so Google OAuth isn't blocked
+    const target = window.top ?? window;
+    target.location.href = `${window.location.origin}/api/auth/google`;
   };
 
   if (isLoading) {

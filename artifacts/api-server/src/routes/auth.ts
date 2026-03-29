@@ -101,8 +101,11 @@ router.get(
     if (!GOOGLE_CONFIGURED) { res.redirect("/?error=auth_failed"); return; }
     passport.authenticate("google", { failureRedirect: "/?error=auth_failed" })(req, res, next);
   },
-  (_req, res) => {
-    res.redirect("/dashboard");
+  (req, res) => {
+    // Explicitly save session before redirect to avoid race condition
+    req.session.save(() => {
+      res.redirect("/dashboard");
+    });
   }
 );
 
