@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MyMonastery"
+version = "1.0.0"
+id = "artifacts/mymonastery"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23896
+
+[services.development]
+run = "pnpm --filter @workspace/mymonastery run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mymonastery", "run", "build" ]
+publicDir = "artifacts/mymonastery/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23896"
+BASE_PATH = "/"

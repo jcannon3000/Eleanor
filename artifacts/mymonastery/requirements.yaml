@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "For premium page transitions, stagger effects, and smooth multi-step form animations"
+  "date-fns": "For elegant, human-readable date formatting (e.g., 'Next Thursday')"
+  "lucide-react": "For crisp, modern icons that match the minimal aesthetic"
+  "clsx": "For conditional class names"
+  "tailwind-merge": "For merging tailwind classes safely"
+
+images:
+  - path: "artifacts/mymonastery/public/images/onboarding-hero.png"
+    description: "Abstract minimal art representing connection, community, and gathering. Intersecting soft natural shapes in deep forest green and soft terracotta, on a warm cream off-white background. Calming, retreat center aesthetic."
+    aspect_ratio: "16:9"
+  - path: "artifacts/mymonastery/public/images/empty-village.png"
+    description: "Warm, minimalist illustration of an empty cozy village or tea table setup. Soft earth tones, clean organic lines, plenty of negative space. Grounded, intentional, and inviting."
+    aspect_ratio: "1:1"
+
+notes:
+  - Assuming Orval generated API hooks are available at @workspace/api-client-react
+  - wouter is used for routing
+  - We use standard shadcn UI component structures available in the workspace

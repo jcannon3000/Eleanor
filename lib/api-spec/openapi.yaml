@@ -1,15 +1,22 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MyMonastery API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User operations
+  - name: rituals
+    description: Ritual operations
+  - name: meetups
+    description: Meetup operations
+  - name: messages
+    description: Message operations
 paths:
   /healthz:
     get:
@@ -24,6 +31,220 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+    put:
+      operationId: upsertUser
+      tags: [users]
+      summary: Create or update user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertUserBody"
+      responses:
+        "200":
+          description: User upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /rituals:
+    get:
+      operationId: listRituals
+      tags: [rituals]
+      summary: List all rituals
+      responses:
+        "200":
+          description: List of rituals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ritual"
+    post:
+      operationId: createRitual
+      tags: [rituals]
+      summary: Create a ritual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRitualBody"
+      responses:
+        "201":
+          description: Ritual created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ritual"
+
+  /rituals/{id}:
+    get:
+      operationId: getRitual
+      tags: [rituals]
+      summary: Get a ritual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ritual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RitualDetail"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRitual
+      tags: [rituals]
+      summary: Update a ritual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRitualBody"
+      responses:
+        "200":
+          description: Updated ritual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ritual"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteRitual
+      tags: [rituals]
+      summary: Delete a ritual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /rituals/{id}/meetups:
+    get:
+      operationId: listMeetups
+      tags: [meetups]
+      summary: Get meetup history for a ritual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of meetups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meetup"
+    post:
+      operationId: logMeetup
+      tags: [meetups]
+      summary: Log a meetup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogMeetupBody"
+      responses:
+        "201":
+          description: Meetup logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meetup"
+
+  /rituals/{id}/messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Get chat messages for a ritual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  /rituals/{id}/chat:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message to the AI coordinator
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +255,215 @@ components:
       required:
         - status
 
+    Participant:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+      required:
+        - name
+        - email
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - createdAt
+
+    UpsertUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+      required:
+        - name
+        - email
+
+    Ritual:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly]
+        dayPreference:
+          type: ["string", "null"]
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+        intention:
+          type: ["string", "null"]
+        ownerId:
+          type: integer
+        streak:
+          type: integer
+        lastMeetupDate:
+          type: ["string", "null"]
+        nextMeetupDate:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [on_track, overdue, needs_scheduling]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - frequency
+        - participants
+        - ownerId
+        - streak
+        - status
+        - createdAt
+
+    RitualDetail:
+      allOf:
+        - $ref: "#/components/schemas/Ritual"
+        - type: object
+          properties:
+            meetups:
+              type: array
+              items:
+                $ref: "#/components/schemas/Meetup"
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/Message"
+
+    CreateRitualBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly]
+        dayPreference:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+        intention:
+          type: string
+        ownerId:
+          type: integer
+      required:
+        - name
+        - frequency
+        - participants
+        - ownerId
+
+    UpdateRitualBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        frequency:
+          type: string
+          enum: [weekly, biweekly, monthly]
+        dayPreference:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+        intention:
+          type: string
+
+    Meetup:
+      type: object
+      properties:
+        id:
+          type: integer
+        ritualId:
+          type: integer
+        scheduledDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [planned, completed, skipped]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - ritualId
+        - scheduledDate
+        - status
+        - createdAt
+
+    LogMeetupBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [completed, skipped]
+        notes:
+          type: string
+        scheduledDate:
+          type: string
+          format: date-time
+      required:
+        - status
+        - scheduledDate
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        ritualId:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - ritualId
+        - role
+        - content
+        - createdAt
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
