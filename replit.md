@@ -60,7 +60,7 @@ artifacts-monorepo/
 GET  /api/users/me?email=... — get user by email
 PUT  /api/users/me          — upsert user
 
-GET    /api/rituals          — list all rituals (enriched with streak/status)
+GET    /api/rituals          — list rituals; filter by owner with ?ownerId=N (enriched with streak/status)
 POST   /api/rituals          — create ritual (sends AI welcome message)
 GET    /api/rituals/:id      — ritual detail (includes meetups + messages)
 PUT    /api/rituals/:id      — update ritual
@@ -81,7 +81,7 @@ Two example rituals exist in the database:
 
 ## Development
 
-- Run codegen after spec changes: `pnpm --filter @workspace/api-spec run codegen`
+- Run codegen after spec changes: `cd lib/api-spec && npx orval --config orval.config.ts`
 - Push DB schema: `pnpm --filter @workspace/db run push`
 - API server: auto-started via workflow
 - Frontend: auto-started via workflow at port 23896 / previewPath "/"

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable } from "@workspace/db";
 import {
   CreateRitualBody,
@@ -38,7 +38,15 @@ async function enrichRitual(ritual: typeof ritualsTable.$inferSelect, meetups: t
 }
 
 router.get("/rituals", async (req, res): Promise<void> => {
-  const rituals = await db.select().from(ritualsTable).orderBy(desc(ritualsTable.createdAt));
+  const rawOwnerId = req.query.ownerId;
+  const ownerId = rawOwnerId !== undefined ? parseInt(String(rawOwnerId), 10) : null;
+  
+  const rituals = await db
+    .select()
+    .from(ritualsTable)
+    .where(ownerId !== null && !isNaN(ownerId) ? eq(ritualsTable.ownerId, ownerId) : undefined)
+    .orderBy(desc(ritualsTable.createdAt));
+    
   const enriched = await Promise.all(
     rituals.map(async (r) => {
       const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, r.id));

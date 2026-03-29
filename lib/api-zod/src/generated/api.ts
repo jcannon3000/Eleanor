@@ -41,8 +41,12 @@ export const UpsertUserResponse = zod.object({
 });
 
 /**
- * @summary List all rituals
+ * @summary List rituals, optionally filtered by owner
  */
+export const ListRitualsQueryParams = zod.object({
+  ownerId: zod.coerce.number().optional(),
+});
+
 export const ListRitualsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),

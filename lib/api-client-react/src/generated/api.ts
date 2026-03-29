@@ -19,6 +19,7 @@ import type {
 import type {
   CreateRitualBody,
   HealthStatus,
+  ListRitualsParams,
   LogMeetupBody,
   Meetup,
   Message,
@@ -267,41 +268,59 @@ export const useUpsertUser = <
 };
 
 /**
- * @summary List all rituals
+ * @summary List rituals, optionally filtered by owner
  */
-export const getListRitualsUrl = () => {
-  return `/api/rituals`;
+export const getListRitualsUrl = (params?: ListRitualsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/rituals?${stringifiedParams}`
+    : `/api/rituals`;
 };
 
-export const listRituals = async (options?: RequestInit): Promise<Ritual[]> => {
-  return customFetch<Ritual[]>(getListRitualsUrl(), {
+export const listRituals = async (
+  params?: ListRitualsParams,
+  options?: RequestInit,
+): Promise<Ritual[]> => {
+  return customFetch<Ritual[]>(getListRitualsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListRitualsQueryKey = () => {
-  return [`/api/rituals`] as const;
+export const getListRitualsQueryKey = (params?: ListRitualsParams) => {
+  return [`/api/rituals`, ...(params ? [params] : [])] as const;
 };
 
 export const getListRitualsQueryOptions = <
   TData = Awaited<ReturnType<typeof listRituals>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listRituals>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListRitualsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRituals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListRitualsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListRitualsQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listRituals>>> = ({
     signal,
-  }) => listRituals({ signal, ...requestOptions });
+  }) => listRituals(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listRituals>>,
@@ -316,21 +335,24 @@ export type ListRitualsQueryResult = NonNullable<
 export type ListRitualsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List all rituals
+ * @summary List rituals, optionally filtered by owner
  */
 
 export function useListRituals<
   TData = Awaited<ReturnType<typeof listRituals>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listRituals>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListRitualsQueryOptions(options);
+>(
+  params?: ListRitualsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRituals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRitualsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

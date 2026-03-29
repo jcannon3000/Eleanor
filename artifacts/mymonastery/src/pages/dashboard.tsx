@@ -10,7 +10,7 @@ import { RitualCard } from "@/components/RitualCard";
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const user = getLocalUser();
-  const { data: rituals, isLoading } = useListRituals();
+  const { data: rituals, isLoading } = useListRituals({ ownerId: user?.id });
 
   useEffect(() => {
     if (!user) {

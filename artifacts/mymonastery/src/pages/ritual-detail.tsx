@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { format, parseISO } from "date-fns";
 import { Send, CheckCircle2, XCircle, ArrowLeft, MoreVertical, Coffee, MessageSquare, History, Settings } from "lucide-react";
 import { clsx } from "clsx";
@@ -14,15 +14,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useToast } from "@/hooks/use-toast";
+import { getLocalUser } from "@/lib/user";
 
 type Tab = "coordinate" | "history" | "settings";
 
 export default function RitualDetail() {
   const [, params] = useRoute("/ritual/:id");
+  const [, setLocation] = useLocation();
   const ritualId = parseInt(params?.id || "0", 10);
   const { data: ritual, isLoading } = useGetRitual(ritualId);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const user = getLocalUser();
+
+  useEffect(() => {
+    if (!user) setLocation("/");
+  }, [user, setLocation]);
 
   const logMutation = useLogMeetup();
   const deleteMutation = useDeleteRitual();
@@ -74,8 +81,9 @@ export default function RitualDetail() {
         }
       });
       toast({ title: `Meetup ${status}`, description: "The timeline has been updated." });
-      // Invalidate to refresh both ritual details and meetup history
+      // Invalidate both the ritual detail and the dashboard list
       queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/rituals`] });
     } catch (e) {
       toast({ variant: "destructive", title: "Failed to log meetup" });
     }
@@ -346,7 +354,8 @@ export default function RitualDetail() {
                       if(window.confirm("Are you sure you want to delete this ritual?")) {
                         deleteMutation.mutate({ id: ritualId }, {
                           onSuccess: () => {
-                            window.location.href = "/dashboard";
+                            queryClient.invalidateQueries({ queryKey: [`/api/rituals`] });
+                            setLocation("/dashboard");
                           }
                         });
                       }

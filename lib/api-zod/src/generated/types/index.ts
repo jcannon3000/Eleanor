@@ -9,6 +9,7 @@
 export * from "./createRitualBody";
 export * from "./createRitualBodyFrequency";
 export * from "./healthStatus";
+export * from "./listRitualsParams";
 export * from "./logMeetupBody";
 export * from "./logMeetupBodyStatus";
 export * from "./meetup";

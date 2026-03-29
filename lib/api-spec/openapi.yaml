@@ -68,7 +68,13 @@ paths:
     get:
       operationId: listRituals
       tags: [rituals]
-      summary: List all rituals
+      summary: List rituals, optionally filtered by owner
+      parameters:
+        - name: ownerId
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: List of rituals

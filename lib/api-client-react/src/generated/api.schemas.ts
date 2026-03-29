@@ -156,3 +156,7 @@ export interface LogMeetupBody {
 export interface SendMessageBody {
   content: string;
 }
+
+export type ListRitualsParams = {
+  ownerId?: number;
+};
