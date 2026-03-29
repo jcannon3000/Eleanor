@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft, Plus, X, Loader2, Sparkles } from "lucide-react";
 import { useCreateRitual, CreateRitualBodyFrequency } from "@workspace/api-client-react";
-import { getLocalUser } from "@/lib/user";
+import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +16,7 @@ const STEPS = [
 
 export default function CreateRitual() {
   const [, setLocation] = useLocation();
-  const user = getLocalUser();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const createMutation = useCreateRitual();
 
@@ -28,8 +28,8 @@ export default function CreateRitual() {
   const [intention, setIntention] = useState("");
 
   useEffect(() => {
-    if (!user) setLocation("/");
-  }, [user, setLocation]);
+    if (!authLoading && !user) setLocation("/");
+  }, [user, authLoading, setLocation]);
 
   const handleNext = () => setStep(s => Math.min(STEPS.length, s + 1));
   const handlePrev = () => setStep(s => Math.max(1, s - 1));

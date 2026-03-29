@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable } from "@workspace/db";
+import { createCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -221,6 +222,21 @@ router.post("/rituals/:id/meetups", async (req, res): Promise<void> => {
       notes: parsed.data.notes ?? null,
     })
     .returning();
+
+  if (parsed.data.status === "completed" && ritual.ownerId) {
+    const scheduledDate = new Date(parsed.data.scheduledDate);
+    const calEventId = await createCalendarEvent(ritual.ownerId, {
+      summary: `${ritual.name} ✓`,
+      description: parsed.data.notes ?? `Completed meetup for ${ritual.name}`,
+      startDate: scheduledDate,
+    });
+    if (calEventId) {
+      await db
+        .update(meetupsTable)
+        .set({ googleCalendarEventId: calEventId })
+        .where(eq(meetupsTable.id, meetup.id));
+    }
+  }
 
   res.status(201).json(meetup);
 });

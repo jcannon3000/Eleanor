@@ -9,6 +9,7 @@ export const meetupsTable = pgTable("meetups", {
   scheduledDate: timestamp("scheduled_date", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("planned"),
   notes: text("notes"),
+  googleCalendarEventId: text("google_calendar_event_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

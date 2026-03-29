@@ -6,6 +6,11 @@ export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  avatarUrl: text("avatar_url"),
+  googleId: text("google_id").unique(),
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+  googleTokenExpiry: timestamp("google_token_expiry", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

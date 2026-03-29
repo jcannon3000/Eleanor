@@ -3,21 +3,22 @@ import { Link, useLocation } from "wouter";
 import { Plus, Coffee } from "lucide-react";
 import { motion } from "framer-motion";
 import { useListRituals } from "@workspace/api-client-react";
-import { getLocalUser } from "@/lib/user";
+import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { RitualCard } from "@/components/RitualCard";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const user = getLocalUser();
+  const { user, isLoading: authLoading } = useAuth();
   const { data: rituals, isLoading } = useListRituals({ ownerId: user?.id });
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       setLocation("/");
     }
-  }, [user, setLocation]);
+  }, [user, authLoading, setLocation]);
 
+  if (authLoading) return null;
   if (!user) return null;
 
   const container = {

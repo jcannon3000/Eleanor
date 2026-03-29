@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useToast } from "@/hooks/use-toast";
-import { getLocalUser } from "@/lib/user";
+import { useAuth } from "@/hooks/useAuth";
 
 type Tab = "coordinate" | "history" | "settings";
 
@@ -25,11 +25,11 @@ export default function RitualDetail() {
   const { data: ritual, isLoading } = useGetRitual(ritualId);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const user = getLocalUser();
+  const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!user) setLocation("/");
-  }, [user, setLocation]);
+    if (!authLoading && !user) setLocation("/");
+  }, [user, authLoading, setLocation]);
 
   const logMutation = useLogMeetup();
   const deleteMutation = useDeleteRitual();
