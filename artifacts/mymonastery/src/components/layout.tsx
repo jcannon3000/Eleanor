@@ -1,25 +1,44 @@
 import { ReactNode, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth, useLogout } from "@/hooks/useAuth";
-import { LogOut, ChevronDown, Sprout } from "lucide-react";
+import { LogOut, ChevronDown, Sprout, Users } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const logout = useLogout();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [location] = useLocation();
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       <header className="absolute top-0 w-full z-10 p-6 md:p-8 flex justify-between items-center max-w-7xl mx-auto">
-        <Link href="/dashboard" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-            <Sprout size={20} strokeWidth={1.5} />
-          </div>
-          <span className="font-serif text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
-            Eleanor
-          </span>
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+              <Sprout size={20} strokeWidth={1.5} />
+            </div>
+            <span className="font-serif text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
+              Eleanor
+            </span>
+          </Link>
+
+          {user && (
+            <nav className="hidden sm:flex items-center gap-1">
+              <Link
+                href="/people"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  location.startsWith("/people")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+              >
+                <Users size={14} />
+                People
+              </Link>
+            </nav>
+          )}
+        </div>
 
         {user && (
           <div className="relative">

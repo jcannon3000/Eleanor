@@ -8,6 +8,8 @@ import Onboarding from "./pages/onboarding";
 import Dashboard from "./pages/dashboard";
 import CreateRitual from "./pages/create";
 import RitualDetail from "./pages/ritual-detail";
+import People from "./pages/people";
+import PersonProfile from "./pages/person";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/create" component={CreateRitual} />
       <Route path="/ritual/:id" component={RitualDetail} />
+      <Route path="/people" component={People} />
+      <Route path="/people/:email" component={PersonProfile} />
       <Route component={NotFound} />
     </Switch>
   );

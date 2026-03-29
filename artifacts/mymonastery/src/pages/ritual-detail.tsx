@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, Link } from "wouter";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { Send, CheckCircle2, XCircle, ArrowLeft, MessageSquare, BookOpen, Settings, Sprout } from "lucide-react";
 import { clsx } from "clsx";
@@ -151,16 +151,17 @@ export default function RitualDetail() {
             <div className="flex flex-col items-start md:items-end gap-3">
               <div className="flex -space-x-3">
                 {ritual.participants.map((p, i) => (
-                  <div
+                  <Link
                     key={i}
-                    className="w-10 h-10 rounded-full border-2 border-card bg-secondary flex items-center justify-center text-sm font-medium text-secondary-foreground shadow-sm relative group"
+                    href={`/people/${encodeURIComponent(p.email)}`}
+                    className="w-10 h-10 rounded-full border-2 border-card bg-secondary flex items-center justify-center text-sm font-medium text-secondary-foreground shadow-sm relative group hover:z-10 hover:scale-110 hover:border-primary/40 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     title={p.name}
                   >
                     {p.name.charAt(0).toUpperCase()}
                     <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                       {p.name}
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
               <div className="flex items-center gap-2">
