@@ -86,6 +86,73 @@ export async function deleteCalendarEvent(userId: number, eventId: string): Prom
   }
 }
 
+export async function getFreeBusy(
+  userId: number,
+  timeMin: Date,
+  timeMax: Date
+): Promise<Array<{ start: string; end: string }>> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return [];
+
+  const calendar = google.calendar({ version: "v3", auth });
+
+  try {
+    const res = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        items: [{ id: "primary" }],
+      },
+    });
+    const busySlots = res.data.calendars?.["primary"]?.busy ?? [];
+    return busySlots
+      .filter((s) => s.start && s.end)
+      .map((s) => ({ start: s.start as string, end: s.end as string }));
+  } catch (err) {
+    console.error("Free/busy query failed:", err);
+    return [];
+  }
+}
+
+export async function updateCalendarEvent(
+  userId: number,
+  eventId: string,
+  opts: {
+    summary?: string;
+    description?: string;
+    startDate: Date;
+    endDate?: Date;
+    attendees?: string[];
+  }
+): Promise<boolean> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return false;
+
+  const calendar = google.calendar({ version: "v3", auth });
+  const start = opts.startDate;
+  const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
+  const attendeeList = opts.attendees?.map((email) => ({ email })) ?? [];
+
+  try {
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId,
+      sendUpdates: "all",
+      requestBody: {
+        summary: opts.summary,
+        description: opts.description,
+        start: { dateTime: start.toISOString(), timeZone: "UTC" },
+        end: { dateTime: end.toISOString(), timeZone: "UTC" },
+        attendees: attendeeList.length > 0 ? attendeeList : undefined,
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error("Calendar event update failed:", err);
+    return false;
+  }
+}
+
 export async function searchContacts(userId: number, query: string): Promise<Array<{ name: string; email: string }>> {
   const auth = await getAuthedClient(userId);
   if (!auth) return [];

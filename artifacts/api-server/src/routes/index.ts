@@ -5,6 +5,7 @@ import ritualsRouter from "./rituals";
 import authRouter from "./auth";
 import peopleRouter from "./people";
 import contactsRouter from "./contacts";
+import scheduleRouter from "./schedule";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(usersRouter);
 router.use(ritualsRouter);
 router.use(peopleRouter);
 router.use(contactsRouter);
+router.use(scheduleRouter);
 
 export default router;

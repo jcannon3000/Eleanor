@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable } from "@workspace/db";
-import { createCalendarEvent } from "../lib/calendar";
+import { eq, desc } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable } from "@workspace/db";
+import { createCalendarEvent, updateCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -22,8 +23,9 @@ import {
   SendMessageResponse,
 } from "@workspace/api-zod";
 import { computeStreak } from "../lib/streak";
-import { getWelcomeMessage, getCoordinatorResponse } from "../lib/agent";
+import { getWelcomeMessage, getCoordinatorResponse, suggestMeetingTimes } from "../lib/agent";
 import { deriveStartDate } from "../lib/scheduleDate";
+import { z } from "zod/v4";
 
 const router: IRouter = Router();
 
@@ -65,6 +67,8 @@ router.post("/rituals", async (req, res): Promise<void> => {
     return;
   }
 
+  const schedulingToken = randomUUID();
+
   const [ritual] = await db
     .insert(ritualsTable)
     .values({
@@ -75,6 +79,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
       participants: parsed.data.participants ?? [],
       intention: parsed.data.intention ?? null,
       ownerId: parsed.data.ownerId,
+      schedulingToken,
     })
     .returning();
 
@@ -123,6 +128,19 @@ router.post("/rituals", async (req, res): Promise<void> => {
       attendees: participantEmails,
       recurrence: recurrenceRule,
     }).catch(err => req.log.warn({ err }, "Failed to create ritual calendar event"));
+
+    // Fire-and-forget: populate proposedTimes via AI + calendar free/busy
+    const ritualForSuggestion = {
+      ...ritual,
+      participants: (ritual.participants as Array<{ name: string; email: string }>) ?? [],
+    };
+    suggestMeetingTimes(sessionUserId, ritualForSuggestion)
+      .then(async (times) => {
+        if (times.length > 0) {
+          await db.update(ritualsTable).set({ proposedTimes: times }).where(eq(ritualsTable.id, ritual.id));
+        }
+      })
+      .catch(err => req.log.warn({ err }, "Failed to suggest meeting times on create"));
   }
 
   res.status(201).json(ListRitualsResponse.element.parse(enriched));
@@ -344,6 +362,219 @@ router.post("/rituals/:id/chat", async (req, res): Promise<void> => {
     .returning();
 
   res.json(SendMessageResponse.parse(savedMsg));
+});
+
+// GET /api/rituals/:id/suggested-times — auth-required
+router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ritual id" });
+    return;
+  }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) {
+    res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const enrichedRitual = {
+    ...ritual,
+    participants: (ritual.participants as Array<{ name: string; email: string }>) ?? [],
+  };
+
+  try {
+    const times = await suggestMeetingTimes(sessionUserId, enrichedRitual);
+    if (times.length > 0) {
+      await db.update(ritualsTable).set({ proposedTimes: times }).where(eq(ritualsTable.id, id));
+    }
+    res.json({ proposedTimes: times });
+  } catch (err) {
+    req.log.error({ err }, "Failed to suggest meeting times");
+    res.status(500).json({ error: "Failed to generate time suggestions" });
+  }
+});
+
+// PATCH /api/rituals/:id/proposed-times — auth-required
+const ISOTimestamp = z.string().refine((s) => !isNaN(Date.parse(s)), { message: "Must be a valid ISO timestamp" });
+const ProposedTimesBody = z.object({
+  proposedTimes: z.array(ISOTimestamp).length(3),
+});
+
+router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ritual id" });
+    return;
+  }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = ProposedTimesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) {
+    res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(ritualsTable)
+    .set({ proposedTimes: parsed.data.proposedTimes })
+    .where(eq(ritualsTable.id, id))
+    .returning();
+
+  res.json({ proposedTimes: updated.proposedTimes });
+});
+
+// GET /api/rituals/:id/scheduling-summary — auth-required
+router.get("/rituals/:id/scheduling-summary", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ritual id" });
+    return;
+  }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) {
+    res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const responses = await db
+    .select()
+    .from(schedulingResponsesTable)
+    .where(eq(schedulingResponsesTable.ritualId, id))
+    .orderBy(schedulingResponsesTable.createdAt);
+
+  res.json({ responses });
+});
+
+// POST /api/rituals/:id/confirm-time — auth-required
+const ConfirmTimeBody = z.object({
+  confirmedTime: z.string().refine((s) => !isNaN(Date.parse(s)), { message: "confirmedTime must be a valid ISO timestamp" }),
+});
+
+router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ritual id" });
+    return;
+  }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = ConfirmTimeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) {
+    res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const confirmedTime = new Date(parsed.data.confirmedTime);
+
+  await db
+    .update(ritualsTable)
+    .set({ confirmedTime })
+    .where(eq(ritualsTable.id, id));
+
+  // Gather all participant emails from scheduling responses + ritual participants
+  const responses = await db
+    .select()
+    .from(schedulingResponsesTable)
+    .where(eq(schedulingResponsesTable.ritualId, id));
+
+  const responseEmails = responses.map((r) => r.email);
+  const participantEmails = ((ritual.participants as Array<{ email: string }>) ?? []).map((p) => p.email);
+  const allEmails = [...new Set([...responseEmails, ...participantEmails])].filter(Boolean);
+
+  // Find existing calendar event on the most recent meetup for this ritual
+  const meetups = await db
+    .select()
+    .from(meetupsTable)
+    .where(eq(meetupsTable.ritualId, id))
+    .orderBy(desc(meetupsTable.createdAt));
+
+  const existingEventId = meetups.find((m) => m.googleCalendarEventId)?.googleCalendarEventId ?? null;
+
+  if (existingEventId) {
+    updateCalendarEvent(sessionUserId, existingEventId, {
+      summary: ritual.name,
+      description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+      startDate: confirmedTime,
+      attendees: allEmails,
+    }).catch((err) => req.log.warn({ err }, "Failed to update calendar event"));
+  } else {
+    // Create a new event and persist its ID to a new meetup row for future updates
+    createCalendarEvent(sessionUserId, {
+      summary: ritual.name,
+      description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+      startDate: confirmedTime,
+      attendees: allEmails,
+    })
+      .then(async (eventId) => {
+        if (eventId) {
+          await db.insert(meetupsTable).values({
+            ritualId: id,
+            scheduledDate: confirmedTime,
+            status: "planned",
+            googleCalendarEventId: eventId,
+          });
+        }
+      })
+      .catch((err) => req.log.warn({ err }, "Failed to create confirmation calendar event"));
+  }
+
+  res.json({ confirmedTime: confirmedTime.toISOString() });
 });
 
 export default router;
