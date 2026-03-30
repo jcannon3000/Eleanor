@@ -507,7 +507,7 @@ router.get("/moments", async (req, res): Promise<void> => {
 
   const flatMoments = (await db.select().from(sharedMomentsTable)
     .where(inArray(sharedMomentsTable.id, momentIds)))
-    .filter(m => m.ritualId === null);
+    .filter(m => m.ritualId === null && m.state !== "archived");
 
   const enriched = await Promise.all(flatMoments.map(async (m) => {
     const allMembers = await db.select().from(momentUserTokensTable)
@@ -1079,6 +1079,57 @@ router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
     console.error("POST /moments/:momentToken/join error:", err);
     if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ─── PATCH /api/moments/:id/archive — soft-delete a practice ─────────────────
+router.patch("/moments/:id/archive", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  // Must be a member
+  const membership = await db.select().from(momentUserTokensTable)
+    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+  if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  await db.update(sharedMomentsTable)
+    .set({ state: "archived" })
+    .where(eq(sharedMomentsTable.id, momentId));
+
+  res.json({ ok: true });
+});
+
+// ─── DELETE /api/moments/:id — permanently delete a practice ─────────────────
+router.delete("/moments/:id", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  // Must be a member
+  const membership = await db.select().from(momentUserTokensTable)
+    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+  if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Hard delete — cascades remove windows, posts, tokens, calendar events, renewals
+  await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+
+  res.json({ ok: true });
 });
 
 export default router;

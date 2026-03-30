@@ -153,6 +153,8 @@ export default function MomentDetail() {
   const qc = useQueryClient();
   const [seedText, setSeedText] = useState("");
   const [showSeedForm, setShowSeedForm] = useState(false);
+  const [showManage, setShowManage] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
@@ -168,6 +170,22 @@ export default function MomentDetail() {
       qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
       setSeedText("");
       setShowSeedForm(false);
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/moments/${id}/archive`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/moments"] });
+      setLocation("/moments");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/moments/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/moments"] });
+      setLocation("/moments");
     },
   });
 
@@ -210,7 +228,7 @@ export default function MomentDetail() {
           onClick={() => setLocation("/moments")}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-5 transition-colors"
         >
-          ← Shared Moments
+          ← Your practices
         </button>
 
         {/* Open Now Banner */}
@@ -395,6 +413,82 @@ export default function MomentDetail() {
             </div>
           )}
         </div>
+        {/* ── Manage section ─────────────────────────────────────────── */}
+        <div className="mt-10 pt-6 border-t border-border/30">
+          <button
+            onClick={() => setShowManage(m => !m)}
+            className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1"
+          >
+            {showManage ? "▲" : "▾"} Manage this practice
+          </button>
+
+          {showManage && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18 }}
+              className="mt-4 space-y-3"
+            >
+              {/* Archive */}
+              <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Archive this practice</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Hides it from your garden. History is preserved.</p>
+                </div>
+                <button
+                  onClick={() => archiveMutation.mutate()}
+                  disabled={archiveMutation.isPending}
+                  className="shrink-0 ml-4 text-xs font-medium text-amber-700 border border-amber-300/60 rounded-full px-4 py-1.5 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                >
+                  {archiveMutation.isPending ? "Archiving…" : "Archive"}
+                </button>
+              </div>
+
+              {/* Delete */}
+              {!showDeleteConfirm ? (
+                <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Delete this practice</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Permanently removes it and all history. Cannot be undone.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="shrink-0 ml-4 text-xs font-medium text-rose-600 border border-rose-300/60 rounded-full px-4 py-1.5 hover:bg-rose-50 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-rose-50 border border-rose-200 rounded-2xl px-5 py-4"
+                >
+                  <p className="text-sm font-semibold text-rose-800 mb-1">Delete "{moment.name}"?</p>
+                  <p className="text-xs text-rose-700/80 mb-4">
+                    This cannot be undone. All history, streaks, and reflections will be permanently removed.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => deleteMutation.mutate()}
+                      disabled={deleteMutation.isPending}
+                      className="text-xs font-semibold text-white bg-rose-600 rounded-full px-5 py-2 hover:bg-rose-700 transition-colors disabled:opacity-50"
+                    >
+                      {deleteMutation.isPending ? "Deleting…" : "Yes, delete it"}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="text-xs text-rose-700 px-3 py-2 hover:text-rose-900 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </div>
+
       </div>
     </Layout>
   );
