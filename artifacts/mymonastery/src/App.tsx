@@ -15,6 +15,8 @@ import People from "./pages/people";
 import PersonProfile from "./pages/person";
 import MomentNew from "./pages/moment-new";
 import MomentPostPage from "./pages/moment-post";
+import MomentsDashboard from "./pages/moments-dashboard";
+import MomentDetail from "./pages/moment-detail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +35,8 @@ function Router() {
       <Route path="/create" component={CreateRitual} />
       <Route path="/ritual/:id/schedule" component={RitualSchedule} />
       <Route path="/moment/new" component={MomentNew} />
+      <Route path="/moments/:id" component={MomentDetail} />
+      <Route path="/moments" component={MomentsDashboard} />
       <Route path="/ritual/:id" component={RitualDetail} />
       <Route path="/schedule/:token" component={GuestSchedule} />
       <Route path="/invite/:token" component={InvitePage} />

@@ -378,7 +378,13 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="mb-6 h-px bg-border/40" />
+        <div className="mt-3 mb-4 flex items-center gap-2">
+          <Link href="/moments" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+            🌿 Shared Moments →
+          </Link>
+        </div>
+
+        <div className="mb-4 h-px bg-border/40" />
 
         {isLoading ? (
           <div className="space-y-3">

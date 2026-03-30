@@ -170,8 +170,8 @@ export default function MomentNew() {
   }, []);
 
   const plantMutation = useMutation({
-    mutationFn: (data: object) => apiRequest("POST", "/api/moments", data),
-    onSuccess: () => setStep(STEP_COUNT),
+    mutationFn: (data: object) => apiRequest<{ moment: { id: number } }>("POST", "/api/moments", data),
+    onSuccess: (data) => setLocation(`/moments/${data.moment.id}`),
   });
 
   const addPerson = () => {

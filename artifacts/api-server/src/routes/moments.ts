@@ -413,6 +413,72 @@ router.get("/moments", async (req, res): Promise<void> => {
   res.json({ moments: enriched });
 });
 
+// ─── GET /api/moments/:id — full detail for one moment ──────────────────────
+router.get("/moments/:id", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  // Auth: must be a participant
+  const myTokenRow = await db.select().from(momentUserTokensTable)
+    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+  if (myTokenRow.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const allMembers = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+
+  // All windows sorted newest first
+  const windows = await db.select().from(momentWindowsTable)
+    .where(eq(momentWindowsTable.momentId, momentId));
+  const sortedWindows = windows.sort((a, b) => b.windowDate.localeCompare(a.windowDate));
+
+  // All posts ever
+  const allPosts = await db.select().from(momentPostsTable)
+    .where(eq(momentPostsTable.momentId, momentId));
+
+  // Group posts by windowDate
+  const postsByDate: Record<string, typeof allPosts> = {};
+  for (const post of allPosts) {
+    if (!postsByDate[post.windowDate]) postsByDate[post.windowDate] = [];
+    postsByDate[post.windowDate].push(post);
+  }
+
+  const windowsWithPosts = sortedWindows.map(w => ({
+    ...w,
+    posts: (postsByDate[w.windowDate] ?? []).map(p => ({
+      guestName: p.guestName,
+      photoUrl: p.photoUrl,
+      reflectionText: p.reflectionText,
+      isCheckin: p.isCheckin === 1,
+    })),
+  }));
+
+  // Today's open window (may not have a record yet if no posts)
+  const windowDate = todayDate();
+  const todayPosts = postsByDate[windowDate] ?? [];
+  const windowOpen = isWindowOpen(moment);
+  const minsLeft = minutesRemaining(moment);
+
+  res.json({
+    moment,
+    members: allMembers.map(t => ({ name: t.name, email: t.email })),
+    memberCount: allMembers.length,
+    myUserToken: myTokenRow[0]?.userToken ?? null,
+    windows: windowsWithPosts,
+    todayPostCount: todayPosts.length,
+    windowOpen,
+    minutesLeft: minsLeft,
+  });
+});
+
 // ─── GET /api/rituals/:id/moments — list moments for a circle ───────────────
 router.get("/rituals/:id/moments", async (req, res): Promise<void> => {
   const ritualId = parseInt(req.params.id, 10);
@@ -463,7 +529,9 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
     return;
   }
 
-  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, moment.ritualId));
+  const ritual = moment.ritualId
+    ? (await db.select().from(ritualsTable).where(eq(ritualsTable.id, moment.ritualId)))[0] ?? null
+    : null;
   const windowDate = todayDate();
 
   const allTodayPosts = await db.select().from(momentPostsTable)
