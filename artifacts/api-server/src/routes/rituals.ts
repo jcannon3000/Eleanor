@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable } from "@workspace/db";
-import { createCalendarEvent, updateCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, updateCalendarEvent, getFreeBusy } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
   CreateRitualBody,
@@ -372,6 +372,10 @@ function hasExplicitTime(text: string): boolean {
     /\b([01]?\d|2[0-3]):([0-5]\d)\b/.test(text);
 }
 
+function hasExplicitWeekday(text: string): boolean {
+  return /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i.test(text);
+}
+
 function getContextualHour(text: string): number {
   const t = text.toLowerCase();
   if (/brunch/.test(t)) return 11;
@@ -380,14 +384,20 @@ function getContextualHour(text: string): number {
   if (/dinner|supper/.test(t)) return 19;
   if (/happy.?hour/.test(t)) return 18;
   if (/coffee|cafe/.test(t)) return 9;
-  if (/morning\s+(run|walk|hike|yoga|swim)/.test(t)) return 7;
+  if (/morning\s+(run|walk|hike|yoga|swim|ride|workout)/.test(t)) return 7;
   if (/morning/.test(t)) return 8;
   if (/evening|night/.test(t)) return 19;
   if (/afternoon/.test(t)) return 14;
   return 18;
 }
 
-function generateFallbackTimes(dayPreference: string, frequency: string, name = ""): string[] {
+/**
+ * Generate candidate slots based on day preference and frequency.
+ * When a specific weekday is specified (e.g. "Monday"), all candidates fall on
+ * that weekday — spaced weekly (or per-frequency) — so "Monday morning run"
+ * always returns Mondays.
+ */
+function generateCandidateSlots(dayPreference: string, frequency: string, name: string, count = 8): Date[] {
   const base = deriveStartDate(dayPreference || "", frequency);
 
   if (!hasExplicitTime(dayPreference)) {
@@ -395,31 +405,74 @@ function generateFallbackTimes(dayPreference: string, frequency: string, name = 
     base.setHours(hour, 0, 0, 0);
   }
 
-  const times: string[] = [base.toISOString()];
+  // When a specific weekday is named, keep all slots on that same weekday.
+  // Otherwise space by frequency.
+  const weekdaySpecified = hasExplicitWeekday(dayPreference + " " + name);
+  const stepDays = weekdaySpecified
+    ? 7                                          // next 8 Mondays (or whichever day)
+    : frequency === "monthly" ? 28
+    : frequency === "biweekly" ? 14
+    : 7;
 
-  const alt1 = new Date(base);
-  if (frequency === "monthly") {
-    alt1.setDate(alt1.getDate() + 7);
-  } else {
-    alt1.setDate(alt1.getDate() + 1);
-    if (alt1.getDay() === 0) alt1.setDate(alt1.getDate() + 1);
+  const candidates: Date[] = [base];
+  for (let i = 1; i < count; i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + stepDays * i);
+    candidates.push(d);
   }
-  times.push(alt1.toISOString());
+  return candidates;
+}
 
-  const alt2 = new Date(base);
-  if (frequency === "monthly") {
-    alt2.setDate(alt2.getDate() + 14);
-  } else {
-    alt2.setDate(alt2.getDate() + 7);
-    const hoursShift = base.getHours() < 17 ? 2 : -2;
-    alt2.setHours(alt2.getHours() + hoursShift);
+function slotIsBusy(slot: Date, busy: Array<{ start: string; end: string }>): boolean {
+  const slotEnd = new Date(slot.getTime() + 60 * 60 * 1000);
+  return busy.some((b) => {
+    const bs = new Date(b.start);
+    const be = new Date(b.end);
+    return slot < be && slotEnd > bs;
+  });
+}
+
+function generateFallbackTimes(dayPreference: string, frequency: string, name = ""): string[] {
+  return generateCandidateSlots(dayPreference, frequency, name, 3)
+    .map((d) => d.toISOString());
+}
+
+/**
+ * Calendar-aware time generation — no Anthropic needed.
+ * Gets the organizer's free/busy slots and prefers available windows,
+ * falling back to unfiltered candidates if not enough free slots are found.
+ */
+async function generateCalendarAwareTimes(
+  userId: number,
+  dayPreference: string,
+  frequency: string,
+  name: string
+): Promise<string[]> {
+  const candidates = generateCandidateSlots(dayPreference, frequency, name, 8);
+  const lastCandidate = candidates[candidates.length - 1];
+
+  let busy: Array<{ start: string; end: string }> = [];
+  try {
+    busy = await getFreeBusy(userId, new Date(), lastCandidate);
+  } catch {
+    // Calendar unavailable — proceed without filtering
   }
-  times.push(alt2.toISOString());
 
-  return times;
+  const available = candidates.filter((c) => !slotIsBusy(c, busy));
+  const result = available.slice(0, 3);
+
+  // If not enough free slots found, pad from unfiltered candidates
+  for (const c of candidates) {
+    if (result.length >= 3) break;
+    if (!result.some((r) => r.getTime() === c.getTime())) result.push(c);
+  }
+
+  return result.slice(0, 3).map((d) => d.toISOString());
 }
 
 // GET /api/rituals/:id/suggested-times — auth-required
+// Always generates fresh suggestions based on day preference + calendar free/busy.
+// Does NOT use proposedTimes cache — that is only set via PATCH when the user confirms.
 router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
@@ -444,28 +497,14 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
     return;
   }
 
-  const existing = (ritual.proposedTimes as string[]) ?? [];
-  if (existing.length > 0) {
-    res.json({ proposedTimes: existing });
-    return;
-  }
+  // Generate calendar-aware suggestions: all on the right weekday, calendar-checked, no Anthropic needed
+  const times = await generateCalendarAwareTimes(
+    sessionUserId,
+    ritual.dayPreference ?? "",
+    ritual.frequency,
+    ritual.name
+  );
 
-  const enrichedRitual = {
-    ...ritual,
-    participants: (ritual.participants as Array<{ name: string; email: string }>) ?? [],
-  };
-
-  let times: string[];
-  try {
-    times = await suggestMeetingTimes(sessionUserId, enrichedRitual);
-  } catch (err) {
-    req.log.warn({ err }, "AI time suggestion failed, using date-math fallback");
-    times = generateFallbackTimes(ritual.dayPreference ?? "", ritual.frequency, ritual.name);
-  }
-
-  if (times.length > 0) {
-    await db.update(ritualsTable).set({ proposedTimes: times }).where(eq(ritualsTable.id, id));
-  }
   res.json({ proposedTimes: times });
 });
 
