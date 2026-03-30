@@ -14,29 +14,79 @@ function generateToken() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-// ─── Current window date (YYYY-MM-DD) ───────────────────────────────────────
+// ─── Timezone-aware time helpers ─────────────────────────────────────────────
+
+function getCurrentTimeInTz(timezone: string): { hour: number; minute: number } {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone, hour: "numeric", minute: "numeric", hour12: false,
+    }).formatToParts(new Date());
+    const hour = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+    const minute = parseInt(parts.find(p => p.type === "minute")?.value ?? "0", 10);
+    return { hour: isNaN(hour) ? 0 : hour, minute: isNaN(minute) ? 0 : minute };
+  } catch {
+    const now = new Date();
+    return { hour: now.getUTCHours(), minute: now.getUTCMinutes() };
+  }
+}
+
+function todayDateInTz(timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+// ─── Current window date (YYYY-MM-DD) — falls back to UTC ───────────────────
 function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// ─── Is the posting window currently open? ──────────────────────────────────
-function isWindowOpen(moment: { scheduledTime: string; windowMinutes: number }): boolean {
-  const now = new Date();
+// ─── Is the posting window currently open? (timezone-aware) ─────────────────
+function isWindowOpen(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): boolean {
+  const tz = moment.timezone || "UTC";
+  const { hour, minute } = getCurrentTimeInTz(tz);
+  const currentMins = hour * 60 + minute;
   const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const windowStart = new Date();
-  windowStart.setHours(h, m, 0, 0);
-  const windowEnd = new Date(windowStart.getTime() + moment.windowMinutes * 60_000);
-  return now >= windowStart && now <= windowEnd;
+  const startMins = h * 60 + m;
+  const endMins = startMins + moment.windowMinutes;
+  return currentMins >= startMins && currentMins < endMins;
 }
 
-// ─── Minutes remaining in window ────────────────────────────────────────────
-function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number }): number {
-  const now = new Date();
+// ─── Minutes remaining in window (timezone-aware) ────────────────────────────
+function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): number {
+  const tz = moment.timezone || "UTC";
+  const { hour, minute } = getCurrentTimeInTz(tz);
+  const currentMins = hour * 60 + minute;
   const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const windowStart = new Date();
-  windowStart.setHours(h, m, 0, 0);
-  const windowEnd = new Date(windowStart.getTime() + moment.windowMinutes * 60_000);
-  return Math.max(0, Math.round((windowEnd.getTime() - now.getTime()) / 60_000));
+  const endMins = h * 60 + m + moment.windowMinutes;
+  return Math.max(0, endMins - currentMins);
+}
+
+// ─── Build local datetime strings for calendar events ────────────────────────
+function buildLocalEventTimes(hh: number, mm: number, timezone: string): { startLocalStr: string; endLocalStr: string } {
+  const { hour: curH, minute: curM } = getCurrentTimeInTz(timezone);
+  const hasPassed = (curH * 60 + curM) >= (hh * 60 + mm);
+
+  const localToday = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+  let startDay = localToday;
+
+  if (hasPassed) {
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    startDay = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(tomorrow);
+  }
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const endTotalMins = hh * 60 + mm + 60;
+  const endH = Math.floor(endTotalMins / 60) % 24;
+  const endM = endTotalMins % 60;
+
+  return {
+    startLocalStr: `${startDay}T${pad(hh)}:${pad(mm)}:00`,
+    endLocalStr: `${startDay}T${pad(endH)}:${pad(endM)}:00`,
+  };
 }
 
 // ─── Evaluate window and update streak ──────────────────────────────────────
@@ -250,6 +300,7 @@ const StandalonePlantSchema = z.object({
   scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
   goalDays: z.number().int().min(1).max(365).default(30),
+  timezone: z.string().default("UTC"),
   participants: z.array(z.object({ name: z.string(), email: z.string().email() })).min(1).max(20),
 });
 
@@ -260,7 +311,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   const parsed = StandalonePlantSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
 
-  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, dayOfWeek, goalDays, participants } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, dayOfWeek, goalDays, timezone, participants } = parsed.data;
 
   const momentToken = generateToken();
 
@@ -274,6 +325,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     scheduledTime,
     dayOfWeek: dayOfWeek ?? null,
     goalDays,
+    timezone,
     momentToken,
     windowMinutes: 60,
   }).returning();
@@ -334,10 +386,9 @@ router.post("/moments", async (req, res): Promise<void> => {
     ? [`RRULE:FREQ=WEEKLY${dayOfWeek ? `;BYDAY=${dayOfWeek}` : ""}`]
     : ["RRULE:FREQ=MONTHLY"];
 
-  const startDate = new Date();
-  startDate.setHours(hh, mm, 0, 0);
-  if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
-  const endDate = new Date(startDate.getTime() + 60 * 60_000);
+  const tz = timezone || "UTC";
+  const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, tz);
+  const startDate = new Date(); // fallback
 
   const attendeeEmails = uniqueMembers.map(m => m.email);
 
@@ -345,7 +396,9 @@ router.post("/moments", async (req, res): Promise<void> => {
     summary: `🌿 ${name}`,
     description: calDescription,
     startDate,
-    endDate,
+    startLocalStr,
+    endLocalStr,
+    timeZone: tz,
     attendees: attendeeEmails,
     recurrence: recurrenceRule,
   }).catch(() => null);
@@ -390,7 +443,7 @@ router.get("/moments", async (req, res): Promise<void> => {
       .where(eq(momentUserTokensTable.momentId, m.id));
 
     const todayPosts = await db.select().from(momentPostsTable)
-      .where(and(eq(momentPostsTable.momentId, m.id), eq(momentPostsTable.windowDate, todayDate())));
+      .where(and(eq(momentPostsTable.momentId, m.id), eq(momentPostsTable.windowDate, todayDateInTz(m.timezone || "UTC"))));
 
     const windows = await db.select().from(momentWindowsTable)
       .where(eq(momentWindowsTable.momentId, m.id));
@@ -444,11 +497,16 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
   const allPosts = await db.select().from(momentPostsTable)
     .where(eq(momentPostsTable.momentId, momentId));
 
-  // Group posts by windowDate
+  // Group posts by windowDate, separate out seed posts
   const postsByDate: Record<string, typeof allPosts> = {};
+  const seedPosts: typeof allPosts = [];
   for (const post of allPosts) {
-    if (!postsByDate[post.windowDate]) postsByDate[post.windowDate] = [];
-    postsByDate[post.windowDate].push(post);
+    if (post.windowDate === "seed") {
+      seedPosts.push(post);
+    } else {
+      if (!postsByDate[post.windowDate]) postsByDate[post.windowDate] = [];
+      postsByDate[post.windowDate].push(post);
+    }
   }
 
   const windowsWithPosts = sortedWindows.map(w => ({
@@ -462,7 +520,8 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
   }));
 
   // Today's open window (may not have a record yet if no posts)
-  const windowDate = todayDate();
+  const tz = moment.timezone || "UTC";
+  const windowDate = todayDateInTz(tz);
   const todayPosts = postsByDate[windowDate] ?? [];
   const windowOpen = isWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
@@ -473,10 +532,69 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     memberCount: allMembers.length,
     myUserToken: myTokenRow[0]?.userToken ?? null,
     windows: windowsWithPosts,
+    seedPosts: seedPosts.map(p => ({
+      guestName: p.guestName,
+      photoUrl: p.photoUrl,
+      reflectionText: p.reflectionText,
+      isCheckin: p.isCheckin === 1,
+    })),
     todayPostCount: todayPosts.length,
     windowOpen,
     minutesLeft: minsLeft,
   });
+});
+
+// ─── POST /api/moments/:id/seed-post — creator plants an example post ────────
+const SeedPostSchema = z.object({
+  photoUrl: z.string().url().optional(),
+  reflectionText: z.string().max(500).optional(),
+});
+
+router.post("/moments/:id/seed-post", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = SeedPostSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Must be a participant
+  const [myTokenRow] = await db.select().from(momentUserTokensTable)
+    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+  if (!myTokenRow) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const { photoUrl, reflectionText } = parsed.data;
+
+  // Upsert seed post (one per user)
+  const existing = await db.select().from(momentPostsTable)
+    .where(and(
+      eq(momentPostsTable.momentId, momentId),
+      eq(momentPostsTable.windowDate, "seed"),
+      eq(momentPostsTable.userToken, myTokenRow.userToken),
+    ));
+
+  if (existing.length > 0) {
+    await db.update(momentPostsTable)
+      .set({ photoUrl: photoUrl ?? null, reflectionText: reflectionText ?? null })
+      .where(eq(momentPostsTable.id, existing[0].id));
+  } else {
+    await db.insert(momentPostsTable).values({
+      momentId,
+      windowDate: "seed",
+      userToken: myTokenRow.userToken,
+      guestName: myTokenRow.name ?? user.email,
+      photoUrl: photoUrl ?? null,
+      reflectionText: reflectionText ?? null,
+      isCheckin: 0,
+    });
+  }
+
+  res.status(201).json({ success: true });
 });
 
 // ─── GET /api/rituals/:id/moments — list moments for a circle ───────────────
@@ -501,7 +619,7 @@ router.get("/rituals/:id/moments", async (req, res): Promise<void> => {
     const latestWindow = sortedWindows[0] ?? null;
 
     const todayPosts = await db.select().from(momentPostsTable)
-      .where(and(eq(momentPostsTable.momentId, m.id), eq(momentPostsTable.windowDate, todayDate())));
+      .where(and(eq(momentPostsTable.momentId, m.id), eq(momentPostsTable.windowDate, todayDateInTz(m.timezone || "UTC"))));
 
     return {
       ...m,

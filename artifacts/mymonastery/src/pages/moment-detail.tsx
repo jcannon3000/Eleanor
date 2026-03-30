@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +47,7 @@ interface MomentDetail {
   memberCount: number;
   myUserToken: string | null;
   windows: MomentWindow[];
+  seedPosts: WindowPost[];
   todayPostCount: number;
   windowOpen: boolean;
   minutesLeft: number;
@@ -158,11 +159,28 @@ export default function MomentDetail() {
   const [, setLocation] = useLocation();
   const { id } = useParams<{ id: string }>();
   const { user, isLoading: authLoading } = useAuth();
+  const qc = useQueryClient();
+  const [seedText, setSeedText] = useState("");
+  const [seedPhotoUrl, setSeedPhotoUrl] = useState("");
+  const [showSeedForm, setShowSeedForm] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
     queryFn: () => apiRequest<MomentDetail>("GET", `/api/moments/${id}`),
     enabled: !!user && !!id,
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/moments/${id}/seed-post`, {
+      reflectionText: seedText.trim() || undefined,
+      photoUrl: seedPhotoUrl.trim() || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      setSeedText("");
+      setSeedPhotoUrl("");
+      setShowSeedForm(false);
+    },
   });
 
   useEffect(() => {
@@ -183,7 +201,7 @@ export default function MomentDetail() {
 
   if (!data) return null;
 
-  const { moment, members, memberCount, myUserToken, windows, todayPostCount, windowOpen, minutesLeft } = data;
+  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount, windowOpen, minutesLeft } = data;
   const progress = goalProgress(moment.createdAt, moment.goalDays);
   const postUrl = windowOpen && myUserToken
     ? `/moment/${moment.momentToken}/${myUserToken}`
@@ -299,15 +317,116 @@ export default function MomentDetail() {
           </div>
 
           {windows.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground/50">
-              <p className="text-3xl mb-3">🌱</p>
-              <p className="text-sm">No windows yet — the first one opens at {formatTime(moment.scheduledTime)}</p>
+            <div>
+              {/* Plant a Seed — appears before the first window */}
+              <div className="bg-[#F4F9F5] border border-[#6B8F71]/30 rounded-2xl p-5 mb-4">
+                <p className="text-sm font-semibold text-[#4a6b50] mb-1">🌱 Set the tone</p>
+                <p className="text-xs text-[#4a6b50]/70 mb-3">
+                  No windows have opened yet. Plant a seed — share a photo or thought that inspires the group before the first window.
+                </p>
+
+                {seedPosts.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {seedPosts.map((post, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-xs font-medium text-[#4a6b50] shrink-0">
+                          {(post.guestName ?? "Someone").split(" ")[0]}
+                        </span>
+                        {post.photoUrl && (
+                          <img
+                            src={post.photoUrl}
+                            alt=""
+                            className="w-16 h-16 rounded-xl object-cover border border-[#6B8F71]/30 shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        )}
+                        {post.reflectionText && (
+                          <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!showSeedForm ? (
+                  <button
+                    onClick={() => setShowSeedForm(true)}
+                    className="text-xs text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors"
+                  >
+                    + Plant a seed
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={seedText}
+                      onChange={e => setSeedText(e.target.value)}
+                      placeholder="Share a thought or intention..."
+                      className="w-full text-xs rounded-xl border border-[#6B8F71]/30 bg-white p-3 resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[#6B8F71]/50"
+                    />
+                    <input
+                      type="url"
+                      value={seedPhotoUrl}
+                      onChange={e => setSeedPhotoUrl(e.target.value)}
+                      placeholder="Photo URL (optional)"
+                      className="w-full text-xs rounded-xl border border-[#6B8F71]/30 bg-white p-3 focus:outline-none focus:ring-1 focus:ring-[#6B8F71]/50"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => seedMutation.mutate()}
+                        disabled={seedMutation.isPending || (!seedText.trim() && !seedPhotoUrl.trim())}
+                        className="text-xs text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors disabled:opacity-50"
+                      >
+                        {seedMutation.isPending ? "Planting…" : "Plant 🌱"}
+                      </button>
+                      <button
+                        onClick={() => setShowSeedForm(false)}
+                        className="text-xs text-muted-foreground hover:text-foreground px-3 py-2 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center py-6 text-muted-foreground/50">
+                <p className="text-sm">First window opens at {formatTime(moment.scheduledTime)}</p>
+              </div>
             </div>
           ) : (
-            <div className="bg-card border border-border/60 rounded-2xl px-4 divide-y divide-border/20">
-              {windows.map(win => (
-                <WindowEntry key={win.id} win={win} />
-              ))}
+            <div>
+              {/* Seed posts shown at top of history */}
+              {seedPosts.length > 0 && (
+                <div className="mb-4 bg-[#F4F9F5] border border-[#6B8F71]/20 rounded-2xl px-4 py-3">
+                  <p className="text-xs font-medium text-[#4a6b50] mb-2">🌱 Before the first window</p>
+                  <div className="space-y-2">
+                    {seedPosts.map((post, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-xs font-medium text-[#4a6b50] shrink-0">
+                          {(post.guestName ?? "Someone").split(" ")[0]}
+                        </span>
+                        {post.photoUrl && (
+                          <img
+                            src={post.photoUrl}
+                            alt=""
+                            className="w-14 h-14 rounded-lg object-cover border border-[#6B8F71]/30 shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        )}
+                        {post.reflectionText && (
+                          <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-card border border-border/60 rounded-2xl px-4 divide-y divide-border/20">
+                {windows.map(win => (
+                  <WindowEntry key={win.id} win={win} />
+                ))}
+              </div>
             </div>
           )}
         </div>

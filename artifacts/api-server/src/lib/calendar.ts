@@ -40,9 +40,12 @@ export async function createCalendarEvent(
     description?: string;
     location?: string;
     startDate: Date;
+    startLocalStr?: string; // "2026-03-31T08:00:00" — preferred for tz-aware scheduling
     endDate?: Date;
+    endLocalStr?: string;   // "2026-03-31T09:00:00"
     attendees?: string[];
     recurrence?: string[];
+    timeZone?: string;      // e.g. "America/New_York"
   }
 ): Promise<string | null> {
   const auth = await getAuthedClient(userId);
@@ -51,6 +54,9 @@ export async function createCalendarEvent(
   const calendar = google.calendar({ version: "v3", auth });
   const start = opts.startDate;
   const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
+
+  const useLocalTime = !!(opts.startLocalStr && opts.timeZone);
+  const tz = opts.timeZone ?? "UTC";
 
   const attendeeList = opts.attendees?.map(email => ({ email })) ?? [];
 
@@ -62,11 +68,21 @@ export async function createCalendarEvent(
         summary: opts.summary,
         description: opts.description,
         location: opts.location,
-        start: { dateTime: start.toISOString(), timeZone: "UTC" },
-        end: { dateTime: end.toISOString(), timeZone: "UTC" },
+        start: useLocalTime
+          ? { dateTime: opts.startLocalStr, timeZone: tz }
+          : { dateTime: start.toISOString(), timeZone: "UTC" },
+        end: useLocalTime
+          ? { dateTime: opts.endLocalStr ?? opts.startLocalStr, timeZone: tz }
+          : { dateTime: end.toISOString(), timeZone: "UTC" },
         attendees: attendeeList.length > 0 ? attendeeList : undefined,
         recurrence: opts.recurrence,
-        reminders: { useDefault: true },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: "popup", minutes: 10 },
+            { method: "email", minutes: 60 },
+          ],
+        },
       },
     });
     return event.data.id ?? null;

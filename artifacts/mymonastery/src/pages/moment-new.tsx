@@ -213,6 +213,7 @@ export default function MomentNew() {
       scheduledTime,
       dayOfWeek: frequency === "weekly" && dayOfWeek ? dayOfWeek : undefined,
       goalDays,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       participants: validParticipants,
     });
   }
