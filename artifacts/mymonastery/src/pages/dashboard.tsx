@@ -142,13 +142,16 @@ interface MomentData {
 }
 
 function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: boolean; pinned?: boolean }) {
+  const [, setLocation] = useLocation();
   const nextWindow = nextMomentWindow(moment);
   const growthLabel = GROWTH_LABELS[moment.state] ?? moment.state;
   const memberNames = moment.members.slice(0, 3).map(m => (m.name ?? m.email).split(" ")[0]).join(", ");
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
 
   return (
-    <div className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 ${
+    <div
+      onClick={() => setLocation(`/moments/${moment.id}`)}
+      className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
       pinned
         ? "border-[#C17F24]/40 shadow-[0_0_20px_rgba(193,127,36,0.12)] bg-[#F5F5F0]"
         : `border-border/60 bg-[#F5F5F0] ${dim ? "opacity-60" : ""} hover:shadow-md`
@@ -220,7 +223,10 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
             )}
           </div>
           {pinned && moment.myUserToken && (
-            <Link href={`/moment/${moment.momentToken}/${moment.myUserToken}`}>
+            <Link
+              href={`/moment/${moment.momentToken}/${moment.myUserToken}`}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            >
               <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 hover:bg-[#5a7a60] transition-colors">
                 Post your moment →
               </span>
