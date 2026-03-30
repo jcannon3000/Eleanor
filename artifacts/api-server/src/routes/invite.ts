@@ -96,59 +96,111 @@ router.post("/invite/:token/respond", async (req, res): Promise<void> => {
       .set({ respondedAt: new Date() })
       .where(eq(inviteTokensTable.token, token));
 
-    // Update organizer's Google Calendar event — async, non-blocking
-    updateCalendarEventWithResponses({
-      ritual,
-      organizerUserId: ritual.ownerId,
-      newResponse: {
-        name: invite.name ?? invite.email,
-        email: invite.email,
-        chosenTime,
-        unavailable: isUnavailable === 1,
-        isUpdate,
-      },
-    }).catch((err) => console.warn("GCal update failed (non-fatal):", err?.message ?? err));
-
     res.status(201).json({ success: true });
+
+    // Async work: update GCal description + check for consensus auto-confirm
+    const allAfter = await db.select().from(scheduleResponsesTable)
+      .where(eq(scheduleResponsesTable.ritualId, ritual.id));
+
+    const newResponse = {
+      name: invite.name ?? invite.email,
+      email: invite.email,
+      chosenTime,
+      unavailable: isUnavailable === 1,
+      isUpdate,
+    };
+
+    // Check for consensus (2+ people picked the same proposed time)
+    checkAndAutoConfirm({ ritual, organizerUserId: ritual.ownerId, allResponses: allAfter })
+      .catch((err) => console.warn("Auto-confirm check failed:", err?.message ?? err));
+
+    // Update GCal description with all responses
+    updateCalendarEventDescription({ ritual, organizerUserId: ritual.ownerId, newResponse, allResponses: allAfter })
+      .catch((err) => console.warn("GCal description update failed:", err?.message ?? err));
+
   } catch (err) {
     console.error("POST /invite/:token/respond error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ─── Helper: rebuild GCal event description with all responses ───────────
-async function updateCalendarEventWithResponses(opts: {
+// ─── Auto-confirm when 2+ people agree on the same proposed time ────────────
+async function checkAndAutoConfirm(opts: {
   ritual: typeof ritualsTable.$inferSelect;
   organizerUserId: number;
-  newResponse: {
-    name: string;
-    email: string;
-    chosenTime: string | null;
-    unavailable: boolean;
-    isUpdate: boolean;
-  };
+  allResponses: (typeof scheduleResponsesTable.$inferSelect)[];
 }) {
-  const { ritual, organizerUserId, newResponse } = opts;
+  const { ritual, organizerUserId, allResponses } = opts;
+  const proposedTimes = (ritual.proposedTimes as string[]) ?? [];
+  if (proposedTimes.length === 0) return;
 
-  // Find the planned meetup with a GCal event ID
+  // Already confirmed by organizer — don't override
+  if (ritual.confirmedTime) return;
+
+  // Tally votes per proposed time slot (fuzzy match within 2 minutes)
+  const votes: Record<string, string[]> = {};
+  for (const r of allResponses) {
+    if (!r.chosenTime || r.unavailable) continue;
+    const chosenMs = new Date(r.chosenTime).getTime();
+    for (const pt of proposedTimes) {
+      if (Math.abs(chosenMs - new Date(pt).getTime()) < 2 * 60_000) {
+        votes[pt] = votes[pt] ?? [];
+        votes[pt].push(r.guestName);
+        break;
+      }
+    }
+  }
+
+  // Find the first proposed time with 2+ votes
+  const consensus = proposedTimes.find((pt) => (votes[pt]?.length ?? 0) >= 2);
+  if (!consensus) return;
+
+  const confirmedDate = new Date(consensus);
+  const voterNames = votes[consensus];
+
+  console.log(`[auto-confirm] Ritual ${ritual.id} confirmed at ${consensus} by ${voterNames.join(", ")}`);
+
+  // Update ritual.confirmedTime
+  await db.update(ritualsTable)
+    .set({ confirmedTime: consensus })
+    .where(eq(ritualsTable.id, ritual.id));
+
+  // Update the planned meetup's scheduledDate and GCal event
+  const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritual.id));
+  const planned = meetups.find((m) => m.status === "planned");
+  if (!planned) return;
+
+  await db.update(meetupsTable)
+    .set({ scheduledDate: confirmedDate })
+    .where(eq(meetupsTable.id, planned.id));
+
+  if (!planned.googleCalendarEventId) return;
+
+  const description = buildConfirmedDescription(ritual, consensus, voterNames);
+  await updateCalendarEvent(organizerUserId, planned.googleCalendarEventId, {
+    summary: `${ritual.name} — Confirmed`,
+    description,
+    startDate: confirmedDate,
+  });
+}
+
+// ─── Update GCal description with all current responses ────────────────────
+async function updateCalendarEventDescription(opts: {
+  ritual: typeof ritualsTable.$inferSelect;
+  organizerUserId: number;
+  newResponse: { name: string; email: string; chosenTime: string | null; unavailable: boolean; isUpdate: boolean };
+  allResponses: (typeof scheduleResponsesTable.$inferSelect)[];
+}) {
+  const { ritual, organizerUserId, newResponse, allResponses } = opts;
+
   const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritual.id));
   const planned = meetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
   if (!planned?.googleCalendarEventId) return;
 
-  // Fetch all responses (already updated in DB)
-  const allResponses = await db.select().from(scheduleResponsesTable)
-    .where(eq(scheduleResponsesTable.ritualId, ritual.id));
+  // If already confirmed, don't overwrite with a "responses" description
+  if (ritual.confirmedTime) return;
 
   const proposedTimes = (ritual.proposedTimes as string[]) ?? [];
-
-  function fmtTime(iso: string) {
-    const d = new Date(iso);
-    return (
-      d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " at " +
-      d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-    );
-  }
 
   const lines: string[] = [];
   if (ritual.name) lines.push(`📍 ${ritual.name}`);
@@ -158,7 +210,7 @@ async function updateCalendarEventWithResponses(opts: {
   if (proposedTimes.length > 0) {
     lines.push("📅 Proposed times:");
     proposedTimes.forEach((t, i) => {
-      const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup";
+      const label = i === 0 ? "Option 1" : i === 1 ? "Option 2" : "Option 3";
       lines.push(`  ${label}: ${fmtTime(t)}`);
     });
     lines.push("");
@@ -178,7 +230,6 @@ async function updateCalendarEventWithResponses(opts: {
   }
   lines.push("");
 
-  // Highlight the change
   if (newResponse.unavailable) {
     lines.push(
       newResponse.isUpdate
@@ -188,28 +239,45 @@ async function updateCalendarEventWithResponses(opts: {
   } else if (newResponse.chosenTime) {
     lines.push(
       newResponse.isUpdate
-        ? `🔄 Update: ${newResponse.name} changed their preference → ${fmtTime(newResponse.chosenTime)}`
-        : `📌 New: ${newResponse.name} picked ${fmtTime(newResponse.chosenTime)}`
+        ? `🔄 Update: ${newResponse.name} changed preference → ${fmtTime(newResponse.chosenTime)}`
+        : `📌 New: ${newResponse.name} is available ${fmtTime(newResponse.chosenTime)}`
     );
   }
   lines.push("", "Coordinated by Eleanor · eleanor.app");
 
-  const description = lines.join("\n");
-
-  // Update the event title to reflect the latest selected time if available
-  const latestTime = newResponse.chosenTime && !newResponse.unavailable
-    ? new Date(newResponse.chosenTime)
-    : planned.scheduledDate;
-
-  const summary = newResponse.chosenTime && !newResponse.unavailable
-    ? `${ritual.name} — ${new Date(newResponse.chosenTime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-    : ritual.name;
-
   await updateCalendarEvent(organizerUserId, planned.googleCalendarEventId, {
-    summary,
-    description,
-    startDate: latestTime,
+    description: lines.join("\n"),
+    startDate: planned.scheduledDate,
   });
+}
+
+// ─── Build confirmed event description ──────────────────────────────────────
+function buildConfirmedDescription(
+  ritual: typeof ritualsTable.$inferSelect,
+  confirmedTime: string,
+  voterNames: string[]
+): string {
+  const lines: string[] = [];
+  if (ritual.name) lines.push(`📍 ${ritual.name}`);
+  if (ritual.intention) lines.push(ritual.intention);
+  lines.push("");
+  lines.push(`✅ CONFIRMED: ${fmtTime(confirmedTime)}`);
+  lines.push("");
+  lines.push(`Agreed by: ${voterNames.join(", ")}`);
+  lines.push("");
+  if (ritual.location) lines.push(`📍 ${ritual.location}`);
+  lines.push("", "Coordinated by Eleanor · eleanor.app");
+  return lines.join("\n");
+}
+
+// ─── Format ISO time for display ────────────────────────────────────────────
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
+    " at " +
+    d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  );
 }
 
 export default router;

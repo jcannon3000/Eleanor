@@ -238,38 +238,56 @@ export default function RitualDetail() {
               {timelineLoading ? (
                 <div className="h-40 bg-card rounded-2xl border border-card-border animate-pulse" />
               ) : timeline?.upcoming ? (
-                <div className="bg-card rounded-2xl border border-card-border p-6 shadow-[var(--shadow-warm-sm)]">
+                <div className={`bg-card rounded-2xl border p-6 shadow-[var(--shadow-warm-sm)] ${
+                  timeline.confirmedTime ? "border-primary/30" : "border-card-border border-dashed"
+                }`}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <CalendarCheck size={16} className="text-primary" />
-                      <span className="text-sm font-semibold text-primary uppercase tracking-wide">Next Gathering</span>
+                      <CalendarCheck size={16} className={timeline.confirmedTime ? "text-primary" : "text-muted-foreground"} />
+                      <span className={`text-sm font-semibold uppercase tracking-wide ${
+                        timeline.confirmedTime ? "text-primary" : "text-muted-foreground"
+                      }`}>
+                        {timeline.confirmedTime ? "Next Gathering" : "Awaiting Responses"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {calendarSynced && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <RefreshCw size={11} />
-                          Synced from Google Calendar
+                          Synced
                         </span>
                       )}
                       <Link
                         href={`/ritual/${ritualId}/schedule`}
-                        className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors underline"
                       >
                         Reschedule
                       </Link>
                     </div>
                   </div>
 
-                  {timeline.upcoming.googleCalendarEventId && (
-                    <a
-                      href="https://calendar.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 mb-4 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
-                    >
-                      <CheckCircle2 size={12} />
-                      Added to Google Calendar
-                    </a>
+                  {/* Confirmed badge */}
+                  {timeline.confirmedTime ? (
+                    <div className="flex items-center gap-2 mb-4">
+                      {timeline.upcoming.googleCalendarEventId && (
+                        <a
+                          href="https://calendar.google.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                        >
+                          <CheckCircle2 size={12} />
+                          Confirmed in Google Calendar
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                        <RefreshCw size={11} />
+                        Time will confirm when 2+ people agree
+                      </span>
+                    </div>
                   )}
 
                   <p className="text-2xl font-semibold text-foreground mb-1">
@@ -277,7 +295,10 @@ export default function RitualDetail() {
                   </p>
                   <p className="text-lg text-muted-foreground mb-4">
                     {format(parseISO(timeline.upcoming.scheduledDate), "h:mm a")}
-                    {!upcomingIsPast && (
+                    {!upcomingIsPast && !timeline.confirmedTime && (
+                      <span className="text-sm ml-2 text-muted-foreground/50 italic"> · pending</span>
+                    )}
+                    {!upcomingIsPast && timeline.confirmedTime && (
                       <span className="text-sm ml-2 text-muted-foreground/60">
                         · {formatDistanceToNow(parseISO(timeline.upcoming.scheduledDate), { addSuffix: true })}
                       </span>
@@ -301,16 +322,28 @@ export default function RitualDetail() {
                         {loggingId ? "Logging..." : "We gathered ✓"}
                       </button>
                     </div>
-                  ) : (
+                  ) : timeline.confirmedTime ? (
                     <div className="pt-2 border-t border-border/50">
                       <p className="text-xs text-muted-foreground text-center italic">
                         Come back after your gathering to log it 🌱
                       </p>
                     </div>
+                  ) : (
+                    <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground italic">
+                        Waiting for circle responses via invite links
+                      </p>
+                      <Link
+                        href={`/ritual/${ritualId}/schedule`}
+                        className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                      >
+                        Change times →
+                      </Link>
+                    </div>
                   )}
                 </div>
               ) : (
-                /* No confirmed gathering yet */
+                /* No gathering scheduled yet */
                 <div className="bg-card rounded-2xl border border-dashed border-border p-8 text-center">
                   <div className="w-12 h-12 bg-primary/8 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Sprout size={22} strokeWidth={1.5} className="text-primary/60" />
