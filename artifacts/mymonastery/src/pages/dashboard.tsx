@@ -298,13 +298,15 @@ function FAB() {
             className="flex flex-col gap-2 mb-1"
           >
             <Link href="/moment/new" onClick={() => setOpen(false)}>
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border rounded-full shadow-lg text-sm font-medium text-foreground hover:bg-secondary/40 transition-colors whitespace-nowrap">
-                🌿 Plant a Shared Moment
+              <div className="px-4 py-3 bg-card border border-[#6B8F71]/30 rounded-2xl shadow-lg hover:bg-[#6B8F71]/5 transition-colors whitespace-nowrap min-w-[210px]">
+                <p className="text-sm font-semibold text-foreground">🌿 Plant a Practice</p>
+                <p className="text-xs text-muted-foreground mt-0.5">For when you can't be together</p>
               </div>
             </Link>
-            <Link href="/create?type=circle" onClick={() => setOpen(false)}>
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border rounded-full shadow-lg text-sm font-medium text-foreground hover:bg-secondary/40 transition-colors whitespace-nowrap">
-                📅 Plan a Gathering
+            <Link href="/tradition/new" onClick={() => setOpen(false)}>
+              <div className="px-4 py-3 bg-card border border-[#C17F24]/30 rounded-2xl shadow-lg hover:bg-[#C17F24]/5 transition-colors whitespace-nowrap min-w-[210px]">
+                <p className="text-sm font-semibold text-foreground">🌱 Plant a Tradition</p>
+                <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </div>
             </Link>
           </motion.div>
@@ -427,9 +429,13 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="mt-3 mb-4 flex items-center gap-2">
+        <div className="mt-3 mb-4 flex items-center gap-3">
           <Link href="/moments" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
-            🌿 Shared Moments →
+            🌿 Practices →
+          </Link>
+          <span className="text-muted-foreground/30 text-xs">·</span>
+          <Link href="/create" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+            🌱 Traditions →
           </Link>
         </div>
 
@@ -453,11 +459,13 @@ export default function Dashboard() {
               "The rituals you tend now become<br />the traditions you'll remember."
             </p>
             <div className="mt-8 space-y-3 w-full">
-              <Link href="/moment/new" className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary text-primary-foreground rounded-full font-medium shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] transition-all">
-                🌿 Plant a Shared Moment
+              <Link href="/moment/new" className="block w-full text-left px-5 py-4 bg-primary text-primary-foreground rounded-2xl font-medium shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] transition-all">
+                <p className="font-semibold">🌿 Plant a Practice</p>
+                <p className="text-xs opacity-80 mt-0.5">For when you can't be together</p>
               </Link>
-              <Link href="/create" className="flex items-center justify-center gap-2 w-full py-3.5 bg-card text-foreground border border-border rounded-full font-medium hover:bg-secondary/40 transition-all">
-                📅 Plan a Gathering
+              <Link href="/tradition/new" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#C17F24]/30 rounded-2xl font-medium hover:bg-[#C17F24]/5 transition-all">
+                <p className="font-semibold">🌱 Plant a Tradition</p>
+                <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </Link>
             </div>
           </motion.div>

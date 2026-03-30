@@ -216,8 +216,8 @@ export default function MomentsDashboard() {
             <button onClick={() => setLocation("/dashboard")} className="text-xs text-muted-foreground hover:text-foreground mb-3 flex items-center gap-1 transition-colors">
               ← Dashboard
             </button>
-            <h1 className="text-2xl font-semibold text-foreground">Shared Moments</h1>
-            <p className="text-sm text-muted-foreground mt-1">Recurring micro-rituals with the people you love</p>
+            <h1 className="text-2xl font-semibold text-foreground">Your practices 🌿</h1>
+            <p className="text-sm text-muted-foreground italic mt-1">For the distance between gatherings</p>
           </div>
           <Link
             href="/moment/new"
@@ -242,13 +242,13 @@ export default function MomentsDashboard() {
             className="text-center py-16"
           >
             <div className="text-4xl mb-4">🌱</div>
-            <p className="text-foreground/70 mb-2 font-medium">No shared moments yet</p>
-            <p className="text-sm text-muted-foreground mb-8">Plant a recurring moment with someone you love — no app needed on their end.</p>
+            <p className="text-foreground/70 mb-2 font-medium">No practices yet</p>
+            <p className="text-sm text-muted-foreground mb-8">Plant a spiritual practice that you and someone you love do together — even across the distance.</p>
             <Link
               href="/moment/new"
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium shadow-[var(--shadow-warm-md)]"
             >
-              🌿 Plant your first moment
+              🌿 Plant your first practice
             </Link>
           </motion.div>
         ) : (
@@ -269,7 +269,7 @@ export default function MomentsDashboard() {
               <>
                 {openNow.length > 0 && (
                   <div className="flex items-center gap-2 mb-3 mt-2">
-                    <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">Your moments</span>
+                    <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">Your practices</span>
                     <div className="flex-1 h-px bg-border/40" />
                   </div>
                 )}

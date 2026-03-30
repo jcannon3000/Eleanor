@@ -12,7 +12,7 @@ type LoggingType = "reflection" | "timer" | "timer_reflection" | "checkin";
 type Frequency = "daily" | "weekly";
 type TimeOfDay = "morning" | "midday" | "afternoon" | "night";
 
-const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
 
 const TIME_OF_DAY_OPTIONS: { id: TimeOfDay; emoji: string; label: string; sub: string; range: string }[] = [
   { id: "morning",   emoji: "🌅", label: "Morning",   sub: "As the day begins",              range: "Roughly 6am – 10am" },
@@ -201,19 +201,6 @@ const TEMPLATES = [
       timerDuration: 10,
       reflectionPrompt: "What did you notice?",
       scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
-      frequency: "daily" as Frequency,
-    },
-  },
-  {
-    id: "morning-coffee", emoji: "☕", name: "Morning Coffee",
-    desc: "Share your first cup across the distance",
-    prefill: {
-      name: "Morning Coffee ☕",
-      intention: "Wherever we are, we are having coffee together. Share your cup.",
-      loggingType: "checkin" as LoggingType,
-      timerDuration: 10,
-      reflectionPrompt: "",
-      scheduledHour: 8, scheduledAmPm: "AM" as "AM" | "PM",
       frequency: "daily" as Frequency,
     },
   },
@@ -413,6 +400,17 @@ export default function MomentNew() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
 
+  // Intro splash (1.5s, first use only)
+  const [showIntro, setShowIntro] = useState(() => !localStorage.getItem("eleanor_practice_intro_seen"));
+
+  useEffect(() => {
+    if (showIntro) {
+      localStorage.setItem("eleanor_practice_intro_seen", "1");
+      const t = setTimeout(() => setShowIntro(false), 1600);
+      return () => clearTimeout(t);
+    }
+  }, [showIntro]);
+
   // Step navigation
   const [step, setStep] = useState<StepId>("template");
   const [done, setDone] = useState(false);
@@ -475,8 +473,7 @@ export default function MomentNew() {
       setLoggingType(t.prefill.loggingType);
       setTimerDuration(t.prefill.timerDuration);
       setReflectionPrompt(t.prefill.reflectionPrompt);
-      setScheduledHour(t.prefill.scheduledHour);
-      setScheduledAmPm(t.prefill.scheduledAmPm);
+      // No pre-filled time or day — user fills these in
       setFrequency(t.prefill.frequency);
       if (t.prefill.loggingType === "timer_reflection") setHasReflectionAfterTimer(true);
     }
@@ -726,6 +723,32 @@ export default function MomentNew() {
     );
   }
 
+  // ── Practice intro splash (first use only) ──────────────────────────────────
+  if (showIntro) {
+    return (
+      <Layout>
+        <div className="flex-1 flex items-center justify-center min-h-[70vh]">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="w-full max-w-sm mx-auto"
+          >
+            <div className="bg-[#EEF3EF] border border-[#6B8F71]/20 rounded-[2rem] p-10 text-center shadow-[var(--shadow-warm-lg)]">
+              <div className="text-5xl mb-5">🌿</div>
+              <p className="text-[#2C1A0E] font-serif text-[1.1rem] leading-relaxed italic">
+                "Practices are for the distance between gatherings.
+                <br /><br />
+                You're not in the same room — but you're doing the same thing, at the same time, together."
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-2xl mx-auto w-full pt-6 pb-16">
@@ -754,9 +777,9 @@ export default function MomentNew() {
               {/* ── Template selection ──────────────────────────── */}
               {step === "template" && (
                 <div className="flex-1">
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl font-semibold text-foreground mb-1">What practice will you tend together? 🌿</h2>
-                    <p className="text-sm text-muted-foreground italic">Choose a practice or begin from stillness. Everything can be edited.</p>
+                  <div className="mb-5">
+                    <h2 className="text-2xl font-semibold text-foreground mb-1">What will you tend together? 🌿</h2>
+                    <p className="text-sm text-muted-foreground italic">Spiritual practices for when you can't be in the same place. Everything can be edited.</p>
                   </div>
                   <div className="grid gap-3">
                     {TEMPLATES.map(t => (

@@ -180,10 +180,27 @@ export default function CreateRitual() {
   const createMutation = useCreateRitual();
 
   // Type chooser: null = chooser, "circle" = existing wizard
-  const [createType, setCreateType] = useState<"circle" | null>(null);
+  // If URL has ?type=circle or sessionStorage has tradition prefill, skip chooser
+  const [createType, setCreateType] = useState<"circle" | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("type") === "circle") return "circle";
+    if (sessionStorage.getItem("eleanor_tradition_prefill")) return "circle";
+    return null;
+  });
 
   const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
+
+  // Read tradition prefill from sessionStorage once on mount
+  const [name, setName] = useState<string>(() => {
+    try {
+      const raw = sessionStorage.getItem("eleanor_tradition_prefill");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed.name ?? "";
+      }
+    } catch {}
+    return "";
+  });
   const [participants, setParticipants] = useState([{ name: "", email: "" }]);
   const [frequency, setFrequency] = useState<CreateRitualBodyFrequency>("weekly");
   const [dayPreference, setDayPreference] = useState("");
@@ -199,6 +216,11 @@ export default function CreateRitual() {
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
+
+  // Clear sessionStorage prefill after reading
+  useEffect(() => {
+    sessionStorage.removeItem("eleanor_tradition_prefill");
+  }, []);
 
   const handleNext = () => setStep(s => Math.min(STEPS.length, s + 1));
   const handlePrev = () => setStep(s => Math.max(1, s - 1));
