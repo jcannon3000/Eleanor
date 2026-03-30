@@ -25,7 +25,6 @@ import {
 } from "@workspace/api-zod";
 import { computeStreak } from "../lib/streak";
 import { getWelcomeMessage, getCoordinatorResponse, suggestMeetingTimes } from "../lib/agent";
-import { deriveStartDate } from "../lib/scheduleDate";
 import { z } from "zod/v4";
 
 const router: IRouter = Router();
@@ -69,6 +68,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
   }
 
   const schedulingToken = randomUUID();
+  const location = typeof req.body.location === "string" ? req.body.location.trim() || null : null;
 
   const [ritual] = await db
     .insert(ritualsTable)
@@ -79,6 +79,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
       dayPreference: parsed.data.dayPreference ?? null,
       participants: parsed.data.participants ?? [],
       intention: parsed.data.intention ?? null,
+      location,
       ownerId: parsed.data.ownerId,
       scheduleToken: schedulingToken,
     })
@@ -125,6 +126,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
     createCalendarEvent(sessionUserId, {
       summary: ritual.name,
       description: ritual.intention ?? `Recurring ritual: ${ritual.name}`,
+      location: ritual.location ?? undefined,
       startDate,
       attendees: participantEmails,
       recurrence: recurrenceRule,
@@ -365,8 +367,34 @@ router.post("/rituals/:id/chat", async (req, res): Promise<void> => {
   res.json(SendMessageResponse.parse(savedMsg));
 });
 
-function generateFallbackTimes(dayPreference: string, frequency: string): string[] {
+function hasExplicitTime(text: string): boolean {
+  return /(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.test(text) ||
+    /\b([01]?\d|2[0-3]):([0-5]\d)\b/.test(text);
+}
+
+function getContextualHour(text: string): number {
+  const t = text.toLowerCase();
+  if (/brunch/.test(t)) return 11;
+  if (/breakfast/.test(t)) return 8;
+  if (/lunch/.test(t)) return 12;
+  if (/dinner|supper/.test(t)) return 19;
+  if (/happy.?hour/.test(t)) return 18;
+  if (/coffee|cafe/.test(t)) return 9;
+  if (/morning\s+(run|walk|hike|yoga|swim)/.test(t)) return 7;
+  if (/morning/.test(t)) return 8;
+  if (/evening|night/.test(t)) return 19;
+  if (/afternoon/.test(t)) return 14;
+  return 18;
+}
+
+function generateFallbackTimes(dayPreference: string, frequency: string, name = ""): string[] {
   const base = deriveStartDate(dayPreference || "", frequency);
+
+  if (!hasExplicitTime(dayPreference)) {
+    const hour = getContextualHour(name + " " + dayPreference);
+    base.setHours(hour, 0, 0, 0);
+  }
+
   const times: string[] = [base.toISOString()];
 
   const alt1 = new Date(base);
@@ -432,7 +460,7 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
     times = await suggestMeetingTimes(sessionUserId, enrichedRitual);
   } catch (err) {
     req.log.warn({ err }, "AI time suggestion failed, using date-math fallback");
-    times = generateFallbackTimes(ritual.dayPreference ?? "", ritual.frequency);
+    times = generateFallbackTimes(ritual.dayPreference ?? "", ritual.frequency, ritual.name);
   }
 
   if (times.length > 0) {
@@ -445,6 +473,8 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
 const ISOTimestamp = z.string().refine((s) => !isNaN(Date.parse(s)), { message: "Must be a valid ISO timestamp" });
 const ProposedTimesBody = z.object({
   proposedTimes: z.array(ISOTimestamp).min(1).max(3),
+  confirmedTime: ISOTimestamp.optional(),
+  location: z.string().optional(),
 });
 
 router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
@@ -477,13 +507,23 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     return;
   }
 
+  const updatePayload: Partial<typeof ritualsTable.$inferInsert> = {
+    proposedTimes: parsed.data.proposedTimes,
+  };
+  if (parsed.data.confirmedTime !== undefined) {
+    updatePayload.confirmedTime = parsed.data.confirmedTime;
+  }
+  if (parsed.data.location !== undefined) {
+    updatePayload.location = parsed.data.location || null;
+  }
+
   const [updated] = await db
     .update(ritualsTable)
-    .set({ proposedTimes: parsed.data.proposedTimes })
+    .set(updatePayload)
     .where(eq(ritualsTable.id, id))
     .returning();
 
-  res.json({ proposedTimes: updated.proposedTimes });
+  res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });
 });
 
 // GET /api/rituals/:id/scheduling-summary — auth-required

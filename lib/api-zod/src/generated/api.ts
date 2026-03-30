@@ -53,6 +53,7 @@ export const ListRitualsResponseItem = zod.object({
   description: zod.string().nullish(),
   frequency: zod.enum(["weekly", "biweekly", "monthly"]),
   dayPreference: zod.string().nullish(),
+  location: zod.string().nullish(),
   participants: zod.array(
     zod.object({
       name: zod.string(),
@@ -101,6 +102,7 @@ export const GetRitualResponse = zod
     description: zod.string().nullish(),
     frequency: zod.enum(["weekly", "biweekly", "monthly"]),
     dayPreference: zod.string().nullish(),
+    location: zod.string().nullish(),
     participants: zod.array(
       zod.object({
         name: zod.string(),

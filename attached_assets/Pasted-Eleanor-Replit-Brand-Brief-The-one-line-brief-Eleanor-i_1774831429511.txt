@@ -1,0 +1,71 @@
+Eleanor — Replit Brand Brief
+
+The one-line brief
+Eleanor is a personal assistant for your relationships. She tends the rhythm of your connections so they don’t wither from friction and forgotten intentions. The metaphor is gardening — not productivity, not scheduling. Gardening your sense of belonging.
+
+Typography
+Space Grotesk — use it everywhere, for everything. Bold for headings, regular for body, no other fonts.
+Import: https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap
+
+Colors
+
+--soil:   #2C1810   dark backgrounds, hero sections, nav
+--cream:  #F7F0E6   cards, light surfaces, primary text on dark
+--sage:   #6B8F71   CTAs, growing states, positive actions
+--amber:  #C17F24   streaks, goals achieved, celebration moments
+--blush:  #D4896A   at-risk states, needs water — warm not alarming
+--white:  #FAF6F0   secondary surfaces, page backgrounds
+--muted:  #9B8E82   secondary text, captions, metadata
+
+
+Emojis as icons
+No icon libraries. Emojis only.
+Core set: 🌱 🌿 🌸 🌳 🥀 💧 🌾 ✨ 🔥 📅 ⚠️ ✅ ❌ 😴
+
+The language
+Every word in the product uses gardening metaphors. No exceptions.
+
+
+
+|Term       |Meaning                                     |
+|-----------|--------------------------------------------|
+|Plant      |Start a ritual                              |
+|Tend       |Coordinate, follow up                       |
+|Bloom      |A gathering that happened ✅                 |
+|Wither     |A gathering that didn’t ❌                   |
+|In bloom   |Thriving, consistent                        |
+|Needs water|At risk, falling behind                     |
+|Dormant    |Long gap, not yet gone                      |
+|Harvest    |Goal achieved 🌾                             |
+|Garden     |Home screen — all your rituals              |
+|Circle     |A group of people sharing a ritual          |
+|Ritual     |A recurring shared activity                 |
+|Gathering  |One instance of a ritual                    |
+|Growth     |Consistency over time (not “streak” in copy)|
+
+Growth states
+These replace any gamification language. They are living descriptions, not levels.
+
+🌱  Just planted     — 0–1 gatherings
+🌿  Taking root      — 2–4 gatherings
+🌳  Growing steadily — 5–9 gatherings
+🌸  In bloom         — 10+ consistent
+💧  Needs water      — first miss
+😴  Dormant          — two or more consecutive misses
+
+
+Card style
+16px border radius. Generous padding. Warm not clinical. No sharp edges, no cold greys, nothing that feels like a productivity tool.
+
+Eleanor’s voice
+Warm, patient, observant. Like a gardener who notices what needs tending before you do. Never robotic. Never pushy. Always uses the circle name and people’s names.
+✅ “Your Thursday runs need a little water. I checked everyone’s calendars — here’s what works. 🌿”
+✅ “One more gathering and you’ll harvest your goal. 🌾”
+✅ “Your coffee circle is in bloom. Four gatherings in a row. 🌸”
+❌ “You haven’t scheduled anything!”
+❌ “Reminder: ritual overdue.”
+❌ “Alert: consistency dropping.”
+
+The feeling
+Partiful × Strava. Partiful’s warmth and celebration energy — gatherings feel like events worth attending. Strava’s earned momentum — consistency is visible, numbers are large and proud, showing up feels like it counts.
+Not a productivity app. Not a social network. Not a calendar tool. A garden for your relationships.​​​​​​​​​​​​​​​​

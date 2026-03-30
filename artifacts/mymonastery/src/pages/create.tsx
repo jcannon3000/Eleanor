@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, ArrowLeft, Plus, X, Loader2, Sprout } from "lucide-react";
 import { useCreateRitual, CreateRitualBodyFrequency } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
@@ -137,7 +136,7 @@ function ParticipantRow({ participant, index, showRemove, onUpdate, onRemove, on
             onClick={() => onRemove(index)}
             className="p-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
           >
-            <X size={20} />
+            ✕
           </button>
         )}
       </div>
@@ -146,7 +145,7 @@ function ParticipantRow({ participant, index, showRemove, onUpdate, onRemove, on
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
           {isLoading ? (
             <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-              <Loader2 size={14} className="animate-spin" />
+              <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
               Searching contacts...
             </div>
           ) : (
@@ -185,6 +184,7 @@ export default function CreateRitual() {
   const [participants, setParticipants] = useState([{ name: "", email: "" }]);
   const [frequency, setFrequency] = useState<CreateRitualBodyFrequency>("weekly");
   const [dayPreference, setDayPreference] = useState("");
+  const [locationVal, setLocationVal] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -230,8 +230,9 @@ export default function CreateRitual() {
           frequency,
           dayPreference: dayPreference.trim(),
           participants: validParticipants,
-          ownerId: user.id
-        }
+          ownerId: user.id,
+          ...(locationVal.trim() ? { location: locationVal.trim() } : {}),
+        } as Parameters<typeof createMutation.mutateAsync>[0]["data"]
       });
 
       toast({
@@ -266,7 +267,7 @@ export default function CreateRitual() {
             onClick={() => setLocation("/dashboard")}
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-8 transition-colors"
           >
-            <ArrowLeft size={16} /> Back to Garden
+            ← Back to Garden
           </button>
 
           <div className="mb-3">
@@ -298,7 +299,7 @@ export default function CreateRitual() {
               {step === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-3xl font-serif mb-2">What do you want to grow?</h2>
+                    <h2 className="text-3xl font-semibold mb-2">What do you want to grow?</h2>
                     <p className="text-muted-foreground">Give your ritual a simple, clear name.</p>
                   </div>
                   <input
@@ -316,7 +317,7 @@ export default function CreateRitual() {
               {step === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-3xl font-serif mb-2">Who is in your circle?</h2>
+                    <h2 className="text-3xl font-semibold mb-2">Who is in your circle?</h2>
                     <p className="text-muted-foreground">Add up to 8 people. Eleanor will include them.</p>
                   </div>
 
@@ -339,7 +340,7 @@ export default function CreateRitual() {
                       onClick={addParticipant}
                       className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium px-2 py-2"
                     >
-                      <Plus size={18} /> Add another person
+                      + Add another person
                     </button>
                   )}
                 </div>
@@ -348,7 +349,7 @@ export default function CreateRitual() {
               {step === 3 && (
                 <div className="space-y-8">
                   <div>
-                    <h2 className="text-3xl font-serif mb-2">How often will you gather?</h2>
+                    <h2 className="text-3xl font-semibold mb-2">How often will you gather?</h2>
                     <p className="text-muted-foreground">Consistency is what turns intention into tradition.</p>
                   </div>
 
@@ -378,7 +379,20 @@ export default function CreateRitual() {
                         type="text"
                         value={dayPreference}
                         onChange={e => setDayPreference(e.target.value)}
-                        placeholder="e.g. Thursday evenings, Last Sunday of the month at 6pm"
+                        placeholder="e.g. Thursday evenings, Sunday brunch, Last Sunday at 6pm"
+                        className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-3 text-foreground">
+                        📍 Where will you gather? <span className="text-muted-foreground font-normal">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={locationVal}
+                        onChange={e => setLocationVal(e.target.value)}
+                        placeholder="e.g. Central Park, The usual café, Someone's place"
                         className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                       />
                     </div>
@@ -405,7 +419,7 @@ export default function CreateRitual() {
                 disabled={!isStepValid()}
                 className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                Continue <ChevronRight size={18} />
+                Continue →
               </button>
             ) : (
               <button
@@ -414,9 +428,9 @@ export default function CreateRitual() {
                 className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:shadow-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_4px_14px_rgba(45,74,62,0.25)]"
               >
                 {createMutation.isPending ? (
-                  <><Loader2 size={18} className="animate-spin" /> Planting...</>
+                  <><span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Planting...</>
                 ) : (
-                  <>Plant It <Sprout size={18} /></>
+                  <>Plant It 🌱</>
                 )}
               </button>
             )}

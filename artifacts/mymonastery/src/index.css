@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -51,62 +51,61 @@
 }
 
 :root {
-  /* Warm Earthy Minimal Palette */
-  /* Background: Warm off-white #FAF7F2 */
-  --background: 36 33% 96%;
-  /* Foreground: Deep forest/charcoal for excellent readability #1D2D26 */
-  --foreground: 154 21% 15%;
-  
-  --border: 36 15% 85%;
-  --input: 36 15% 85%;
-  --ring: 155 24% 23%;
+  /* Eleanor — Gardening for your relationships */
+  /* soil   #2C1810 — dark bg, hero, nav       */
+  /* cream  #F7F0E6 — cards, light surfaces    */
+  /* sage   #6B8F71 — CTAs, growing states     */
+  /* amber  #C17F24 — streaks, goals           */
+  /* blush  #D4896A — at-risk, needs water     */
+  /* white  #FAF6F0 — page background          */
+  /* muted  #9B8E82 — secondary text           */
 
-  /* Cards are slightly lighter/whiter than the off-white background */
-  --card: 0 0% 100%;
-  --card-foreground: 154 21% 15%;
-  --card-border: 36 15% 90%;
+  --background: 37 50% 96%;        /* #FAF6F0 */
+  --foreground: 17 47% 12%;        /* #2C1810 soil */
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 154 21% 15%;
-  --popover-border: 36 15% 90%;
+  --border: 35 28% 86%;
+  --input: 35 28% 86%;
+  --ring: 130 14% 49%;             /* sage */
 
-  /* Primary: Deep forest green #2D4A3E */
-  --primary: 155 24% 23%;
-  --primary-foreground: 36 33% 96%;
+  --card: 35 46% 93%;              /* #F7F0E6 cream */
+  --card-foreground: 17 47% 12%;
+  --card-border: 35 28% 88%;
 
-  /* Secondary: Soft Sage/Stone */
-  --secondary: 155 10% 90%;
-  --secondary-foreground: 155 24% 23%;
+  --popover: 37 50% 96%;
+  --popover-foreground: 17 47% 12%;
+  --popover-border: 35 28% 88%;
 
-  /* Muted: Soft background elements */
-  --muted: 36 20% 92%;
-  --muted-foreground: 155 10% 45%;
+  --primary: 130 14% 49%;          /* #6B8F71 sage */
+  --primary-foreground: 37 50% 96%;
 
-  /* Accent: Soft Terracotta #C4735A */
-  --accent: 14 45% 56%;
-  --accent-foreground: 0 0% 100%;
+  --secondary: 35 46% 93%;         /* cream */
+  --secondary-foreground: 17 47% 12%;
 
-  /* Destructive: Warmer, softer red */
-  --destructive: 0 60% 50%;
-  --destructive-foreground: 0 0% 100%;
+  --muted: 35 18% 94%;
+  --muted-foreground: 29 11% 56%;  /* #9B8E82 */
 
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: 'Playfair Display', Georgia, serif;
+  --accent: 35 69% 45%;            /* #C17F24 amber */
+  --accent-foreground: 37 50% 96%;
+
+  --destructive: 18 55% 62%;       /* #D4896A blush — warm not alarming */
+  --destructive-foreground: 37 50% 96%;
+
+  --app-font-sans: 'Space Grotesk', sans-serif;
+  --app-font-serif: 'Space Grotesk', sans-serif;
   --app-font-mono: Menlo, monospace;
-  
-  --radius: 0.75rem;
 
-  /* Custom Warm Shadows */
-  --shadow-warm-sm: 0 2px 4px -1px rgba(45, 74, 62, 0.05);
-  --shadow-warm-md: 0 4px 6px -1px rgba(45, 74, 62, 0.05), 0 2px 4px -1px rgba(45, 74, 62, 0.03);
-  --shadow-warm-lg: 0 10px 15px -3px rgba(45, 74, 62, 0.05), 0 4px 6px -2px rgba(45, 74, 62, 0.025);
-  --shadow-warm-xl: 0 20px 25px -5px rgba(45, 74, 62, 0.05), 0 10px 10px -5px rgba(45, 74, 62, 0.02);
+  --radius: 1rem;
 
-  --button-outline: rgba(45, 74, 62, 0.10);
-  --badge-outline: rgba(45, 74, 62, 0.05);
+  --shadow-warm-sm: 0 2px 4px -1px rgba(44, 24, 16, 0.06);
+  --shadow-warm-md: 0 4px 6px -1px rgba(44, 24, 16, 0.06), 0 2px 4px -1px rgba(44, 24, 16, 0.04);
+  --shadow-warm-lg: 0 10px 15px -3px rgba(44, 24, 16, 0.06), 0 4px 6px -2px rgba(44, 24, 16, 0.03);
+  --shadow-warm-xl: 0 20px 25px -5px rgba(44, 24, 16, 0.06), 0 10px 10px -5px rgba(44, 24, 16, 0.025);
+
+  --button-outline: rgba(107, 143, 113, 0.15);
+  --badge-outline: rgba(107, 143, 113, 0.08);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(45, 74, 62, 0.03);
-  --elevate-2: rgba(45, 74, 62, 0.08);
+  --elevate-1: rgba(44, 24, 16, 0.03);
+  --elevate-2: rgba(44, 24, 16, 0.07);
 }
 
 @layer base {
@@ -116,12 +115,12 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background-image: radial-gradient(rgba(45, 74, 62, 0.03) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(44, 24, 16, 0.025) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--app-font-serif);
-    @apply font-medium tracking-tight;
+    font-family: var(--app-font-sans);
+    @apply font-semibold tracking-tight;
   }
 }
