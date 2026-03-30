@@ -7,10 +7,30 @@ import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite";
+type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
+  | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite";
 type LoggingType = "reflection" | "timer" | "timer_reflection" | "checkin";
 type Frequency = "daily" | "weekly";
 type TimeOfDay = "morning" | "midday" | "afternoon" | "night";
+type BcpFreqType = "once" | "twice" | "three" | "five" | "daily";
+
+// ─── BCP Frequency options ────────────────────────────────────────────────────
+const BCP_FREQ_OPTIONS: {
+  id: BcpFreqType; emoji: string; label: string; sub: string;
+  dots: number; daysPerWeek: number; badge: string | null;
+  bg: string; message: string;
+}[] = [
+  { id: "once",  emoji: "🌱", label: "Once a week",       sub: "A gentle beginning",  dots: 1, daysPerWeek: 1, badge: null,          bg: "#EEF3EF", message: "One office together each week. A beginning." },
+  { id: "twice", emoji: "🌿", label: "Twice a week",       sub: "Taking root",         dots: 2, daysPerWeek: 2, badge: null,          bg: "#E8F0EA", message: "Two offices. Enough to find a rhythm." },
+  { id: "three", emoji: "🌸", label: "Three times a week", sub: "A real rhythm",       dots: 3, daysPerWeek: 3, badge: "Most chosen 🌿", bg: "#E0EBE2", message: "Three times. This is where something real takes root." },
+  { id: "five",  emoji: "🌳", label: "Five times a week",  sub: "A weekday practice",  dots: 5, daysPerWeek: 5, badge: null,          bg: "#F7F0E6", message: "The weekday office. A serious commitment." },
+  { id: "daily", emoji: "✨", label: "Daily",              sub: "The full Daily Office", dots: 7, daysPerWeek: 7, badge: null,         bg: "#F7F0E6", message: "Every day. The full practice of the Daily Office." },
+];
+
+const WEEK_DAYS = [
+  { id: "MO", label: "Mon" }, { id: "TU", label: "Tue" }, { id: "WE", label: "Wed" },
+  { id: "TH", label: "Thu" }, { id: "FR", label: "Fri" }, { id: "SA", label: "Sat" }, { id: "SU", label: "Sun" },
+];
 
 const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
 
@@ -442,6 +462,20 @@ export default function MomentNew() {
   const [goalDays, setGoalDays] = useState(7);
   const [participants, setParticipants] = useState([{ name: "", email: "" }]);
 
+  // ─── BCP-specific state (Morning Prayer / Evening Prayer) ────────────────────
+  const [bcpFreqType, setBcpFreqType] = useState<BcpFreqType | null>(null);
+  const [bcpPracticeDays, setBcpPracticeDays] = useState<string[]>([]);
+  const [bcpTimeSlot, setBcpTimeSlot] = useState<"early-morning" | "morning" | "late-afternoon" | "evening" | null>(null);
+  const [bcpPersonalHour, setBcpPersonalHour] = useState(8);
+  const [bcpPersonalMinute, setBcpPersonalMinute] = useState(0);
+  const [bcpPersonalAmPm, setBcpPersonalAmPm] = useState<"AM" | "PM">("AM");
+  const [bcpTimezone, setBcpTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [bcpParticipants, setBcpParticipants] = useState<{ name: string; email: string }[]>([{ name: "", email: "" }]);
+  const [bcpConnections, setBcpConnections] = useState<{ name: string; email: string; invited: boolean }[]>([]);
+  const [bcpConnectionsFetched, setBcpConnectionsFetched] = useState(false);
+  const [bcpDone, setBcpDone] = useState(false);
+  const [bcpCreatedToken, setBcpCreatedToken] = useState<string | null>(null);
+
   // Organizer personal time (after creation for spiritual templates)
   const [showPersonalTimePrompt, setShowPersonalTimePrompt] = useState(false);
   const [personalTimeDone, setPersonalTimeDone] = useState(false);
@@ -467,6 +501,11 @@ export default function MomentNew() {
   // ─── Template selection handler ─────────────────────────────────────────────
   function selectTemplate(t: typeof TEMPLATES[0]) {
     setTemplateId(t.id);
+    // Morning Prayer and Evening Prayer use a completely separate BCP flow
+    if (t.id === "morning-prayer" || t.id === "evening-prayer") {
+      setStep("bcp-commitment");
+      return;
+    }
     if (t.prefill) {
       setName(t.prefill.name);
       setIntention(t.prefill.intention);
@@ -505,13 +544,30 @@ export default function MomentNew() {
   }
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
-  const STEP_ORDER: StepId[] = ["template", ...(templateId === "intercession" ? ["intercession" as StepId] : []), "name", "intention", "logging", "schedule", "goal", "invite"];
+  const isBcpTemplate = templateId === "morning-prayer" || templateId === "evening-prayer";
+  const BCP_STEP_ORDER: StepId[] = ["template", "bcp-commitment", "bcp-frequency", "bcp-time", "bcp-invite"];
+  const STEP_ORDER: StepId[] = isBcpTemplate
+    ? BCP_STEP_ORDER
+    : ["template", ...(templateId === "intercession" ? ["intercession" as StepId] : []), "name", "intention", "logging", "schedule", "goal", "invite"];
 
   function goNext() {
     const idx = STEP_ORDER.indexOf(step);
     if (idx < STEP_ORDER.length - 1) setStep(STEP_ORDER[idx + 1]);
+    else if (isBcpTemplate) handleSubmitBcp();
     else handleSubmit();
   }
+
+  // Fetch existing connections when entering bcp-invite step
+  useEffect(() => {
+    if (step === "bcp-invite" && !bcpConnectionsFetched) {
+      setBcpConnectionsFetched(true);
+      apiRequest<{ connections: { name: string; email: string }[] }>("GET", "/api/connections")
+        .then(r => {
+          setBcpConnections(r.connections.map(c => ({ ...c, invited: false })));
+        })
+        .catch(() => {});
+    }
+  }, [step, bcpConnectionsFetched]);
 
   function goBack() {
     const idx = STEP_ORDER.indexOf(step);
@@ -526,6 +582,16 @@ export default function MomentNew() {
   const canNext = () => {
     if (step === "template") return false;
     if (step === "intercession") return false;
+    if (step === "bcp-commitment") return true;
+    if (step === "bcp-frequency") {
+      if (!bcpFreqType) return false;
+      if (bcpFreqType !== "daily") return bcpPracticeDays.length === BCP_FREQ_OPTIONS.find(f => f.id === bcpFreqType)!.daysPerWeek;
+      return true;
+    }
+    if (step === "bcp-time") {
+      return bcpTimeSlot !== null;
+    }
+    if (step === "bcp-invite") return true;
     if (step === "name") return name.trim().length >= 2;
     if (step === "intention") return intention.trim().length >= 4;
     if (step === "logging") {
@@ -551,6 +617,64 @@ export default function MomentNew() {
       if (isSpiritual) setShowPersonalTimePrompt(true);
     },
   });
+
+  // ─── BCP submit ──────────────────────────────────────────────────────────────
+  const bcpPlantMutation = useMutation({
+    mutationFn: (data: object) => apiRequest<{ moment: { id: number; momentToken: string } }>("POST", "/api/moments", data),
+    onSuccess: (data) => {
+      setBcpCreatedToken(data.moment.momentToken);
+      // Save organizer personal time
+      const h = (() => {
+        let hh = bcpPersonalHour % 12;
+        if (bcpPersonalAmPm === "PM") hh += 12;
+        if (hh === 12 && bcpPersonalAmPm === "AM") hh = 0;
+        return hh;
+      })();
+      const ptStr = `${String(h).padStart(2, "0")}:${String(bcpPersonalMinute).padStart(2, "0")}`;
+      apiRequest("POST", `/api/moments/${data.moment.id}/personal-time`, {
+        personalTime: ptStr,
+        personalTimezone: bcpTimezone,
+      }).catch(() => {});
+      setBcpDone(true);
+    },
+  });
+
+  function handleSubmitBcp() {
+    const isMorning = templateId === "morning-prayer";
+    const freqOpt = BCP_FREQ_OPTIONS.find(f => f.id === bcpFreqType);
+    const daysPerWeek = freqOpt?.daysPerWeek ?? 7;
+    const isDaily = bcpFreqType === "daily";
+    const validParticipants = [
+      ...bcpConnections.filter(c => c.invited),
+      ...bcpParticipants.filter(p => p.name.trim() && p.email.trim()),
+    ];
+
+    // Build the scheduled time from bcpPersonalHour + bcpPersonalAmPm
+    const h = (() => {
+      let hh = bcpPersonalHour % 12;
+      if (bcpPersonalAmPm === "PM") hh += 12;
+      if (hh === 12 && bcpPersonalAmPm === "AM") hh = 0;
+      return hh;
+    })();
+    const scheduledTimeStr = `${String(h).padStart(2, "0")}:${String(bcpPersonalMinute).padStart(2, "0")}`;
+
+    bcpPlantMutation.mutate({
+      name: isMorning ? "Morning Prayer 🌅" : "Evening Prayer 🌙",
+      intention: isMorning
+        ? "We open the day together. From the same book, in our own homes — but not alone."
+        : "We close the day together. From the same book, in our own homes — but not alone.",
+      loggingType: "checkin",
+      templateType: templateId,
+      frequency: isDaily ? "daily" : "weekly",
+      scheduledTime: scheduledTimeStr,
+      timezone: bcpTimezone,
+      goalDays: 0,
+      frequencyType: bcpFreqType,
+      frequencyDaysPerWeek: daysPerWeek,
+      practiceDays: isDaily ? "[]" : JSON.stringify(bcpPracticeDays),
+      participants: validParticipants,
+    });
+  }
 
   const personalTimeMutation = useMutation({
     mutationFn: (data: object) =>
@@ -723,6 +847,95 @@ export default function MomentNew() {
     );
   }
 
+  // ── BCP Confirmation screen ─────────────────────────────────────────────────
+  if (bcpDone) {
+    const isMorning = templateId === "morning-prayer";
+    const freqOpt = BCP_FREQ_OPTIONS.find(f => f.id === bcpFreqType);
+    const freqLabel = freqOpt?.label ?? "Daily";
+    return (
+      <div className="min-h-screen bg-[#2C1810] flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="max-w-sm w-full text-center text-[#F7F0E6]">
+          <div className="text-6xl mb-6">{isMorning ? "🌅" : "🌙"}</div>
+          <h2 className="text-3xl font-bold mb-2">
+            {isMorning ? "Morning Prayer is planted." : "Evening Prayer is planted."}
+          </h2>
+          <p className="text-[#F7F0E6]/70 mb-6">{freqLabel} · Everyone prays at their own time</p>
+          <p className="text-sm text-[#F7F0E6]/60 mb-8">Calendar invites are on their way.</p>
+          <div className="bg-[#F7F0E6]/10 border border-[#F7F0E6]/20 rounded-2xl p-5 mb-8 text-left">
+            <p className="text-sm font-medium text-[#F7F0E6] mb-1">
+              Open your BCP to page {isMorning ? "75" : "115"}.
+            </p>
+            <a href={isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html"}
+              target="_blank" rel="noopener noreferrer"
+              className="text-sm text-[#6B8F71] underline underline-offset-2">
+              Or pray online: {isMorning ? "bcponline.org/MP2.html" : "bcponline.org/EP2.html"}
+            </a>
+          </div>
+          <p className="text-[#F7F0E6]/50 font-serif italic text-sm leading-relaxed mb-8">
+            {isMorning
+              ? '"Let my prayer be set forth in thy sight as incense, and the lifting up of my hands as the evening sacrifice." — Psalm 141:2'
+              : '"O gracious Light, pure brightness of the everliving Father in heaven." — Phos Hilaron'}
+          </p>
+          <button onClick={() => setLocation("/moments")}
+            className="px-10 py-4 bg-[#6B8F71] text-white rounded-full text-base font-semibold hover:bg-[#5a7a60] transition-colors">
+            Done 🌿
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── BCP Commitment screen (full screen, soil bg) ─────────────────────────────
+  if (step === "bcp-commitment" && isBcpTemplate) {
+    const isMorning = templateId === "morning-prayer";
+    return (
+      <div className="min-h-screen bg-[#2C1810] flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className="max-w-sm w-full text-center text-[#F7F0E6]">
+          <div className="text-6xl mb-6">{isMorning ? "🌅" : "🌙"}</div>
+          <h1 className="text-3xl font-bold leading-tight mb-2">
+            Commit to {isMorning ? "Morning Prayer" : "Evening Prayer"}
+          </h1>
+          <p className="text-[#6B8F71] text-lg font-semibold mb-8">together</p>
+          <p className="font-serif italic text-[#F7F0E6]/80 text-base leading-loose mb-8">
+            {isMorning ? (
+              <>
+                "Morning Prayer is the first office of the day.<br />
+                Prayed in the morning, from the same book,<br />
+                in your own home — but not alone.<br /><br />
+                You and your people will pray the same words<br />
+                at the same time of day, wherever you are.<br />
+                That is what makes it fellowship."
+              </>
+            ) : (
+              <>
+                "Evening Prayer is the closing office of the day.<br />
+                Prayed as the light changes, from the same book,<br />
+                in your own home — but not alone.<br /><br />
+                You and your people will pray the same words<br />
+                at the same time of day, wherever you are.<br />
+                That is what makes it fellowship."
+              </>
+            )}
+          </p>
+          <p className="text-[#F7F0E6]/50 text-sm mb-8">
+            {isMorning ? "Morning Prayer Rite II" : "Evening Prayer Rite II"}<br />
+            Book of Common Prayer · Page {isMorning ? "75" : "115"}
+          </p>
+          <button onClick={goNext}
+            className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors">
+            I want to commit to this 🌿
+          </button>
+          <button onClick={() => { setTemplateId(null); setStep("template"); }}
+            className="mt-4 text-sm text-[#F7F0E6]/40 hover:text-[#F7F0E6]/70 transition-colors">
+            ← Go back
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   // ── Practice intro splash (first use only) ──────────────────────────────────
   if (showIntro) {
     return (
@@ -872,6 +1085,255 @@ export default function MomentNew() {
                   )}
                 </div>
               )}
+
+              {/* ── BCP: How often ──────────────────────────────────── */}
+              {step === "bcp-frequency" && (() => {
+                const isMorning = templateId === "morning-prayer";
+                const freqOpt = BCP_FREQ_OPTIONS.find(f => f.id === bcpFreqType);
+                const requiredDays = freqOpt && freqOpt.id !== "daily" ? freqOpt.daysPerWeek : 0;
+                return (
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-1">How many times a week will you pray together? 🌿</h2>
+                      <p className="text-sm text-muted-foreground italic">This is your commitment to each other. Choose what you can sustain.</p>
+                    </div>
+                    <div className="space-y-3">
+                      {BCP_FREQ_OPTIONS.map(opt => {
+                        const sel = bcpFreqType === opt.id;
+                        const accentBar = opt.id === "five" || opt.id === "daily";
+                        return (
+                          <button key={opt.id} onClick={() => {
+                            setBcpFreqType(opt.id);
+                            if (opt.id === "daily") setBcpPracticeDays([]);
+                            else setBcpPracticeDays([]);
+                          }}
+                            className="relative w-full text-left rounded-2xl overflow-hidden transition-all duration-200"
+                            style={{ background: sel ? "#6B8F71" : opt.bg }}
+                          >
+                            {accentBar && !sel && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: opt.id === "five" ? "#6B8F71" : "#C17F24" }} />
+                            )}
+                            <div className={`flex items-center gap-4 px-5 py-4 ${accentBar && !sel ? "pl-6" : ""}`}>
+                              <span className="text-3xl">{opt.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-bold text-base ${sel ? "text-[#F7F0E6]" : "text-[#2C1A0E]"}`}>{opt.label}</span>
+                                  {opt.badge && !sel && (
+                                    <span className="text-xs font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">{opt.badge}</span>
+                                  )}
+                                  {sel && <span className="ml-auto text-[#F7F0E6] text-lg">✓</span>}
+                                </div>
+                                <p className={`text-xs mt-0.5 ${sel ? "text-[#F7F0E6]/80" : "text-[#6b5c4a]/70"}`}>{opt.sub}</p>
+                                <div className="flex gap-1 mt-2">
+                                  {Array.from({ length: 7 }).map((_, i) => (
+                                    <div key={i} className="w-2.5 h-2.5 rounded-full transition-all duration-300"
+                                      style={{ background: i < opt.dots ? (sel ? "#F7F0E6" : "#6B8F71") : "rgba(107,143,113,0.2)" }} />
+                                  ))}
+                                </div>
+                                <p className={`text-xs mt-1 ${sel ? "text-[#F7F0E6]/60" : "text-[#6b5c4a]/50"}`}>
+                                  {opt.dots} office{opt.dots > 1 ? "s" : ""} together each week
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Dynamic message */}
+                    {bcpFreqType && freqOpt && (
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        className="text-sm text-[#6B8F71] font-medium italic text-center py-2">
+                        {freqOpt.message}
+                      </motion.p>
+                    )}
+                    {/* Day selector for non-daily */}
+                    {bcpFreqType && bcpFreqType !== "daily" && requiredDays > 0 && (
+                      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                        <p className="text-sm font-medium text-foreground">Which days? 🌿</p>
+                        <p className="text-xs text-muted-foreground">Choose {requiredDays} day{requiredDays > 1 ? "s" : ""}</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {WEEK_DAYS.map(d => {
+                            const sel = bcpPracticeDays.includes(d.id);
+                            const atMax = bcpPracticeDays.length >= requiredDays && !sel;
+                            return (
+                              <button key={d.id}
+                                disabled={atMax}
+                                onClick={() => {
+                                  if (sel) setBcpPracticeDays(prev => prev.filter(x => x !== d.id));
+                                  else if (!atMax) setBcpPracticeDays(prev => [...prev, d.id]);
+                                }}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                                  sel ? "bg-[#6B8F71] text-white" : "bg-secondary text-foreground hover:bg-[#6B8F71]/10"
+                                } ${atMax ? "opacity-30 cursor-not-allowed" : ""}`}
+                              >
+                                {d.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── BCP: When in morning/evening ────────────────────── */}
+              {step === "bcp-time" && (() => {
+                const isMorning = templateId === "morning-prayer";
+                const slots = isMorning
+                  ? [
+                      { id: "early-morning" as const, emoji: "🌅", label: "Early morning", sub: "Before the day begins", range: "5am – 8am", minH: 5, maxH: 8, defaultH: 6, defaultM: 0, amPm: "AM" as const },
+                      { id: "morning" as const, emoji: "☀️", label: "Morning", sub: "As the day opens", range: "8am – 11am", minH: 8, maxH: 11, defaultH: 8, defaultM: 0, amPm: "AM" as const },
+                    ]
+                  : [
+                      { id: "late-afternoon" as const, emoji: "🌤", label: "Late afternoon", sub: "Before the evening meal", range: "4pm – 7pm", minH: 4, maxH: 7, defaultH: 5, defaultM: 0, amPm: "PM" as const },
+                      { id: "evening" as const, emoji: "🌙", label: "Evening", sub: "As the day releases", range: "7pm – 10pm", minH: 7, maxH: 10, defaultH: 7, defaultM: 0, amPm: "PM" as const },
+                    ];
+                const activeSlot = slots.find(s => s.id === bcpTimeSlot);
+                return (
+                  <div className="flex-1 space-y-5">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-1">
+                        {isMorning ? "When in the morning? 🌅" : "When in the evening? 🌙"}
+                      </h2>
+                      <p className="text-sm text-muted-foreground italic">
+                        You choose your time. Everyone in this practice sets their own.<br />
+                        You will all be praying at the same time of day, wherever you are.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {slots.map(s => {
+                        const sel = bcpTimeSlot === s.id;
+                        return (
+                          <button key={s.id} onClick={() => {
+                            setBcpTimeSlot(s.id);
+                            setBcpPersonalHour(s.defaultH);
+                            setBcpPersonalMinute(s.defaultM);
+                            setBcpPersonalAmPm(s.amPm);
+                          }}
+                            className={`rounded-2xl p-4 text-left transition-all ${
+                              sel ? "bg-[#6B8F71] text-white" : "bg-secondary/50 border border-border hover:border-[#6B8F71]/40"
+                            }`}>
+                            <div className="text-2xl mb-2">{s.emoji}</div>
+                            <p className={`font-bold text-sm ${sel ? "text-white" : "text-foreground"}`}>{s.label}</p>
+                            <p className={`text-xs mt-0.5 ${sel ? "text-white/70" : "text-muted-foreground"}`}>{s.sub}</p>
+                            <p className={`text-xs mt-1 ${sel ? "text-white/60" : "text-muted-foreground/60"}`}>({s.range})</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Time picker constrained to slot range */}
+                    {activeSlot && (
+                      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                        <p className="text-sm font-medium text-foreground">Your time</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl px-4 py-3 border border-border">
+                            <button onClick={() => {
+                              let h = bcpPersonalHour - 1;
+                              if (h < activeSlot.minH) h = activeSlot.maxH - 1;
+                              setBcpPersonalHour(h);
+                            }} className="text-muted-foreground hover:text-foreground px-1">−</button>
+                            <span className="text-xl font-bold w-8 text-center">{String(bcpPersonalHour).padStart(2, "0")}</span>
+                            <button onClick={() => {
+                              let h = bcpPersonalHour + 1;
+                              if (h >= activeSlot.maxH) h = activeSlot.minH;
+                              setBcpPersonalHour(h);
+                            }} className="text-muted-foreground hover:text-foreground px-1">+</button>
+                          </div>
+                          <span className="text-xl font-bold text-muted-foreground">:</span>
+                          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl px-4 py-3 border border-border">
+                            <button onClick={() => setBcpPersonalMinute(m => m === 0 ? 45 : m - 15)} className="text-muted-foreground hover:text-foreground px-1">−</button>
+                            <span className="text-xl font-bold w-8 text-center">{String(bcpPersonalMinute).padStart(2, "0")}</span>
+                            <button onClick={() => setBcpPersonalMinute(m => (m + 15) % 60)} className="text-muted-foreground hover:text-foreground px-1">+</button>
+                          </div>
+                          <span className="text-sm font-medium text-muted-foreground">{activeSlot.amPm}</span>
+                        </div>
+                        {/* Timezone */}
+                        <div>
+                          <label className="text-xs text-muted-foreground">Timezone</label>
+                          <input type="text" value={bcpTimezone} onChange={e => setBcpTimezone(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:border-[#6B8F71] focus:outline-none" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── BCP: Invite ──────────────────────────────────────── */}
+              {step === "bcp-invite" && (() => {
+                const isMorning = templateId === "morning-prayer";
+                return (
+                  <div className="flex-1 space-y-5">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-1">Who will pray with you? 🌿</h2>
+                      <p className="text-sm text-muted-foreground italic">
+                        Invite someone to commit to this practice with you.<br />
+                        They will choose their own time in the {isMorning ? "morning" : "evening"}.
+                      </p>
+                    </div>
+                    {/* Autofill from existing connections */}
+                    {bcpConnections.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">From your practices and traditions 🌿</p>
+                        {bcpConnections.map((c, i) => (
+                          <div key={i} className="flex items-center justify-between bg-secondary/30 border border-border/60 rounded-xl px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{c.name}</p>
+                              <p className="text-xs text-muted-foreground">{c.email}</p>
+                            </div>
+                            <button onClick={() => setBcpConnections(prev => prev.map((x, j) => j === i ? { ...x, invited: !x.invited } : x))}
+                              className={`text-sm font-medium rounded-full px-4 py-1.5 transition-all ${
+                                c.invited ? "bg-[#6B8F71] text-white" : "border border-[#6B8F71] text-[#6B8F71] hover:bg-[#6B8F71]/10"
+                              }`}>
+                              {c.invited ? "Invited ✓" : "+ Invite"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Manual invite */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Invite by email</p>
+                      {bcpParticipants.map((p, i) => (
+                        <div key={i} className="flex gap-2">
+                          <input type="text" value={p.name} onChange={e => setBcpParticipants(prev => { const n = [...prev]; n[i] = { ...n[i], name: e.target.value }; return n; })}
+                            placeholder="Name" className="flex-1 px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:border-[#6B8F71] focus:outline-none" />
+                          <input type="email" value={p.email} onChange={e => setBcpParticipants(prev => { const n = [...prev]; n[i] = { ...n[i], email: e.target.value }; return n; })}
+                            placeholder="Email" className="flex-[1.5] px-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:border-[#6B8F71] focus:outline-none" />
+                          {bcpParticipants.length > 1 && (
+                            <button onClick={() => setBcpParticipants(prev => prev.filter((_, j) => j !== i))}
+                              className="text-muted-foreground hover:text-destructive px-2">×</button>
+                          )}
+                        </div>
+                      ))}
+                      {bcpParticipants.length < 10 && (
+                        <button onClick={() => setBcpParticipants(prev => [...prev, { name: "", email: "" }])}
+                          className="text-sm text-[#6B8F71] hover:text-[#4a6b50] transition-colors">
+                          + Add another person
+                        </button>
+                      )}
+                    </div>
+                    {/* BCP info card */}
+                    <div className="bg-[#EEF3EF] border border-[#6B8F71]/20 rounded-2xl p-4 space-y-1">
+                      <p className="text-sm font-semibold text-[#2C1A0E]">📖 About {isMorning ? "Morning Prayer" : "Evening Prayer"}</p>
+                      <p className="text-sm text-[#6b5c4a]">
+                        {isMorning ? "Morning Prayer Rite II takes 15–20 minutes." : "Evening Prayer Rite II takes 15–20 minutes."}<br />
+                        It begins on page {isMorning ? "75" : "115"} of the Book of Common Prayer.
+                      </p>
+                      <a href={isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html"}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-sm text-[#6B8F71] underline underline-offset-2 block">
+                        No BCP? Pray online: {isMorning ? "bcponline.org/MP2.html" : "bcponline.org/EP2.html"}
+                      </a>
+                      <p className="text-xs text-[#6b5c4a]/70 italic mt-1">Everyone chooses their own time. You are together in spirit.</p>
+                    </div>
+                    {bcpPlantMutation.isError && (
+                      <p className="text-xs text-destructive text-center">Something went wrong. Please try again.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── Name ───────────────────────────────────────────── */}
               {step === "name" && (
@@ -1273,15 +1735,19 @@ export default function MomentNew() {
             </motion.div>
           </AnimatePresence>
 
-          {/* ── Next button (not shown for template or intercession main) ── */}
-          {step !== "template" && step !== "intercession" && (
+          {/* ── Next button (not shown for template, intercession main, or bcp-commitment) ── */}
+          {step !== "template" && step !== "intercession" && step !== "bcp-commitment" && (
             <div className="mt-6 pt-4 border-t border-border/30">
               <button
                 onClick={goNext}
-                disabled={!canNext() || plantMutation.isPending}
+                disabled={!canNext() || plantMutation.isPending || bcpPlantMutation.isPending}
                 className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors disabled:opacity-40"
               >
-                {plantMutation.isPending ? "Planting..." : step === "invite" ? "Plant this practice 🌿" : "Continue →"}
+                {(plantMutation.isPending || bcpPlantMutation.isPending)
+                  ? "Planting..."
+                  : step === "invite" || step === "bcp-invite"
+                    ? "Plant this practice 🌿"
+                    : "Continue →"}
               </button>
               {plantMutation.isError && (
                 <p className="text-xs text-destructive text-center mt-2">Something went wrong. Please try again.</p>

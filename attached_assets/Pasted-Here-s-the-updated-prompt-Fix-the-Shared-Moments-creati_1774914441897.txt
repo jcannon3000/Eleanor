@@ -1,0 +1,108 @@
+Here’s the updated prompt:
+
+Fix the Shared Moments creation flow — remove meditation timer entirely, fix time of day picker, fix detail screen language
+Do not change anything that is currently working correctly. Fix only the issues described below.
+
+CHANGE 1 — Remove the meditation timer completely
+Remove the Meditation Timer option from the logging type selection screen across the entire platform. Remove it from every template that currently pre-selects it including Morning Prayer, Evening Prayer, Breath Together, Contemplative Sit, and Intercession.
+For every practice that currently uses timer as its logging type replace it with the following defaults:
+Morning Prayer → logging type: checkin (Just show up)
+Evening Prayer → logging type: checkin (Just show up)
+Breath Together → logging type: checkin (Just show up)
+Contemplative Sit → logging type: checkin (Just show up)
+Intercession → logging type: reflection
+Remove timer, timer_reflection from the logging_type enum everywhere it appears in the codebase — in the database, in the creation flow, in the detail screen, in the posting page, and in any conditional rendering logic.
+Remove timer_duration_minutes from the shared_moments table or leave the column but stop using it. Do not show a duration selector anywhere in any flow.
+Remove all meditation timer UI from the posting page — the ring animation, the countdown, the Begin button, the completion pulse, the chime logic. None of this should exist anywhere in the app.
+After removal the only valid logging types are:
+
+photo
+reflection
+both
+checkin
+
+
+CHANGE 2 — Time of day selection not constraining the time picker
+On the time picker screen the user selected Afternoon but the hour picker is showing all 12 hours with AM selected by default. The time of day selection from the previous screen is not being passed to the time picker screen.
+Fix the time picker so it constrains based on the selected time of day:
+
+Early morning (5am–8am):
+  Hours: 5, 6, 7
+  AM only — hide PM
+  Default: 6 AM
+
+Morning (8am–11am):
+  Hours: 8, 9, 10, 11
+  AM only — hide PM
+  Default: 8 AM
+
+Midday (11am–2pm):
+  Hours: 11, 12, 1, 2
+  Mixed — 11 and 12 are AM, 1 and 2 are PM
+  Default: 12 PM
+
+Afternoon (2pm–6pm):
+  Hours: 2, 3, 4, 5, 6
+  PM only — hide AM
+  Default: 3 PM
+
+Late afternoon (4pm–7pm):
+  Hours: 4, 5, 6, 7
+  PM only — hide AM
+  Default: 5 PM
+
+Evening (7pm–10pm):
+  Hours: 7, 8, 9, 10
+  PM only — hide AM
+  Default: 8 PM
+
+Night (9pm–11pm):
+  Hours: 9, 10, 11
+  PM only — hide AM
+  Default: 9 PM
+
+
+Also fix the grammatical error on this screen. Currently reads “You’ve planted a afternoon practice.” Fix to “You’ve planted an afternoon practice.”
+
+CHANGE 3 — Detail screen showing wrong information
+Fix every instance of wrong language on the practice detail screen:
+Remove “1440 min window” — this was caused by the timer defaulting incorrectly. After removing the timer this should no longer appear. If it does appear anywhere remove it.
+Remove “min window” language entirely from the detail screen for all practice types. The word “window” should not appear anywhere on the detail screen for practices.
+Replace every instance:
+	∙	“0 blooms of 0 windows so far” → “0 practices together so far”
+	∙	“0 windows” in the HISTORY section → “0 practices”
+	∙	Any other “windows” language on the detail screen → “practices”
+Fix the goal display:
+Currently shows:
+
+7-DAY GOAL          0% through
+0 blooms of 0 windows so far
+
+
+Fix to:
+
+🌿 One week together     Just planted
+0 practices so far
+
+
+Goal label based on milestone chosen:
+	∙	3 days → “🌱 Three days together”
+	∙	7 days → “🌿 One week together”
+	∙	14 days → “🌸 Two weeks together”
+	∙	No goal → hide this section entirely
+Progress label on the right:
+	∙	0 practices → “Just planted”
+	∙	1–50% through → “Taking root”
+	∙	51–99% → “Growing”
+	∙	100% → “🌾 Harvested”
+
+CHANGE 4 — Remove the Set the tone prompt
+Remove the “Set the tone — share a thought or intention that inspires the group before the first window” text input from the practice detail screen entirely. It was not asked for and should not be there. Do not remove or change any journal functionality — only remove this specific unprompted text input from the detail screen.
+
+Fix order
+	1.	Remove meditation timer from the entire codebase — logging types, creation flow, posting page, detail screen, all templates
+	2.	Update all spiritual practice templates to use checkin or reflection as described above
+	3.	Fix time of day constraining the time picker
+	4.	Fix grammatical error “a afternoon” → “an afternoon”
+	5.	Fix detail screen — remove window language, fix goal language, remove Set the tone prompt
+Test after fixing: create a new practice, select any template, verify no timer option appears anywhere, verify time of day constrains the picker correctly, verify detail screen shows correct language throughout with no window references and no Set the tone prompt.​​​​​​​​​​​​​​​​

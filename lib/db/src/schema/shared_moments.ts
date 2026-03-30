@@ -25,6 +25,9 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   longestStreak: integer("longest_streak").notNull().default(0),
   totalBlooms: integer("total_blooms").notNull().default(0),
   state: text("state").notNull().default("active"),
+  frequencyType: text("frequency_type"),
+  frequencyDaysPerWeek: integer("frequency_days_per_week"),
+  practiceDays: text("practice_days"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

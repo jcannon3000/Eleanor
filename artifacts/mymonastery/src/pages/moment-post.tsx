@@ -8,7 +8,8 @@ import clsx from "clsx";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type LoggingType = "reflection" | "checkin" | "timer" | "timer_reflection";
 
-const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
+const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 const RRULE_DAY_MAP: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
 type MomentData = {
@@ -445,6 +446,7 @@ export default function MomentPostPage() {
 
   // ── Spiritual template logic: open all day on practice days ─────────────────
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
+  const isBcp = BCP_TEMPLATE_IDS.has(moment.templateType ?? "");
   const isPracticeDay = (() => {
     if (!isSpiritual) return true;
     if (moment.frequency === "daily") return true;
@@ -508,6 +510,125 @@ export default function MomentPostPage() {
   // ── Outside window or already posted for timer ──────────────────────────────
   if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && !alreadyPosted && !effectiveWindowOpen) {
     return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
+  }
+
+  // ── BCP (Morning Prayer / Evening Prayer) posting page ─────────────────────
+  if (isBcp) {
+    const isMorning = moment.templateType === "morning-prayer";
+    const officeName = isMorning ? "Morning Prayer" : "Evening Prayer";
+    const bcpPage = isMorning ? "75" : "115";
+    const bcpUrl = isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html";
+    const bgColor = isMorning ? "#2C1810" : "#1A1C2E";
+    const accentColor = isMorning ? "#C8975A" : "#7B9EBE";
+
+    if (!effectiveWindowOpen && !alreadyPosted) {
+      return (
+        <div className="min-h-screen flex items-center justify-center px-6" style={{ background: bgColor }}>
+          <div className="text-center max-w-xs text-[#F7F0E6]">
+            <div className="text-5xl mb-5">{isMorning ? "🌅" : "🌙"}</div>
+            <h1 className="text-2xl font-bold mb-2">{officeName}</h1>
+            <p className="text-[#F7F0E6]/60 text-sm mb-6">This practice rests today.</p>
+            <p className="font-serif italic text-[#F7F0E6]/70 text-sm leading-relaxed">
+              {isMorning ? "Come back on your next practice morning." : "Come back on your next practice evening."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (alreadyPosted) {
+      return (
+        <div className="min-h-screen flex items-center justify-center px-6" style={{ background: bgColor }}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="text-center max-w-sm text-[#F7F0E6]">
+            <div className="text-6xl mb-5">{isMorning ? "🌅" : "🌙"}</div>
+            <h1 className="text-2xl font-bold mb-2">You prayed today.</h1>
+            <p className="text-[#F7F0E6]/60 text-sm mb-6">
+              {actualTodayCount} of {actualMemberCount} prayed {officeName} today.
+            </p>
+            <p className="font-serif italic text-[#F7F0E6]/50 text-sm leading-relaxed">
+              {isMorning
+                ? '"Let my prayer be set forth in thy sight as incense." — Psalm 141'
+                : '"O gracious Light, pure brightness of the everliving Father." — Phos Hilaron'}
+            </p>
+          </motion.div>
+        </div>
+      );
+    }
+
+    // Main BCP posting view — open and not yet prayed
+    return (
+      <div className="min-h-screen pb-24" style={{ background: bgColor }}>
+        <div className="max-w-md mx-auto px-5 pt-8">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="text-4xl mb-3">{isMorning ? "🌅" : "🌙"}</div>
+            <h1 className="text-2xl font-bold text-[#F7F0E6]">{officeName}</h1>
+            <p className="text-[#F7F0E6]/50 text-sm mt-1 font-serif italic">{moment.intention}</p>
+          </div>
+
+          {/* Presence count */}
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <PresenceDots count={actualTodayCount} total={actualMemberCount} />
+            <span className="text-sm text-[#F7F0E6]/60">{actualTodayCount} of {actualMemberCount} prayed today</span>
+          </div>
+
+          {/* The BCP link — MOST PROMINENT ELEMENT */}
+          <div className="rounded-2xl border border-[#F7F0E6]/20 p-6 mb-5 text-center"
+            style={{ background: "rgba(247,240,230,0.07)" }}>
+            <p className="text-[#F7F0E6]/50 text-xs uppercase tracking-widest mb-3">Open your Book of Common Prayer</p>
+            <p className="text-[#F7F0E6] font-bold text-xl mb-1">📖 Page {bcpPage}</p>
+            <p className="text-[#F7F0E6]/60 text-sm mb-4">{officeName} Rite II</p>
+            <div className="border-t border-[#F7F0E6]/10 pt-4">
+              <p className="text-[#F7F0E6]/50 text-xs mb-2">No BCP? Pray online:</p>
+              <a href={bcpUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-block px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+                style={{ background: accentColor, color: "#2C1810" }}>
+                Open {officeName} online →
+              </a>
+            </div>
+          </div>
+
+          {/* Already posted by others */}
+          {actualTodayCount > 0 && (
+            <p className="text-center text-sm text-[#F7F0E6]/50 mb-5 font-serif italic">
+              {actualTodayCount === 1 ? "1 person prayed with you already." : `${actualTodayCount} people have prayed today.`}
+            </p>
+          )}
+
+          {/* Submit */}
+          <AnimatePresence>
+            {posted ? (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-8">
+                <div className="text-5xl mb-4">🌿</div>
+                <p className="text-xl font-bold text-[#F7F0E6]">You prayed.</p>
+                <p className="text-[#F7F0E6]/60 text-sm mt-2">
+                  {actualTodayCount} of {actualMemberCount} prayed today.
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <button
+                  onClick={() => postMutation.mutate({ isCheckin: true })}
+                  disabled={postMutation.isPending}
+                  className="w-full py-5 rounded-2xl text-[#2C1810] text-lg font-bold transition-all active:scale-95 disabled:opacity-40"
+                  style={{ background: accentColor }}
+                >
+                  {postMutation.isPending
+                    ? "Marking..."
+                    : isMorning ? "I prayed Morning Prayer 🌿" : "I prayed Evening Prayer 🌿"
+                  }
+                </button>
+                <p className="text-center text-xs text-[#F7F0E6]/30 mt-3 font-serif italic">
+                  Tap after you pray. Takes 15–20 minutes.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
   }
 
   // ── Standard posting layout ─────────────────────────────────────────────────

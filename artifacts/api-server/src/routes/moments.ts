@@ -292,7 +292,8 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 });
 
 // ─── POST /api/moments — plant a standalone shared moment ───────────────────
-const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
+const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 
 const StandalonePlantSchema = z.object({
   name: z.string().min(1).max(100),
@@ -311,6 +312,10 @@ const StandalonePlantSchema = z.object({
   timezone: z.string().default("UTC"),
   timeOfDay: z.enum(["morning", "midday", "afternoon", "night"]).optional(),
   participants: z.array(z.object({ name: z.string(), email: z.string().min(3) })).max(20).default([]),
+  // BCP-specific fields
+  frequencyType: z.string().optional(),
+  frequencyDaysPerWeek: z.number().int().min(1).max(7).optional(),
+  practiceDays: z.string().optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -324,9 +329,10 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays } = parsed.data;
 
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
+  const isBcp = BCP_TEMPLATE_IDS.has(templateType ?? "");
   const momentToken = generateToken();
 
   const [moment] = await db.insert(sharedMomentsTable).values({
@@ -347,7 +353,10 @@ router.post("/moments", async (req, res): Promise<void> => {
     timezone,
     timeOfDay: isSpiritual ? (timeOfDay ?? null) : null,
     momentToken,
-    windowMinutes: isSpiritual ? 1440 : 60,
+    windowMinutes: isBcp ? 1440 : (isSpiritual ? 1440 : 60),
+    ...(frequencyType !== undefined ? { frequencyType } : {}),
+    ...(frequencyDaysPerWeek !== undefined ? { frequencyDaysPerWeek } : {}),
+    ...(practiceDays !== undefined ? { practiceDays } : {}),
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -406,6 +415,51 @@ router.post("/moments", async (req, res): Promise<void> => {
   function buildDescription(memberToken: string, memberName: string): string {
     const personalLink = `${baseUrl}/${momentToken}/${memberToken}`;
     const goalLine = goalDays > 0 ? `${goalDays}-day shared goal` : "Open-ended practice";
+
+    // BCP-specific calendar description
+    if (isBcp) {
+      const isMorning = templateType === "morning-prayer";
+      const bcpPage = isMorning ? "75" : "115";
+      const bcpUrl = isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html";
+      const officeName = isMorning ? "Morning Prayer" : "Evening Prayer";
+      const rite = "Rite II";
+      const freqDisplay = frequencyType === "daily" ? "Daily" : freqCapLabel;
+      const lines = [
+        `${organizer.name ?? organizer.email} invited you to ${officeName} together.`,
+        "",
+        `"${intention}"`,
+        "",
+        "── THE DAILY OFFICE ───────────────────────────────",
+        `This is ${officeName} ${rite} from the Book of Common Prayer.`,
+        `Page ${bcpPage}.`,
+        "",
+        `Everyone prays on their own schedule, but from the same book.`,
+        `That is what makes it fellowship.`,
+        "",
+        "── HOW TO PRAY ────────────────────────────────────",
+        `  📖 BCP Page ${bcpPage} — ${officeName} ${rite}`,
+        `  🌐 Online: ${bcpUrl}`,
+        "",
+        `  Takes about 15–20 minutes.`,
+        `  Open all day on your practice days.`,
+        `  When done, tap your link to mark it prayed. 🌿`,
+        "",
+        "── HOW OFTEN ──────────────────────────────────────",
+        `  ${freqDisplay}${practiceDays && practiceDays !== "[]" ? ` · ${practiceDays}` : ""}`,
+        "",
+        "── YOUR PERSONAL LINK ─────────────────────────────",
+        `This link is yours, ${memberName}. Open it on your practice days:`,
+        "",
+        `  ${personalLink}`,
+        "",
+        "No login required. Just open it and say you prayed. 🌿",
+        "",
+        "──────────────────────────────────────────────────",
+        "Eleanor — a shared practice companion",
+      ];
+      return lines.join("\n");
+    }
+
     const lines = [
       `${organizer.name ?? organizer.email} invited you to ${name}.`,
       "",
@@ -1138,6 +1192,47 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
 
   res.json({ ok: true });
+});
+
+// ─── GET /api/connections — return all unique people in user's moments ────────
+router.get("/connections", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    // Find all moments this user is a member of
+    const userTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
+      .from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.email, user.email));
+
+    const momentIds = [...new Set(userTokenRows.map(r => r.momentId))];
+    if (momentIds.length === 0) {
+      res.json({ connections: [] }); return;
+    }
+
+    // Get all other members of those moments
+    const allMembers = await db.select({ name: momentUserTokensTable.name, email: momentUserTokensTable.email })
+      .from(momentUserTokensTable)
+      .where(inArray(momentUserTokensTable.momentId, momentIds));
+
+    // Deduplicate by email, exclude current user
+    const seen = new Set<string>([user.email]);
+    const connections: { name: string; email: string }[] = [];
+    for (const m of allMembers) {
+      if (!seen.has(m.email)) {
+        seen.add(m.email);
+        connections.push({ name: m.name ?? m.email, email: m.email });
+      }
+    }
+
+    res.json({ connections });
+  } catch (err) {
+    console.error("GET /api/connections error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

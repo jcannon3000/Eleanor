@@ -100,13 +100,17 @@ POST /api/moment/:momentToken/:userToken/post — submit a post (photo URL / ref
 
 Micro-rituals members can show up to individually each day/week in a 1-hour window:
 
-- **Planting flow** (`/ritual/:id/moment/plant`): 5-step wizard — Name → Intention → Logging Type → Time → Goal
-- **Logging types**: `photo` (upload), `reflection` (prompt + text), `both`, `checkin` (just show up)
+- **Planting flow** (`/moment/new`): Multi-step wizard; MP/EP templates use BCP-specific flow (commitment → frequency → time → invite); other templates use general flow (template → name → intention → logging → schedule → goal → invite)
+- **Logging types**: `photo` (upload), `reflection` (prompt + text), `both`, `checkin` (just show up), `timer`, `timer_reflection`
+- **BCP (Morning/Evening Prayer) templates**: Special Daily Office flow; uses `checkin` logging type; window open all day (1440 min); goal=0 (open-ended); frequency options: once/twice/three/five/daily per week; each person sets their own time
 - **Intention text**: 140 chars, shown at top of posting page + in calendar description
-- **Public posting page** (`/moment/:momentToken/:userToken`): no auth, renders per logging type, presence dots, countdown
+- **Public posting page** (`/moment/:momentToken/:userToken`): no auth, renders per logging type, presence dots, countdown; BCP pages show dark-themed full-screen with prominent BCP link (📖 Page 75/115) + "I prayed Morning/Evening Prayer 🌿" button
+- **Dashboard card**: BCP cards show "Daily Office" sage pill + BCP page ref + prayed-today counter + weeks-together tracking
 - **Streak rules**: Streak increments only when 2+ people post in same window (bloom). Solo post = streak rests. No posts = wither. Two consecutive withers → dormant + streak resets
 - **Window statuses**: 🌸 bloom (2+ showed up), 🌿 solo (1 showed up), 🥀 wither (0 showed up)
 - **Moments tab** in ritual detail: shows all moments, streak, state, today's count, "plant a moment" CTA
+- **Archive/Delete**: PATCH /api/moments/:id/archive (soft-delete), DELETE /api/moments/:id (hard delete); any member can archive or delete
+- **Connections**: GET /api/connections returns all unique people in user's moments; used to autofill BCP invite step
 
 ## Google Calendar Integration
 

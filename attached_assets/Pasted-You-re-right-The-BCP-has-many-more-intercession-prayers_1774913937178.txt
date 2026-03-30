@@ -1,0 +1,120 @@
+You’re right. The BCP has many more intercession prayers than what’s showing. The current implementation is only showing one prayer per category. Each category has multiple prayers.
+Here’s the Replit prompt:
+
+Fix the Book of Common Prayer intercession list — show all prayers
+Find the BCP intercession scroll in the Intercession template creation flow. It is currently showing only one prayer per category. Fix this so every prayer in each category is shown.
+
+The full list of prayers by category
+Replace whatever is currently being fetched or hardcoded with this complete list. Every prayer below must appear in the scroll, grouped under its category header.
+
+FOR THE CHURCH
+	∙	For the Universal Church
+	∙	For a Church Convention or Meeting
+	∙	For the Unity of the Church
+	∙	For the Church’s Ministry
+	∙	For the Election of a Bishop or other Minister
+	∙	For the Consecration of a Church
+	∙	For a Church or Mission
+	∙	For a Vestry or other Governing Body
+
+FOR THE MISSION OF THE CHURCH
+	∙	For the Spread of the Gospel
+	∙	For the Mission of the Church
+	∙	For Missionaries
+	∙	For the Peace of Jerusalem
+	∙	For our Enemies
+	∙	For Those Who Suffer for the Faith
+
+FOR THE NATION
+	∙	For Our Country
+	∙	For the President of the United States and all in Civil Authority
+	∙	For Congress or a State Legislature
+	∙	For Courts of Justice
+	∙	For Sound Government
+	∙	For Local Government
+	∙	For an Election
+	∙	For those in the Armed Forces of our Country
+	∙	For those who Suffer for the Sake of Conscience
+
+FOR THE WORLD
+	∙	For Peace Among Nations
+	∙	For Peace
+	∙	For our Enemies
+	∙	For the Human Family
+	∙	For the United Nations
+	∙	In Times of Conflict
+
+FOR THE NATURAL ORDER
+	∙	For the Conservation of Natural Resources
+	∙	For the Harvest of Lands and Waters
+	∙	For Rain
+	∙	For the Future of the Human Race
+
+FOR THE POOR AND NEGLECTED
+	∙	For the Poor and Neglected
+	∙	For the Unemployed
+	∙	For Schools and Colleges
+	∙	For the Right Use of God’s Gifts
+	∙	For those who Influence Public Opinion
+
+FOR THE SICK
+	∙	For the Sick (general)
+	∙	For a Sick Person
+	∙	For a Sick Child
+	∙	For Recovery from Sickness
+	∙	For the Sanctification of Illness
+	∙	For Health of Body and Soul
+	∙	For one about to undergo an Operation
+	∙	For one who is Mentally Ill
+	∙	For Strength and Confidence
+	∙	For one who is near Death
+
+FOR THE SORROWING
+	∙	Comfort and Relief
+	∙	For the Bereaved
+	∙	For the Victims of Addiction
+	∙	For those Contemplating Suicide
+	∙	For those who Mourn
+
+FOR THOSE IN NEED
+	∙	For an Anxious Person
+	∙	For those who are Homeless
+	∙	For those in Prison
+	∙	For those in Trouble or Bereavement
+	∙	For those we Love
+
+FOR SOCIAL JUSTICE
+	∙	For Social Justice
+	∙	For the Poor and Oppressed
+	∙	For Prisons and Correctional Institutions
+	∙	For those who are Alone and Lonely
+	∙	For Young Persons
+	∙	For the Aged
+	∙	For those in Military Service
+	∙	In Times of Great Suffering or Need
+
+FOR THE ENVIRONMENT
+	∙	For the Care of Creation
+	∙	For Conservation of Natural Resources
+	∙	For the Harvest of Lands and Waters
+	∙	For the Future of the Human Race
+
+FOR THE CITY
+	∙	For a City
+	∙	For Towns and Rural Areas
+	∙	For Travelers
+	∙	For those who Live Alone
+
+FOR FAMILIES
+	∙	For Families
+	∙	For the Care of Children
+	∙	For Young Persons
+	∙	For those who are Alone
+
+How to display them
+Each category displays as a bold uppercase section header exactly as it does now. Beneath each header every prayer in that category appears as an expandable row — prayer title visible, tap to expand and read the full prayer text, tap again to collapse.
+Fetch the full text of each prayer from bcponline.org. If the fetch fails or any prayer text is unavailable, show the prayer title with a note: “Open bcponline.org to read this prayer” and a link.
+When a prayer is selected store the full prayer text and display it on the posting page so members can actually pray the words together.
+
+What does not change
+The visual design, the selection mechanic, the back navigation, and the way a selected prayer pre-fills the intercession intention field — none of that changes. Only the completeness of the prayer list changes. Add all the missing prayers without touching anything else.​​​​​​​​​​​​​​​​

@@ -1,0 +1,570 @@
+Here’s the full prompt:
+
+Update Morning Prayer and Evening Prayer in the Plant a Practice flow
+Find the Morning Prayer and Evening Prayer templates in the Plant a Practice creation flow. These two templates need to work differently from all other templates. Do not change any other templates, screens, or logic. Apply everything below only to Morning Prayer and Evening Prayer.
+
+WHAT THESE TWO PRACTICES ARE
+Morning Prayer and Evening Prayer are the two Daily Offices of the Book of Common Prayer. They are not configurable spiritual practices — they are specific liturgical offices with a defined structure, defined content, and a defined time of day. Morning Prayer is always prayed in the morning. Evening Prayer is always prayed in the evening. Eleanor does not ask users to customize them. The BCP has already done that.
+What Eleanor does is hold the commitment and the companionship. When two or more people commit to praying Morning Prayer or Evening Prayer together through Eleanor, they are making a promise to pray the same words from the same book at the same time of day — each in their own home, each at their own schedule — knowing the other is doing the same. This is decentralized fellowship. Not in the same room. Together in spirit.
+This language — together in spirit, praying the same words, decentralized fellowship — should be felt throughout both flows.
+
+THE BCP REFERENCE
+Eleanor always points members to their physical Book of Common Prayer first and to the online BCP second.
+Morning Prayer Rite II begins on page 75 of the Book of Common Prayer.
+Evening Prayer Rite II begins on page 115 of the Book of Common Prayer.
+For those without a physical BCP:
+Morning Prayer Rite II online: bcponline.org/MP2.html
+Evening Prayer Rite II online: bcponline.org/EP2.html
+These references appear in every calendar invite, the posting page, and the confirmation screen. Always show both — physical page number first, online link second.
+
+THE CREATION FLOW — THREE STEPS ONLY
+When a user selects Morning Prayer or Evening Prayer the creation flow has exactly three steps. There is no name field, no intention field, no logging type selection, no template customization of any kind.
+
+STEP 1 — The commitment screen
+This is the most important screen in the flow. It should feel serious and warm. This is not an onboarding screen. It is an invitation to make a commitment together.
+For Morning Prayer — full screen, soil background #2C1810, cream text #F7F0E6:
+
+🌅
+
+Commit to Morning Prayer
+together
+
+[Space Grotesk bold, large, centered]
+
+[Playfair Display italic, sage #6B8F71, centered, generous line height:]
+
+"Morning Prayer is the first office of the day.
+ Prayed in the morning, from the same book,
+ in your own home — but not alone.
+
+ You and your people will pray the same words
+ at the same time of day, wherever you are.
+ That is what makes it fellowship."
+
+[Muted, cream at 60% opacity, smaller:]
+"Morning Prayer Rite II
+ Book of Common Prayer · Page 75"
+
+[Full width CTA, sage background, cream text:]
+"I want to commit to this 🌿"
+
+
+For Evening Prayer — same structure, same design:
+
+🌙
+
+Commit to Evening Prayer
+together
+
+"Evening Prayer is the closing office of the day.
+ Prayed as the light changes, from the same book,
+ in your own home — but not alone.
+
+ You and your people will pray the same words
+ at the same time of day, wherever you are.
+ That is what makes it fellowship."
+
+"Evening Prayer Rite II
+ Book of Common Prayer · Page 115"
+
+"I want to commit to this 🌿"
+
+
+STEP 2 — How often
+Header in Space Grotesk bold:
+“How many times a week will you pray together? 🌿”
+Muted italic subtitle:
+“This is your commitment to each other. Choose what you can sustain.”
+Five large selectable cards — Duolingo goal style, escalating in visual weight and color intensity:
+Card 1 — Once a week
+Background: lightest sage tint #EEF3EF
+Left: 🌱 (40px)
+Title bold: Once a week
+Subtitle muted: “A gentle beginning”
+Progress dots: ● ○ ○ ○ ○ ○ ○
+Muted beneath: “1 office together each week”
+Card 2 — Twice a week
+Background: #E8F0EA
+Left: 🌿 (40px)
+Title: Twice a week
+Subtitle: “Taking root”
+Progress dots: ● ● ○ ○ ○ ○ ○
+Muted: “2 offices together each week”
+Card 3 — Three times a week
+Background: #E0EBE2
+Left: 🌸 (40px)
+Title: Three times a week
+Subtitle: “A real rhythm”
+Progress dots: ● ● ● ○ ○ ○ ○
+Muted: “3 offices together each week”
+Small amber pill top right: “Most chosen 🌿”
+Card 4 — Five times a week
+Background: cream #F7F0E6 with sage left accent bar 4px full height
+Left: 🌳 (40px)
+Title: Five times a week
+Subtitle: “A weekday practice”
+Progress dots: ● ● ● ● ● ○ ○
+Muted: “The weekday Daily Office”
+Card 5 — Daily
+Background: cream #F7F0E6 with amber left accent bar 4px full height
+Left: ✨ (40px)
+Title: Daily
+Subtitle: “The full Daily Office”
+Progress dots: ● ● ● ● ● ● ●
+Muted: “Every day together”
+Selected state for all cards:
+Background shifts to solid sage #6B8F71
+All text shifts to cream #F7F0E6
+Progress dots fill left to right, animated one by one
+Checkmark appears top right
+Dynamic line beneath the cards updates on selection:
+Once: “One morning together each week. A beginning.”
+Twice: “Two mornings. Enough to find a rhythm.”
+Three: “Three times. This is where something real takes root.”
+Five: “The weekday office. A serious commitment.”
+Daily: “Every day. The full practice of the Daily Office.”
+For frequencies less than daily, after selecting the card show a day selector:
+Header: “Which days? 🌿”
+Day pills: Mon Tue Wed Thu Fri Sat Sun
+Multi-select. Member selects exactly the number matching their chosen frequency.
+Muted instruction: “Choose [X] days”
+Store:
+
+shared_moments
+  frequency_type text (once | twice | three | five | daily)
+  frequency_days_per_week integer (1 | 2 | 3 | 5 | 7)
+  practice_days text[] (array of selected days)
+
+
+STEP 3 — When in your morning or evening
+For Morning Prayer:
+Header: “When in the morning? 🌅”
+Muted subtitle:
+“You choose your time. Everyone in this practice sets their own.
+You will all be praying at the same time of day, wherever you are.”
+Two large cards:
+
+🌅  Early morning
+    Before the day begins
+    (5am – 8am)
+
+☀️  Morning
+    As the day opens
+    (8am – 11am)
+
+
+On selecting either card: a time picker appears immediately beneath constrained to that range.
+Timezone selector beneath the time picker — auto-detects, editable.
+For Evening Prayer:
+Header: “When in the evening? 🌙”
+Muted subtitle same as above.
+Two large cards:
+
+🌤  Late afternoon
+    Before the evening meal
+    (4pm – 7pm)
+
+🌙  Evening
+    As the day releases
+    (7pm – 10pm)
+
+
+Same time picker and timezone selector behavior.
+Store in moment_members:
+
+personal_time time
+personal_timezone text
+
+
+INVITE — after step 3
+Header: “Who will pray with you? 🌿”
+Muted subtitle:
+“Invite someone to commit to this practice with you.
+They will choose their own time in the morning.”
+(or evening for Evening Prayer)
+AUTOFILL FROM EXISTING CONNECTIONS
+Before showing the manual invite options, Eleanor automatically surfaces everyone the user is currently in a practice or tradition with.
+Show a section at the top of the invite screen labeled:
+“From your practices and traditions 🌿”
+List every person the current user shares an existing shared_moment or gathering circle with. Display as selectable rows:
+
+[Avatar]  [Name]  [email muted]     [+ Invite]
+
+
+Tapping + Invite immediately queues them to receive a calendar invite. Their row updates to show a sage checkmark and “Invited ✓”
+Multiple people can be selected from this list.
+This list is populated by querying moment_members and circle_members for any practice or tradition the current user belongs to, then deduplicating by email.
+If the user has no existing connections yet this section is hidden entirely.
+Manual invite section beneath:
+Share link: eleanor.app/join/[moment_token]
+Copy button. Share via Messages, WhatsApp, email.
+Invite by email: email input field, tap Add, multiple addresses allowed.
+Warm sage tint card at the bottom:
+For Morning Prayer:
+
+📖 About Morning Prayer
+
+Morning Prayer Rite II takes 15–20 minutes.
+It begins on page 75 of the Book of Common Prayer.
+
+No BCP? Pray online:
+bcponline.org/MP2.html
+
+Everyone chooses their own time.
+You are together in spirit.
+
+
+For Evening Prayer: page 115, bcponline.org/EP2.html
+
+CONFIRMATION SCREEN
+For Morning Prayer — soil background, cream text:
+
+🌅
+
+"Morning Prayer is planted."
+
+[Frequency] · Everyone prays at their own time
+
+Calendar invites are on their way.
+
+Open your BCP to page 75.
+Or pray online: bcponline.org/MP2.html
+
+"Let my prayer be set forth in thy sight as incense,
+ and the lifting up of my hands as the evening sacrifice."
+ — Psalm 141:2
+
+      Done 🌿
+
+
+For Evening Prayer:
+
+🌙
+
+"Evening Prayer is planted."
+
+[Frequency] · Everyone prays at their own time
+
+Calendar invites are on their way.
+
+Open your BCP to page 115.
+Or pray online: bcponline.org/EP2.html
+
+"O gracious Light, pure brightness of the everliving
+ Father in heaven."
+ — Phos Hilaron
+
+      Done 🌿
+
+
+JOIN PAGE FOR INVITEES
+eleanor.app/join/[moment_token]
+No login required to view.
+For Morning Prayer:
+
+🌅
+
+[Inviter name] wants to pray
+Morning Prayer together.
+
+"Morning Prayer Rite II
+ Book of Common Prayer · Page 75"
+
+[Frequency: X times a week]
+
+"You each choose your own time in the morning.
+ You will be together in spirit."
+
+      Join this practice 🌿
+
+
+On tapping join: ask for name and email only. No password required.
+Then immediately show the personal time selection:
+Header: “When in the morning works for you? 🌅”
+Same two time of day cards and constrained time picker as Step 3.
+Timezone auto-detected, editable.
+On completing: generate user_moment_token, create their first two calendar invites, send welcome email.
+If the person joining already has an Eleanor account with that email their history connects automatically and they are shown their existing account rather than asked for a name.
+
+CALENDAR INVITES — the primary communication channel
+There are no nudge emails for Morning Prayer or Evening Prayer. Calendar invites are the only way Eleanor communicates with members about these practices. Every reminder, every re-engagement, every return after a lapse happens through a calendar event.
+Rolling two invites in advance:
+Each member always has exactly two upcoming calendar events for each office they belong to. When a member logs their practice Eleanor immediately creates a new calendar event for the next occurrence after the furthest existing one. The count always returns to two.
+If a member has not logged and a scheduled event passes Eleanor creates a replacement event for the next occurrence. She does not leave the calendar empty. There is always a next practice in the calendar.
+Calendar event — first event only (joining):
+For Morning Prayer:
+
+Title: 🌅 Morning Prayer — [their personal time]
+
+You're in. [Inviter name] is praying with you.
+
+Morning Prayer Rite II
+Book of Common Prayer · Page 75
+
+No BCP? Pray online:
+bcponline.org/MP2.html
+
+[X] members are praying this together.
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+
+
+For Evening Prayer:
+
+Title: 🌙 Evening Prayer — [their personal time]
+
+You're in. [Inviter name] is praying with you.
+
+Evening Prayer Rite II
+Book of Common Prayer · Page 115
+
+No BCP? Pray online:
+bcponline.org/EP2.html
+
+[X] members are praying this together.
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+
+
+Calendar event — all subsequent events:
+For Morning Prayer:
+
+Title: 🌅 Morning Prayer — [their personal time]
+
+Morning Prayer Rite II
+Book of Common Prayer · Page 75
+
+bcponline.org/MP2.html
+
+[X of Y] members prayed last time.
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+
+
+For Evening Prayer:
+
+Title: 🌙 Evening Prayer — [their personal time]
+
+Evening Prayer Rite II
+Book of Common Prayer · Page 115
+
+bcponline.org/EP2.html
+
+[X of Y] members prayed last time.
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+
+
+Re-engagement after a lapse:
+If a member misses two consecutive practice days Eleanor creates a special re-engagement calendar event scheduled for the next practice day. It replaces the standard event for that day.
+For Morning Prayer:
+
+Title: 🌅 Morning Prayer — come back [their personal time]
+
+The office is waiting.
+
+Morning Prayer Rite II
+Book of Common Prayer · Page 75
+
+bcponline.org/MP2.html
+
+[Inviter or other member name] is still praying.
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+
+
+For Evening Prayer — identical structure with 🌙 and page 115.
+This is the only re-engagement mechanism. No emails. No push notifications. Just a calendar event that acknowledges the lapse warmly and invites return.
+For members without Google Calendar connected: send .ics file for the next two occurrences as email attachments whenever the rolling invite system would create a new event.
+
+THE POSTING PAGE
+eleanor.app/moment/[moment_token]/[user_moment_token]
+No login required. No window. Open all day on practice days.
+For Morning Prayer:
+
+🌅 Morning Prayer
+
+[Date written out: Monday, 30 March]
+
+[Sage tint card, generous padding, most prominent element:]
+
+  Open your BCP to page 75.
+
+  📖 Pray online: bcponline.org/MP2.html
+     [Opens in new tab]
+
+  Morning Prayer Rite II takes about 15–20 minutes.
+
+[Presence line:]
+[X of Y] members have prayed today.
+[Small presence dots — filled sage for prayed, empty for not yet]
+
+[If they have not yet logged — single large full-width button, soil background, cream text:]
+
+      I prayed Morning Prayer 🌿
+
+[If they have already logged today:]
+
+🌅 "You prayed Morning Prayer today."
+[X of Y] members prayed together.
+🌿 [X] of [frequency] this week
+Next practice: [day] · [their personal time]
+
+
+For Evening Prayer: identical structure. 🌙. Page 115. bcponline.org/EP2.html.
+If they open on a non-practice day:
+
+🌿
+
+"Morning Prayer rests today."
+
+Next practice: [day] · [their personal time]
+It's in your calendar.
+
+
+After tapping I prayed:
+
+🌅
+
+"You prayed Morning Prayer today."
+
+[X of Y] members prayed together.
+
+🌿 [X] of [frequency] this week
+
+Come back [next practice day]. 🌅
+
+
+STREAK AND FREQUENCY TRACKING
+Track two things silently. Never frame either as a game or a goal.
+Weekly completion rate:
+How many of the committed days did the group actually pray together (2+ members logged) this week.
+Display as one quiet line:
+
+🌿 3 of 3 this week
+
+
+or
+
+🌿 1 of 3 this week
+
+
+Consecutive weeks:
+How many weeks in a row the group has met their weekly commitment.
+Display quietly on the dashboard card:
+
+🌿 4 weeks together
+
+
+A week counts if the group meets or exceeds their committed frequency for that week. Committed to 3 times and they pray together 3 or more times — the week counts.
+These display on the posting page after logging and on the dashboard card. They do not appear as milestone dots, progress bars, or goal frames. They are a quiet record of faithfulness.
+
+AUTOFILL IN ALL INVITE CONTEXTS
+Wherever Eleanor shows an invite field — in the creation flow, on the join page when someone wants to invite someone else, or in any settings screen for these practices — Eleanor automatically surfaces people the current user is already in a practice or tradition with.
+Query moment_members and circle_members for all practices and traditions the current user belongs to. Deduplicate by email. Display as selectable rows at the top of any invite interface:
+
+[Avatar]  [Name]  [email muted]     [+ Invite]
+
+
+Tapping + Invite queues a calendar invite to that person. Row updates to “Invited ✓” in sage.
+This list appears before any manual entry options. If the user has no existing connections the list is hidden and only manual options show.
+
+DASHBOARD CARD
+Morning Prayer:
+
+🌅  Morning Prayer                    [sage pill: Daily Office]
+    with [member names]
+    [Their personal time] · [frequency]
+
+    📖 Page 75 · BCP
+
+    🌿 [X] of [frequency] this week
+    🌿 [X] weeks together
+
+
+Evening Prayer — identical with 🌙 and page 115.
+Left accent bar: sage #6B8F71
+On practice days when not yet logged: amber pulsing dot + “Today · tap to log”
+On practice days when logged: “🌸 Prayed today”
+On non-practice days: “Next: [day]”
+
+WELCOME EMAIL — the only email Eleanor sends for these practices
+When someone joins a Morning Prayer or Evening Prayer practice Eleanor sends one welcome email. This is not a nudge. It is a welcome. All subsequent communication happens through calendar invites.
+For Morning Prayer:
+
+Subject: 🌅 You're praying Morning Prayer with [inviter name]
+
+[Inviter name] has invited you to pray the Daily Office together.
+
+Morning Prayer Rite II
+Book of Common Prayer · Page 75
+
+No BCP? Pray online:
+bcponline.org/MP2.html
+
+[Frequency] · You pray at your own time in the morning.
+
+Two calendar invites are on their way to your inbox.
+When the time comes, open your BCP and pray.
+Then tap the link in your calendar event to log that you prayed.
+
+Your personal link — bookmark this:
+[personal_url]
+
+No login needed. Together in spirit. 🌿
+Eleanor
+
+
+For Evening Prayer — identical. Page 115. bcponline.org/EP2.html. Evening.
+After this welcome email all communication is through calendar invites only. No reminder emails. No re-engagement emails. The calendar is the only channel.
+
+DATA MODEL
+Add to shared_moments for these two templates:
+
+frequency_type text (once | twice | three | five | daily)
+frequency_days_per_week integer (1 | 2 | 3 | 5 | 7)
+practice_days text[]
+
+
+Use existing tables for everything else:
+moment_members (personal_time, personal_timezone)
+user_moment_tokens
+moment_calendar_events (rolling two in advance)
+moment_posts (is_checkin true — logging is always just show up)
+moment_streak_days
+
+BUILD ORDER
+	1.	Commitment screen — Step 1, soil background, liturgical text, page reference, CTA
+	2.	How often screen — Step 2, five Duolingo-style goal cards, day selector for less than daily
+	3.	When in morning or evening screen — Step 3, two time of day cards, constrained time picker, timezone
+	4.	Invite screen — autofill from existing connections shown first, manual invite below, BCP reference card
+	5.	Autofill logic — query moment_members and circle_members, deduplicate by email, display as selectable rows
+	6.	Confirmation screen — page reference, scripture quote, calendar invites note
+	7.	Join page — no login, commitment display, personal time selection on joining, autofill if they have existing connections
+	8.	Welcome email — one email only, page reference, online link, personal URL
+	9.	Calendar invite system — rolling two in advance, first event format, subsequent event format, re-engagement event after two consecutive misses
+	10.	.ics fallback — for members without Google Calendar, sent as email attachments
+	11.	Posting page — BCP link prominent, presence counter, single log button, open all day, no window
+	12.	Weekly completion tracking — X of Y this week
+	13.	Consecutive weeks tracking — X weeks together
+	14.	Dashboard card — practice day states, logged state, next practice state
+	15.	Re-engagement calendar event — fires after two consecutive missed days, warm language, same personal URL
+
+THE ONE THING TO GET RIGHT
+The BCP link on the posting page must be the most prominent element after the practice name. It opens the correct page directly — bcponline.org/MP2.html for Morning Prayer, bcponline.org/EP2.html for Evening Prayer — in a new tab so the member can pray the office and return to log. The page number for the physical BCP appears in every calendar invite, the posting page, and the confirmation screen. A member should never have to search for where to find the office. Eleanor always tells them exactly where it is.
+The calendar invite is Eleanor’s voice for these two practices. It is the only thing she sends after the welcome email. It must work flawlessly — opening on any device, in any calendar app, with the personal URL clickable and the BCP link clickable. Test both links on a real phone before considering this done.​​​​​​​​​​​​​​​​
