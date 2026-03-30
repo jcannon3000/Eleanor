@@ -60,55 +60,60 @@ router.post("/invite/:token/respond", async (req, res): Promise<void> => {
   if (!token) { res.status(400).json({ error: "Token required" }); return; }
 
   const parsed = RespondBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
 
-  const [invite] = await db.select().from(inviteTokensTable).where(eq(inviteTokensTable.token, token));
-  if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
+  try {
+    const [invite] = await db.select().from(inviteTokensTable).where(eq(inviteTokensTable.token, token));
+    if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
 
-  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
-  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+    const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
+    if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
 
-  const chosenTime = parsed.data.chosenTime ?? null;
-  const isUnavailable = parsed.data.unavailable ? 1 : 0;
-  const isUpdate = parsed.data.isUpdate ?? false;
+    const chosenTime = parsed.data.chosenTime ?? null;
+    const isUnavailable = parsed.data.unavailable ? 1 : 0;
+    const isUpdate = parsed.data.isUpdate ?? false;
 
-  // Upsert: update if already exists, otherwise insert
-  const existing = await db.select().from(scheduleResponsesTable)
-    .where(eq(scheduleResponsesTable.ritualId, ritual.id));
-  const myExisting = existing.find((r) => r.guestEmail === invite.email);
+    // Upsert: update existing row if present, otherwise insert
+    const existing = await db.select().from(scheduleResponsesTable)
+      .where(eq(scheduleResponsesTable.ritualId, ritual.id));
+    const myExisting = existing.find((r) => r.guestEmail != null && r.guestEmail === invite.email);
 
-  if (myExisting) {
-    await db.update(scheduleResponsesTable)
-      .set({ chosenTime, unavailable: isUnavailable })
-      .where(eq(scheduleResponsesTable.id, myExisting.id));
-  } else {
-    await db.insert(scheduleResponsesTable).values({
-      ritualId: ritual.id,
-      guestName: invite.name ?? invite.email,
-      guestEmail: invite.email,
-      chosenTime,
-      unavailable: isUnavailable,
-    });
+    if (myExisting) {
+      await db.update(scheduleResponsesTable)
+        .set({ chosenTime, unavailable: isUnavailable })
+        .where(eq(scheduleResponsesTable.id, myExisting.id));
+    } else {
+      await db.insert(scheduleResponsesTable).values({
+        ritualId: ritual.id,
+        guestName: invite.name ?? invite.email,
+        guestEmail: invite.email,
+        chosenTime,
+        unavailable: isUnavailable,
+      });
+    }
+
+    await db.update(inviteTokensTable)
+      .set({ respondedAt: new Date() })
+      .where(eq(inviteTokensTable.token, token));
+
+    // Update organizer's Google Calendar event — async, non-blocking
+    updateCalendarEventWithResponses({
+      ritual,
+      organizerUserId: ritual.ownerId,
+      newResponse: {
+        name: invite.name ?? invite.email,
+        email: invite.email,
+        chosenTime,
+        unavailable: isUnavailable === 1,
+        isUpdate,
+      },
+    }).catch((err) => console.warn("GCal update failed (non-fatal):", err?.message ?? err));
+
+    res.status(201).json({ success: true });
+  } catch (err) {
+    console.error("POST /invite/:token/respond error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  await db.update(inviteTokensTable)
-    .set({ respondedAt: new Date() })
-    .where(eq(inviteTokensTable.token, token));
-
-  // Update organizer's Google Calendar event — async, non-blocking
-  updateCalendarEventWithResponses({
-    ritual,
-    organizerUserId: ritual.ownerId,
-    newResponse: {
-      name: invite.name ?? invite.email,
-      email: invite.email,
-      chosenTime,
-      unavailable: isUnavailable === 1,
-      isUpdate,
-    },
-  }).catch(() => {});
-
-  res.status(201).json({ success: true });
 });
 
 // ─── Helper: rebuild GCal event description with all responses ───────────
