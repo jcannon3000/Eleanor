@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable } from "@workspace/db";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable } from "@workspace/db";
 import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
@@ -607,22 +607,83 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     .orderBy(desc(meetupsTable.createdAt));
   const existingPlanned = existingMeetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
 
+  const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+  const appBase = process.env["REPLIT_DEV_DOMAIN"]
+    ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
+    : "http://localhost:23896";
+
+  // Upsert invite tokens for each participant (idempotent — keeps existing tokens)
+  const inviteLinks: Array<{ email: string; name: string; token: string; url: string }> = [];
+  for (const p of participants) {
+    const existing = await db
+      .select()
+      .from(inviteTokensTable)
+      .where(eq(inviteTokensTable.ritualId, id));
+    const existingForEmail = existing.find((t) => t.email === p.email);
+    const token = existingForEmail?.token ?? randomUUID();
+    if (!existingForEmail) {
+      await db.insert(inviteTokensTable).values({ ritualId: id, email: p.email, name: p.name, token });
+    }
+    inviteLinks.push({ email: p.email, name: p.name, token, url: `${appBase}/invite/${token}` });
+  }
+
+  // Build calendar description with per-person invite links
+  function buildCalendarDescription(opts: {
+    ritual: typeof ritualsTable.$inferSelect;
+    proposedTimes: string[];
+    confirmedTime?: string;
+    inviteLinks: typeof inviteLinks;
+    participantEmail?: string;
+  }): string {
+    const { ritual: r, proposedTimes, confirmedTime, inviteLinks: links, participantEmail } = opts;
+    const link = links.find((l) => l.email === participantEmail);
+    const lines: string[] = [];
+    if (r.intention) lines.push(r.intention, "");
+    if (confirmedTime) {
+      const d = new Date(confirmedTime);
+      lines.push(`✅ Confirmed: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+    } else if (proposedTimes.length > 0) {
+      lines.push("📅 Proposed times:");
+      proposedTimes.forEach((t, i) => {
+        const d = new Date(t);
+        const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup";
+        lines.push(`  ${label}: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      });
+    }
+    lines.push("");
+    if (link) {
+      lines.push("👉 Your personal link — tap to indicate availability (no account needed):");
+      lines.push(link.url);
+    } else if (links.length > 0) {
+      lines.push("👉 Indicate your availability (no account needed):");
+      lines.push(`${appBase}/invite/${links[0].token}`);
+    }
+    lines.push("", "Coordinated by Eleanor · eleanor.app");
+    return lines.join("\n");
+  }
+
   // When confirmedTime is included, create/update the Google Calendar event and send invites
   if (parsed.data.confirmedTime !== undefined) {
     const confirmedTime = new Date(parsed.data.confirmedTime);
-    const participantEmails = ((ritual.participants as Array<{ email: string }>) ?? []).map((p) => p.email);
+    const participantEmails = participants.map((p) => p.email);
+    const description = buildCalendarDescription({
+      ritual,
+      proposedTimes: parsed.data.proposedTimes ?? [],
+      confirmedTime: parsed.data.confirmedTime,
+      inviteLinks,
+    });
 
     if (existingPlanned?.googleCalendarEventId) {
       updateCalendarEvent(sessionUserId, existingPlanned.googleCalendarEventId, {
         summary: ritual.name,
-        description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+        description,
         startDate: confirmedTime,
         attendees: participantEmails,
       }).catch(() => {});
     } else {
       createCalendarEvent(sessionUserId, {
         summary: ritual.name,
-        description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+        description,
         location: parsed.data.location || ritual.location || undefined,
         startDate: confirmedTime,
         attendees: participantEmails,
@@ -641,14 +702,19 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     }
   } else if (parsed.data.proposedTimes && parsed.data.proposedTimes.length > 0 && !existingPlanned) {
     // Flexible save without a confirmedTime: create a placeholder calendar event for the organizer
-    // using the first proposed time. No attendees — no invites sent.
+    // with per-person invite links in the description for each attendee.
     const placeholderTime = new Date(parsed.data.proposedTimes[0]);
+    const description = buildCalendarDescription({
+      ritual,
+      proposedTimes: parsed.data.proposedTimes,
+      inviteLinks,
+    });
     createCalendarEvent(sessionUserId, {
-      summary: ritual.name,
-      description: ritual.intention ?? `Proposed gathering: ${ritual.name}`,
+      summary: `${ritual.name} — time TBD`,
+      description,
       location: parsed.data.location || ritual.location || undefined,
       startDate: placeholderTime,
-      attendees: [],
+      attendees: participants.map((p) => p.email),
     })
       .then(async (eventId) => {
         if (eventId) {
@@ -687,7 +753,7 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
   // The upcoming meetup is the most recent "planned" one
   let upcoming = allMeetups.find((m) => m.status === "planned") ?? null;
 
-  // Sync with Google Calendar: if the event was rescheduled in Google, update our record
+  // Sync with Google Calendar: if the event was rescheduled or deleted in Google, update our record
   if (upcoming?.googleCalendarEventId) {
     try {
       const calEvent = await getCalendarEvent(sessionUserId, upcoming.googleCalendarEventId);
@@ -695,7 +761,7 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
         const storedTime = upcoming.scheduledDate.getTime();
         const calTime = calEvent.startDate.getTime();
         if (Math.abs(storedTime - calTime) > 60_000) {
-          // More than 1 minute difference — Google Calendar was updated
+          // More than 1 minute difference — Google Calendar was updated, sync the new time
           const [synced] = await db
             .update(meetupsTable)
             .set({ scheduledDate: calEvent.startDate })
@@ -703,6 +769,14 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
             .returning();
           upcoming = synced;
         }
+      } else {
+        // Event was deleted from Google Calendar — clear the event ID from our record
+        const [cleared] = await db
+          .update(meetupsTable)
+          .set({ googleCalendarEventId: null })
+          .where(eq(meetupsTable.id, upcoming.id))
+          .returning();
+        upcoming = cleared;
       }
     } catch {
       // Calendar sync failure is non-fatal

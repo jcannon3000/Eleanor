@@ -77,7 +77,7 @@ export default function RitualDetail() {
     if (!ritualId) return;
     setTimelineLoading(true);
     try {
-      const res = await fetch(`/api/rituals/${ritualId}/timeline`, { credentials: "include" });
+      const res = await fetch(`/api/rituals/${ritualId}/timeline`, { credentials: "include", cache: "no-store" });
       if (res.ok) {
         const data: TimelineData = await res.json();
         const prevDate = timeline?.upcoming?.scheduledDate;

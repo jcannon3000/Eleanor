@@ -52,10 +52,11 @@ artifacts-monorepo/
 ## Database Schema
 
 - `users` — id, name, email, created_at
-- `rituals` — id, name, description, frequency, day_preference, participants (jsonb), intention, owner_id, proposed_times (jsonb), confirmed_time, schedule_token, created_at
-- `meetups` — id, ritual_id, scheduled_date, status (planned/completed/skipped), notes, created_at
+- `rituals` — id, name, description, frequency, day_preference, participants (jsonb), intention, owner_id, proposed_times (jsonb), confirmed_time, location, schedule_token, created_at
+- `meetups` — id, ritual_id, scheduled_date, status (planned/completed/skipped), notes, google_calendar_event_id, created_at
 - `ritual_messages` — id, ritual_id, role (user/assistant), content, created_at
 - `schedule_responses` — id, ritual_id, guest_name, guest_email, chosen_time, unavailable (int), created_at
+- `invite_tokens` — id, ritual_id, email, name, token (uuid), responded_at, created_at
 
 ## API Routes
 
@@ -75,13 +76,31 @@ POST /api/rituals/:id/meetups  — log meetup (completed/skipped)
 GET  /api/rituals/:id/messages — chat messages
 POST /api/rituals/:id/chat     — send message to AI coordinator
 
-GET  /api/rituals/:id/suggested-times     — generate/return 3 proposed time slots
-POST /api/rituals/:id/confirm-time        — confirm a time (body: { confirmedTime })
-GET  /api/rituals/:id/schedule-responses  — get scheduling summary with responses
+PATCH /api/rituals/:id/proposed-times — save proposed times; generates invite tokens + GCal event with per-person links
+GET   /api/rituals/:id/timeline       — upcoming + history, syncs GCal deletions/reschedules
 
 GET  /api/schedule/:token          — public guest schedule info (no auth)
 POST /api/schedule/:token/respond  — guest submits time choice or unavailability
+
+GET  /api/invite/:token          — public invite info by token (no auth)
+POST /api/invite/:token/respond  — invitee submits time choice or unavailability
 ```
+
+## Google Calendar Integration
+
+- Organizer grants calendar access via OAuth (offline + consent=select_account)
+- Events created via Google Calendar API; event IDs stored on meetup rows
+- PATCH /proposed-times: creates/updates GCal event with rich description including per-person invite links
+- Timeline endpoint: syncs GCal deletions (clears googleCalendarEventId) and reschedules (updates scheduledDate)
+- Invite tokens: UUIDs generated per participant, embedded in calendar event descriptions, persisted in invite_tokens table
+
+## Invite Token System
+
+- When organizer saves proposed times, each participant gets a unique UUID token
+- Tokens are stored in `invite_tokens` table (idempotent — doesn't duplicate for same email)
+- Tokens embedded in Google Calendar event descriptions as clickable invite links
+- `/invite/:token` page: no-auth, shows ritual info + proposed times, lets invitee vote
+- After responding: shows confirmation screen + "Join Eleanor with Google" CTA
 
 ## Seed Data
 
