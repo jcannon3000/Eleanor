@@ -260,6 +260,18 @@ export default function RitualDetail() {
                     </div>
                   </div>
 
+                  {timeline.upcoming.googleCalendarEventId && (
+                    <a
+                      href="https://calendar.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mb-4 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                    >
+                      <CheckCircle2 size={12} />
+                      Added to Google Calendar
+                    </a>
+                  )}
+
                   <p className="text-2xl font-semibold text-foreground mb-1">
                     {format(parseISO(timeline.upcoming.scheduledDate), "EEEE, MMMM d")}
                   </p>
