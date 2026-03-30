@@ -202,12 +202,12 @@ export default function InvitePage() {
         {/* Ritual header */}
         <div className="text-center mb-8">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">
-            You're invited by {data?.organizerName}
+            {data?.organizerName} is inviting you to
           </p>
           <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-3">{data?.ritualName}</h1>
-          {data?.ritualIntention && (
-            <p className="text-muted-foreground text-sm leading-relaxed mb-3">{data.ritualIntention}</p>
-          )}
+          <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+            {data?.ritualIntention || `A recurring ${data?.frequency ?? ""} gathering organized by ${data?.organizerName ?? "your host"}.`}
+          </p>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
             <span className="capitalize"><FrequencyLabel f={data?.frequency ?? ""} /> gathering</span>
             {data?.location && (

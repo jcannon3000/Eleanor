@@ -674,13 +674,15 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     });
 
     if (existingPlanned?.googleCalendarEventId) {
+      // Already have a meetup row — update the GCal event async
       updateCalendarEvent(sessionUserId, existingPlanned.googleCalendarEventId, {
         summary: ritual.name,
         description,
         startDate: confirmedTime,
         attendees: participantEmails,
       }).catch(() => {});
-    } else {
+    } else if (existingPlanned) {
+      // Have a meetup row but no GCal ID — create the GCal event async and link it
       createCalendarEvent(sessionUserId, {
         summary: ritual.name,
         description,
@@ -690,43 +692,76 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
       })
         .then(async (eventId) => {
           if (eventId) {
-            await db.insert(meetupsTable).values({
-              ritualId: id,
-              scheduledDate: confirmedTime,
-              status: "planned",
-              googleCalendarEventId: eventId,
-            });
+            await db.update(meetupsTable).set({ googleCalendarEventId: eventId }).where(eq(meetupsTable.id, existingPlanned.id));
+          }
+        })
+        .catch(() => {});
+    } else {
+      // No meetup row yet — insert it NOW so the timeline is immediately visible, then link GCal async
+      const [newMeetup] = await db.insert(meetupsTable).values({
+        ritualId: id,
+        scheduledDate: confirmedTime,
+        status: "planned",
+      }).returning();
+
+      createCalendarEvent(sessionUserId, {
+        summary: ritual.name,
+        description,
+        location: parsed.data.location || ritual.location || undefined,
+        startDate: confirmedTime,
+        attendees: participantEmails,
+      })
+        .then(async (eventId) => {
+          if (eventId && newMeetup) {
+            await db.update(meetupsTable).set({ googleCalendarEventId: eventId }).where(eq(meetupsTable.id, newMeetup.id));
           }
         })
         .catch(() => {});
     }
-  } else if (parsed.data.proposedTimes && parsed.data.proposedTimes.length > 0 && !existingPlanned) {
-    // Flexible save without a confirmedTime: create a placeholder calendar event for the organizer
-    // with per-person invite links in the description for each attendee.
+  } else if (parsed.data.proposedTimes && parsed.data.proposedTimes.length > 0) {
+    // Flexible save: proposed times without a confirmed time.
     const placeholderTime = new Date(parsed.data.proposedTimes[0]);
     const description = buildCalendarDescription({
       ritual,
       proposedTimes: parsed.data.proposedTimes,
       inviteLinks,
     });
-    createCalendarEvent(sessionUserId, {
-      summary: `${ritual.name} — time TBD`,
-      description,
-      location: parsed.data.location || ritual.location || undefined,
-      startDate: placeholderTime,
-      attendees: participants.map((p) => p.email),
-    })
-      .then(async (eventId) => {
-        if (eventId) {
-          await db.insert(meetupsTable).values({
-            ritualId: id,
-            scheduledDate: placeholderTime,
-            status: "planned",
-            googleCalendarEventId: eventId,
-          });
-        }
+
+    if (existingPlanned) {
+      // Already have a meetup row — update its date if changed, and update GCal event async
+      if (existingPlanned.scheduledDate.getTime() !== placeholderTime.getTime()) {
+        await db.update(meetupsTable).set({ scheduledDate: placeholderTime }).where(eq(meetupsTable.id, existingPlanned.id));
+      }
+      if (existingPlanned.googleCalendarEventId) {
+        updateCalendarEvent(sessionUserId, existingPlanned.googleCalendarEventId, {
+          summary: `${ritual.name} — time TBD`,
+          description,
+          startDate: placeholderTime,
+          attendees: participants.map((p) => p.email),
+        }).catch(() => {});
+      }
+    } else {
+      // No meetup row yet — insert it NOW so the timeline shows immediately, then create GCal async
+      const [newMeetup] = await db.insert(meetupsTable).values({
+        ritualId: id,
+        scheduledDate: placeholderTime,
+        status: "planned",
+      }).returning();
+
+      createCalendarEvent(sessionUserId, {
+        summary: `${ritual.name} — time TBD`,
+        description,
+        location: parsed.data.location || ritual.location || undefined,
+        startDate: placeholderTime,
+        attendees: participants.map((p) => p.email),
       })
-      .catch(() => {});
+        .then(async (eventId) => {
+          if (eventId && newMeetup) {
+            await db.update(meetupsTable).set({ googleCalendarEventId: eventId }).where(eq(meetupsTable.id, newMeetup.id));
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });
