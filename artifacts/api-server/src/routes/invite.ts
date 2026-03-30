@@ -1,12 +1,12 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, ritualsTable, inviteTokensTable, scheduleResponsesTable, usersTable } from "@workspace/db";
+import { db, ritualsTable, inviteTokensTable, scheduleResponsesTable, meetupsTable, usersTable } from "@workspace/db";
+import { updateCalendarEvent } from "../lib/calendar";
 
 const router: IRouter = Router();
 
 // GET /api/invite/:token — no auth required
-// Returns ritual info, proposed times, and invitee's pre-filled name/email
 router.get("/invite/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
   if (!token) { res.status(400).json({ error: "Token required" }); return; }
@@ -17,7 +17,8 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
   if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
 
-  const [organizer] = await db.select({ name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, ritual.ownerId));
+  const [organizer] = await db.select({ name: usersTable.name, email: usersTable.email })
+    .from(usersTable).where(eq(usersTable.id, ritual.ownerId));
 
   const existingResponse = await db
     .select()
@@ -39,10 +40,7 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
     inviteeEmail: invite.email,
     hasResponded: !!myResponse,
     previousResponse: myResponse
-      ? {
-          chosenTime: myResponse.chosenTime,
-          unavailable: myResponse.unavailable === 1,
-        }
+      ? { chosenTime: myResponse.chosenTime, unavailable: myResponse.unavailable === 1 }
       : null,
   });
 });
@@ -67,6 +65,7 @@ router.post("/invite/:token/respond", async (req, res): Promise<void> => {
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
   if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
 
+  // Save the response
   await db.insert(scheduleResponsesTable).values({
     ritualId: ritual.id,
     guestName: invite.name ?? invite.email,
@@ -75,12 +74,96 @@ router.post("/invite/:token/respond", async (req, res): Promise<void> => {
     unavailable: parsed.data.unavailable ? 1 : 0,
   });
 
-  await db
-    .update(inviteTokensTable)
-    .set({ respondedAt: new Date() })
-    .where(eq(inviteTokensTable.token, token));
+  await db.update(inviteTokensTable).set({ respondedAt: new Date() }).where(eq(inviteTokensTable.token, token));
+
+  // Update the organizer's Google Calendar event with the response — async, non-blocking
+  updateCalendarEventWithResponses({
+    ritual,
+    organizerUserId: ritual.ownerId,
+    newResponse: {
+      name: invite.name ?? invite.email,
+      email: invite.email,
+      chosenTime: parsed.data.chosenTime ?? null,
+      unavailable: parsed.data.unavailable ?? false,
+    },
+  }).catch(() => {});
 
   res.status(201).json({ success: true });
 });
+
+// Fetch all responses and update the organizer's GCal event description
+async function updateCalendarEventWithResponses(opts: {
+  ritual: typeof ritualsTable.$inferSelect;
+  organizerUserId: number;
+  newResponse: { name: string; email: string; chosenTime: string | null; unavailable: boolean };
+}) {
+  const { ritual, organizerUserId, newResponse } = opts;
+
+  // Find the planned meetup that has a GCal event ID
+  const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritual.id));
+  const planned = meetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
+  if (!planned?.googleCalendarEventId) return;
+
+  // Fetch all responses so far
+  const allResponses = await db.select().from(scheduleResponsesTable)
+    .where(eq(scheduleResponsesTable.ritualId, ritual.id));
+
+  const proposedTimes = (ritual.proposedTimes as string[]) ?? [];
+
+  function fmtTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+      + " at " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  }
+
+  const lines: string[] = [];
+  if (ritual.name) lines.push(`📍 ${ritual.name}`);
+  if (ritual.intention) lines.push(ritual.intention);
+  lines.push("");
+
+  if (proposedTimes.length > 0) {
+    lines.push("📅 Proposed times:");
+    proposedTimes.forEach((t, i) => {
+      const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup";
+      lines.push(`  ${label}: ${fmtTime(t)}`);
+    });
+    lines.push("");
+  }
+
+  lines.push("✅ Availability responses:");
+  if (allResponses.length === 0) {
+    lines.push("  No responses yet.");
+  } else {
+    for (const r of allResponses) {
+      if (r.unavailable) {
+        lines.push(`  ${r.guestName}: Unavailable`);
+      } else if (r.chosenTime) {
+        lines.push(`  ${r.guestName}: ${fmtTime(r.chosenTime)}`);
+      }
+    }
+  }
+  lines.push("");
+
+  // Highlight the latest response
+  if (newResponse.unavailable) {
+    lines.push(`📌 Latest: ${newResponse.name} marked unavailable`);
+  } else if (newResponse.chosenTime) {
+    lines.push(`📌 Latest: ${newResponse.name} picked ${fmtTime(newResponse.chosenTime)}`);
+  }
+  lines.push("", "Coordinated by Eleanor · eleanor.app");
+
+  const description = lines.join("\n");
+  const newSummary = newResponse.chosenTime && !newResponse.unavailable
+    ? `${ritual.name} — ${new Date(newResponse.chosenTime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : ritual.name;
+
+  await updateCalendarEvent(organizerUserId, planned.googleCalendarEventId, {
+    summary: newSummary,
+    description,
+    startDate: newResponse.chosenTime
+      ? new Date(newResponse.chosenTime)
+      : planned.scheduledDate,
+  });
+}
 
 export default router;
