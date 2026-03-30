@@ -396,14 +396,30 @@ function getContextualHour(text: string): number {
  * When a specific weekday is specified (e.g. "Monday"), all candidates fall on
  * that weekday — spaced weekly (or per-frequency) — so "Monday morning run"
  * always returns Mondays.
+ *
+ * tzOffsetMinutes: value of new Date().getTimezoneOffset() on the client.
+ * Positive = west of UTC (EDT=240, PDT=420). Used to convert the contextual
+ * local hour to the correct UTC timestamp.
  */
-function generateCandidateSlots(dayPreference: string, frequency: string, name: string, count = 8): Date[] {
+function generateCandidateSlots(dayPreference: string, frequency: string, name: string, tzOffsetMinutes = 0, count = 8): Date[] {
   const base = deriveStartDate(dayPreference || "", frequency);
 
-  if (!hasExplicitTime(dayPreference)) {
-    const hour = getContextualHour(name + " " + dayPreference);
-    base.setHours(hour, 0, 0, 0);
+  // Determine the desired local hour
+  let localHour: number;
+  if (hasExplicitTime(dayPreference)) {
+    // deriveStartDate already set base's hours in server-UTC to the parsed value.
+    // Treat that UTC hour as the "intended local hour" and convert to real UTC.
+    localHour = base.getUTCHours();
+  } else {
+    localHour = getContextualHour(name + " " + dayPreference);
   }
+
+  // Convert local hour → UTC: UTC = local + tzOffset/60
+  const utcHour = localHour + Math.round(tzOffsetMinutes / 60);
+  const utcHourNorm = ((utcHour % 24) + 24) % 24;
+  const dayDelta = utcHour >= 24 ? 1 : utcHour < 0 ? -1 : 0;
+  base.setUTCHours(utcHourNorm, 0, 0, 0);
+  if (dayDelta !== 0) base.setUTCDate(base.getUTCDate() + dayDelta);
 
   // When a specific weekday is named, keep all slots on that same weekday.
   // Otherwise space by frequency.
@@ -417,7 +433,7 @@ function generateCandidateSlots(dayPreference: string, frequency: string, name: 
   const candidates: Date[] = [base];
   for (let i = 1; i < count; i++) {
     const d = new Date(base);
-    d.setDate(d.getDate() + stepDays * i);
+    d.setUTCDate(d.getUTCDate() + stepDays * i);
     candidates.push(d);
   }
   return candidates;
@@ -446,9 +462,10 @@ async function generateCalendarAwareTimes(
   userId: number,
   dayPreference: string,
   frequency: string,
-  name: string
+  name: string,
+  tzOffsetMinutes = 0
 ): Promise<string[]> {
-  const candidates = generateCandidateSlots(dayPreference, frequency, name, 8);
+  const candidates = generateCandidateSlots(dayPreference, frequency, name, tzOffsetMinutes, 8);
   const lastCandidate = candidates[candidates.length - 1];
 
   let busy: Array<{ start: string; end: string }> = [];
@@ -497,12 +514,17 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
     return;
   }
 
+  // Parse optional timezone offset sent by the client (new Date().getTimezoneOffset())
+  const tzOffset = parseInt(String(req.query.tzOffset ?? "0"), 10);
+  const tzOffsetMinutes = isNaN(tzOffset) ? 0 : tzOffset;
+
   // Generate calendar-aware suggestions: all on the right weekday, calendar-checked, no Anthropic needed
   const times = await generateCalendarAwareTimes(
     sessionUserId,
     ritual.dayPreference ?? "",
     ritual.frequency,
-    ritual.name
+    ritual.name,
+    tzOffsetMinutes
   );
 
   res.json({ proposedTimes: times });

@@ -56,7 +56,7 @@ export default function RitualSchedule() {
       try {
         const [ritualRes, timesRes] = await Promise.all([
           fetch(`/api/rituals/${ritualId}`, { credentials: "include" }),
-          fetch(`/api/rituals/${ritualId}/suggested-times`, { credentials: "include" }),
+          fetch(`/api/rituals/${ritualId}/suggested-times?tzOffset=${new Date().getTimezoneOffset()}`, { credentials: "include" }),
         ]);
         if (ritualRes.ok) {
           const ritual = await ritualRes.json();

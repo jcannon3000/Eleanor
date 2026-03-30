@@ -22,7 +22,7 @@ function getEleanorNote(firstName: string, ritualCount: number): string {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
-  const { data: rituals, isLoading } = useListRituals({ ownerId: user?.id });
+  const { data: rituals, isLoading, refetch } = useListRituals({ ownerId: user?.id });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -35,6 +35,10 @@ export default function Dashboard() {
 
   const firstName = user.name.split(" ")[0];
   const ritualCount = rituals?.length ?? 0;
+
+  const handleDelete = () => {
+    refetch();
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -90,7 +94,7 @@ export default function Dashboard() {
           >
             {rituals.map((ritual) => (
               <motion.div key={ritual.id} variants={item}>
-                <RitualCard ritual={ritual} />
+                <RitualCard ritual={ritual} onDelete={handleDelete} />
               </motion.div>
             ))}
           </motion.div>
