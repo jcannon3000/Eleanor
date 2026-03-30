@@ -155,6 +155,28 @@ export async function updateCalendarEvent(
   }
 }
 
+export async function getCalendarEvent(
+  userId: number,
+  eventId: string
+): Promise<{ startDate: Date; endDate: Date } | null> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return null;
+
+  const calendar = google.calendar({ version: "v3", auth });
+  try {
+    const res = await calendar.events.get({ calendarId: "primary", eventId });
+    const start = res.data.start?.dateTime;
+    const end = res.data.end?.dateTime;
+    if (!start) return null;
+    return {
+      startDate: new Date(start),
+      endDate: end ? new Date(end) : new Date(new Date(start).getTime() + 60 * 60 * 1000),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function searchContacts(userId: number, query: string): Promise<Array<{ name: string; email: string }>> {
   const auth = await getAuthedClient(userId);
   if (!auth) return [];

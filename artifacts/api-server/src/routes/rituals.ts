@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable } from "@workspace/db";
-import { createCalendarEvent, updateCalendarEvent, getFreeBusy } from "../lib/calendar";
+import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
   CreateRitualBody,
@@ -584,7 +584,139 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     .where(eq(ritualsTable.id, id))
     .returning();
 
+  // When confirmedTime is included, create/update the Google Calendar event and send invites
+  if (parsed.data.confirmedTime !== undefined) {
+    const confirmedTime = new Date(parsed.data.confirmedTime);
+    const participantEmails = ((ritual.participants as Array<{ email: string }>) ?? []).map((p) => p.email);
+
+    // Check if there's already a planned meetup with a calendar event ID
+    const existingMeetups = await db
+      .select()
+      .from(meetupsTable)
+      .where(eq(meetupsTable.ritualId, id))
+      .orderBy(desc(meetupsTable.createdAt));
+    const existingPlanned = existingMeetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
+
+    if (existingPlanned?.googleCalendarEventId) {
+      updateCalendarEvent(sessionUserId, existingPlanned.googleCalendarEventId, {
+        summary: ritual.name,
+        description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+        startDate: confirmedTime,
+        attendees: participantEmails,
+      }).catch(() => {});
+    } else {
+      createCalendarEvent(sessionUserId, {
+        summary: ritual.name,
+        description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
+        location: parsed.data.location || ritual.location || undefined,
+        startDate: confirmedTime,
+        attendees: participantEmails,
+      })
+        .then(async (eventId) => {
+          if (eventId) {
+            await db.insert(meetupsTable).values({
+              ritualId: id,
+              scheduledDate: confirmedTime,
+              status: "planned",
+              googleCalendarEventId: eventId,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }
+
   res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });
+});
+
+// GET /api/rituals/:id/timeline — returns upcoming (planned) meetup synced with Google Calendar + past meetups
+router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+  if (ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const allMeetups = await db
+    .select()
+    .from(meetupsTable)
+    .where(eq(meetupsTable.ritualId, id))
+    .orderBy(desc(meetupsTable.scheduledDate));
+
+  // The upcoming meetup is the most recent "planned" one
+  let upcoming = allMeetups.find((m) => m.status === "planned") ?? null;
+
+  // Sync with Google Calendar: if the event was rescheduled in Google, update our record
+  if (upcoming?.googleCalendarEventId) {
+    try {
+      const calEvent = await getCalendarEvent(sessionUserId, upcoming.googleCalendarEventId);
+      if (calEvent) {
+        const storedTime = upcoming.scheduledDate.getTime();
+        const calTime = calEvent.startDate.getTime();
+        if (Math.abs(storedTime - calTime) > 60_000) {
+          // More than 1 minute difference — Google Calendar was updated
+          const [synced] = await db
+            .update(meetupsTable)
+            .set({ scheduledDate: calEvent.startDate })
+            .where(eq(meetupsTable.id, upcoming.id))
+            .returning();
+          upcoming = synced;
+        }
+      }
+    } catch {
+      // Calendar sync failure is non-fatal
+    }
+  }
+
+  // Also check if ritual.confirmedTime has a matching planned meetup; if not, create one
+  if (ritual.confirmedTime && !upcoming) {
+    const confirmedTime = new Date(ritual.confirmedTime);
+    if (confirmedTime > new Date()) {
+      const [newMeetup] = await db
+        .insert(meetupsTable)
+        .values({ ritualId: id, scheduledDate: confirmedTime, status: "planned" })
+        .returning();
+      upcoming = newMeetup;
+    }
+  }
+
+  const past = allMeetups.filter((m) => m.status !== "planned");
+
+  res.json({
+    upcoming: upcoming
+      ? { ...upcoming, scheduledDate: upcoming.scheduledDate.toISOString() }
+      : null,
+    past: past.map((m) => ({ ...m, scheduledDate: m.scheduledDate.toISOString() })),
+    location: ritual.location,
+    confirmedTime: ritual.confirmedTime,
+  });
+});
+
+// PATCH /api/rituals/:id/meetups/:meetupId — log a planned meetup as completed or skipped
+router.patch("/rituals/:id/meetups/:meetupId", async (req, res): Promise<void> => {
+  const ritualId = parseInt(req.params.id, 10);
+  const meetupId = parseInt(req.params.meetupId, 10);
+  if (isNaN(ritualId) || isNaN(meetupId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const parsed = z.object({ status: z.enum(["completed", "skipped"]) }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "status must be completed or skipped" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+  const [updated] = await db
+    .update(meetupsTable)
+    .set({ status: parsed.data.status })
+    .where(eq(meetupsTable.id, meetupId))
+    .returning();
+
+  if (!updated) { res.status(404).json({ error: "Meetup not found" }); return; }
+
+  res.json({ ...updated, scheduledDate: updated.scheduledDate.toISOString() });
 });
 
 // GET /api/rituals/:id/scheduling-summary — auth-required
