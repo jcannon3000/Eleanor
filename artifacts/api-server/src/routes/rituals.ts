@@ -392,16 +392,20 @@ function getContextualHour(text: string): number {
 }
 
 /**
- * Generate candidate slots based on day preference and frequency.
- * When a specific weekday is specified (e.g. "Monday"), all candidates fall on
- * that weekday — spaced weekly (or per-frequency) — so "Monday morning run"
- * always returns Mondays.
+ * Generate 5 candidate time slots all on the single nearest valid date.
+ * The slots are centered on the contextual hour for the ritual, with offsets
+ * of -1, 0, +1 (primary) and -2, +2 (fallback) hours on that same date.
+ * This gives users varied time options for the same upcoming gathering day
+ * rather than the same time repeated across multiple future dates.
  *
  * tzOffsetMinutes: value of new Date().getTimezoneOffset() on the client.
  * Positive = west of UTC (EDT=240, PDT=420). Used to convert the contextual
  * local hour to the correct UTC timestamp.
+ *
+ * Note: slots near midnight may cross a UTC date boundary; the "same day"
+ * guarantee is in local time but UTC dates may differ for midnight-adjacent inputs.
  */
-function generateCandidateSlots(dayPreference: string, frequency: string, name: string, tzOffsetMinutes = 0, count = 8): Date[] {
+function generateCandidateSlots(dayPreference: string, frequency: string, name: string, tzOffsetMinutes = 0, _count = 8): Date[] {
   const base = deriveStartDate(dayPreference || "", frequency);
 
   // Determine the desired local hour
@@ -421,21 +425,18 @@ function generateCandidateSlots(dayPreference: string, frequency: string, name: 
   base.setUTCHours(utcHourNorm, 0, 0, 0);
   if (dayDelta !== 0) base.setUTCDate(base.getUTCDate() + dayDelta);
 
-  // When a specific weekday is named, keep all slots on that same weekday.
-  // Otherwise space by frequency.
-  const weekdaySpecified = hasExplicitWeekday(dayPreference + " " + name);
-  const stepDays = weekdaySpecified
-    ? 7                                          // next 8 Mondays (or whichever day)
-    : frequency === "monthly" ? 28
-    : frequency === "biweekly" ? 14
-    : 7;
-
-  const candidates: Date[] = [base];
-  for (let i = 1; i < count; i++) {
+  // Return 3 time options on the same nearest date: contextual hour -1, same, +1
+  // Fallback offsets: -2 and +2 if -1/+1 are busy (handled in generateCalendarAwareTimes)
+  const offsets = [-1, 0, 1, -2, 2];
+  const candidates: Date[] = offsets.map((offset) => {
     const d = new Date(base);
-    d.setUTCDate(d.getUTCDate() + stepDays * i);
-    candidates.push(d);
-  }
+    const adjustedUtcHour = utcHourNorm + offset;
+    const normHour = ((adjustedUtcHour % 24) + 24) % 24;
+    const extraDay = adjustedUtcHour >= 24 ? 1 : adjustedUtcHour < 0 ? -1 : 0;
+    d.setUTCHours(normHour, 0, 0, 0);
+    if (extraDay !== 0) d.setUTCDate(d.getUTCDate() + extraDay);
+    return d;
+  });
   return candidates;
 }
 
@@ -449,7 +450,8 @@ function slotIsBusy(slot: Date, busy: Array<{ start: string; end: string }>): bo
 }
 
 function generateFallbackTimes(dayPreference: string, frequency: string, name = ""): string[] {
-  return generateCandidateSlots(dayPreference, frequency, name, 3)
+  return generateCandidateSlots(dayPreference, frequency, name, 0)
+    .slice(0, 3)
     .map((d) => d.toISOString());
 }
 
@@ -465,8 +467,9 @@ async function generateCalendarAwareTimes(
   name: string,
   tzOffsetMinutes = 0
 ): Promise<string[]> {
-  const candidates = generateCandidateSlots(dayPreference, frequency, name, tzOffsetMinutes, 8);
-  const lastCandidate = candidates[candidates.length - 1];
+  // candidates[0]=-1hr, [1]=0hr, [2]=+1hr, [3]=-2hr, [4]=+2hr — all on same nearest date
+  const candidates = generateCandidateSlots(dayPreference, frequency, name, tzOffsetMinutes);
+  const lastCandidate = candidates.reduce((a, b) => (a > b ? a : b));
 
   let busy: Array<{ start: string; end: string }> = [];
   try {
@@ -475,14 +478,26 @@ async function generateCalendarAwareTimes(
     // Calendar unavailable — proceed without filtering
   }
 
-  const available = candidates.filter((c) => !slotIsBusy(c, busy));
-  const result = available.slice(0, 3);
+  // Prefer the primary three (-1, 0, +1) that are free; fall back to (-2, +2) if needed
+  const primary = candidates.slice(0, 3);
+  const fallback = candidates.slice(3);
 
-  // If not enough free slots found, pad from unfiltered candidates
-  for (const c of candidates) {
+  const result: Date[] = primary.filter((c) => !slotIsBusy(c, busy));
+
+  // Pad with fallback slots if needed
+  for (const c of fallback) {
+    if (result.length >= 3) break;
+    if (!slotIsBusy(c, busy)) result.push(c);
+  }
+
+  // Final pad from primary (busy) if still not enough
+  for (const c of primary) {
     if (result.length >= 3) break;
     if (!result.some((r) => r.getTime() === c.getTime())) result.push(c);
   }
+
+  // Sort by time so they appear in chronological order
+  result.sort((a, b) => a.getTime() - b.getTime());
 
   return result.slice(0, 3).map((d) => d.toISOString());
 }
@@ -584,18 +599,18 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     .where(eq(ritualsTable.id, id))
     .returning();
 
+  // Check if there's already a planned meetup with a calendar event ID
+  const existingMeetups = await db
+    .select()
+    .from(meetupsTable)
+    .where(eq(meetupsTable.ritualId, id))
+    .orderBy(desc(meetupsTable.createdAt));
+  const existingPlanned = existingMeetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
+
   // When confirmedTime is included, create/update the Google Calendar event and send invites
   if (parsed.data.confirmedTime !== undefined) {
     const confirmedTime = new Date(parsed.data.confirmedTime);
     const participantEmails = ((ritual.participants as Array<{ email: string }>) ?? []).map((p) => p.email);
-
-    // Check if there's already a planned meetup with a calendar event ID
-    const existingMeetups = await db
-      .select()
-      .from(meetupsTable)
-      .where(eq(meetupsTable.ritualId, id))
-      .orderBy(desc(meetupsTable.createdAt));
-    const existingPlanned = existingMeetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
 
     if (existingPlanned?.googleCalendarEventId) {
       updateCalendarEvent(sessionUserId, existingPlanned.googleCalendarEventId, {
@@ -624,6 +639,28 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
         })
         .catch(() => {});
     }
+  } else if (parsed.data.proposedTimes && parsed.data.proposedTimes.length > 0 && !existingPlanned) {
+    // Flexible save without a confirmedTime: create a placeholder calendar event for the organizer
+    // using the first proposed time. No attendees — no invites sent.
+    const placeholderTime = new Date(parsed.data.proposedTimes[0]);
+    createCalendarEvent(sessionUserId, {
+      summary: ritual.name,
+      description: ritual.intention ?? `Proposed gathering: ${ritual.name}`,
+      location: parsed.data.location || ritual.location || undefined,
+      startDate: placeholderTime,
+      attendees: [],
+    })
+      .then(async (eventId) => {
+        if (eventId) {
+          await db.insert(meetupsTable).values({
+            ritualId: id,
+            scheduledDate: placeholderTime,
+            status: "planned",
+            googleCalendarEventId: eventId,
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });
