@@ -12,6 +12,7 @@ export const ritualsTable = pgTable("rituals", {
   participants: jsonb("participants").notNull().default([]),
   intention: text("intention"),
   ownerId: integer("owner_id").notNull().references(() => usersTable.id),
+  location: text("location"),
   proposedTimes: jsonb("proposed_times").notNull().default([]),
   confirmedTime: text("confirmed_time"),
   scheduleToken: text("schedule_token"),

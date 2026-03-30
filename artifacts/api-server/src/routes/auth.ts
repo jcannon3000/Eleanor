@@ -92,7 +92,7 @@ router.get("/auth/google", (_req, res, next) => {
     res.status(503).send("Google Sign-In is not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
     return;
   }
-  passport.authenticate("google")(res.req, res, next);
+  passport.authenticate("google", { accessType: "offline", prompt: "consent" })(res.req, res, next);
 });
 
 router.get(

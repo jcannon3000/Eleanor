@@ -38,6 +38,7 @@ export async function createCalendarEvent(
   opts: {
     summary: string;
     description?: string;
+    location?: string;
     startDate: Date;
     endDate?: Date;
     attendees?: string[];
@@ -60,6 +61,7 @@ export async function createCalendarEvent(
       requestBody: {
         summary: opts.summary,
         description: opts.description,
+        location: opts.location,
         start: { dateTime: start.toISOString(), timeZone: "UTC" },
         end: { dateTime: end.toISOString(), timeZone: "UTC" },
         attendees: attendeeList.length > 0 ? attendeeList : undefined,
