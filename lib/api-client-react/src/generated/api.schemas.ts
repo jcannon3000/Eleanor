@@ -111,11 +111,21 @@ export const CreateRitualBodyFrequency = {
   monthly: "monthly",
 } as const;
 
+export type DayOfWeekCode = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+export type MonthlyType = "day_of_month" | "day_of_week_in_month";
+export type MonthlyWeekOrdinal = "1" | "2" | "3" | "4" | "-1";
+
 export interface CreateRitualBody {
   name: string;
   description?: string;
   frequency: CreateRitualBodyFrequency;
   dayPreference?: string;
+  dayOfWeek?: DayOfWeekCode;
+  monthlyType?: MonthlyType;
+  monthlyDayOfMonth?: number;
+  monthlyWeekOrdinal?: MonthlyWeekOrdinal;
+  monthlyWeekDay?: DayOfWeekCode;
+  location?: string;
   participants: Participant[];
   intention?: string;
   ownerId: number;
@@ -135,6 +145,11 @@ export interface UpdateRitualBody {
   description?: string;
   frequency?: UpdateRitualBodyFrequency;
   dayPreference?: string;
+  dayOfWeek?: DayOfWeekCode;
+  monthlyType?: MonthlyType;
+  monthlyDayOfMonth?: number;
+  monthlyWeekOrdinal?: MonthlyWeekOrdinal;
+  monthlyWeekDay?: DayOfWeekCode;
   participants?: Participant[];
   intention?: string;
 }

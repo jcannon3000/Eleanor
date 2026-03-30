@@ -7,13 +7,15 @@ const DAY_PATTERNS: Array<{ pattern: RegExp; dow: number }> = [
   { pattern: /\bthursdays?\b|\bthurs\b|\bthur\b|\bthu\b/i, dow: 4 },
   { pattern: /\bfridays?\b|\bfri\b/i, dow: 5 },
   { pattern: /\bsaturdays?\b|\bsat\b/i, dow: 6 },
-  // Short abbreviations last (only match if no longer form already matched)
   { pattern: /\bsun\b/i, dow: 0 },
   { pattern: /\bmon\b/i, dow: 1 },
 ];
 
+const RRULE_DOW_TO_JS: Record<string, number> = {
+  MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0,
+};
+
 function parseHourMinute(text: string): { hour: number; minute: number } | null {
-  // Only match if explicit am/pm or HH:MM 24-hour — bare numbers are too ambiguous
   const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i)
     ?? text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
 
@@ -38,37 +40,169 @@ function parseDayOfWeek(text: string): number | null {
 }
 
 /**
- * Given a dayPreference string (e.g. "Thursday evenings", "Last Sunday of the month at 6pm",
- * "Tuesdays at 7:30pm") and a frequency, returns the next reasonable start Date.
- *
- * Falls back to: tomorrow at 18:00 UTC when parsing fails.
+ * Find the next date that falls on the given day-of-week (0=Sun..6=Sat),
+ * starting from tomorrow.
  */
-export function deriveStartDate(dayPreference: string, _frequency: string): Date {
+function nextWeekday(targetDow: number, hour: number, minute: number): Date {
+  const now = new Date();
+  const result = new Date(now);
+  result.setDate(now.getDate() + 1);
+  result.setHours(hour, minute, 0, 0);
+  for (let i = 0; i < 7; i++) {
+    if (result.getDay() === targetDow) break;
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
+/**
+ * Find the next date in the current or next month that matches an ordinal weekday pattern.
+ * e.g. ordinal=1 means "first", ordinal=-1 means "last".
+ */
+function nextOrdinalWeekday(targetDow: number, ordinal: number, hour: number, minute: number): Date {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+
+  // Try current month and next two months until we find a date >= tomorrow
+  for (let monthOffset = 0; monthOffset <= 2; monthOffset++) {
+    const year = now.getFullYear();
+    const month = now.getMonth() + monthOffset;
+    const actualMonth = month % 12;
+    const actualYear = year + Math.floor(month / 12);
+
+    let candidate: Date | null = null;
+
+    if (ordinal === -1) {
+      // Last occurrence: start from last day of month and go backwards
+      const lastDay = new Date(actualYear, actualMonth + 1, 0);
+      const d = new Date(lastDay);
+      d.setHours(hour, minute, 0, 0);
+      while (d.getDay() !== targetDow) {
+        d.setDate(d.getDate() - 1);
+      }
+      candidate = d;
+    } else {
+      // Nth occurrence: start from first day of month and find Nth match
+      const firstDay = new Date(actualYear, actualMonth, 1);
+      let count = 0;
+      const d = new Date(firstDay);
+      d.setHours(hour, minute, 0, 0);
+      while (d.getMonth() === actualMonth) {
+        if (d.getDay() === targetDow) {
+          count++;
+          if (count === ordinal) {
+            candidate = new Date(d);
+            break;
+          }
+        }
+        d.setDate(d.getDate() + 1);
+      }
+    }
+
+    if (candidate && candidate >= tomorrow) {
+      return candidate;
+    }
+  }
+
+  // Absolute fallback: 30 days from now
+  const fallback = new Date(now);
+  fallback.setDate(now.getDate() + 30);
+  fallback.setHours(hour, minute, 0, 0);
+  return fallback;
+}
+
+/**
+ * Find the next date in upcoming months that matches a specific day-of-month.
+ * Only considers months that actually contain that day (e.g., skips months
+ * with fewer days than the requested dayOfMonth).
+ */
+function nextDayOfMonth(dayOfMonth: number, hour: number, minute: number): Date {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+
+  // Search up to 13 months forward to find a month that contains dayOfMonth
+  for (let monthOffset = 0; monthOffset <= 12; monthOffset++) {
+    const year = now.getFullYear();
+    const month = now.getMonth() + monthOffset;
+    const actualMonth = month % 12;
+    const actualYear = year + Math.floor(month / 12);
+
+    // Only use months that actually contain this day-of-month
+    const lastDay = new Date(actualYear, actualMonth + 1, 0).getDate();
+    if (dayOfMonth > lastDay) continue;
+
+    const candidate = new Date(actualYear, actualMonth, dayOfMonth, hour, minute, 0, 0);
+    if (candidate >= tomorrow) {
+      return candidate;
+    }
+  }
+
+  // Fallback: 30 days from now
+  const fallback = new Date(now);
+  fallback.setDate(now.getDate() + 30);
+  fallback.setHours(hour, minute, 0, 0);
+  return fallback;
+}
+
+export interface StructuredSchedule {
+  dayOfWeek?: string;
+  monthlyType?: "day_of_month" | "day_of_week_in_month";
+  monthlyDayOfMonth?: number;
+  monthlyWeekOrdinal?: string;
+  monthlyWeekDay?: string;
+}
+
+/**
+ * Derive start date from structured schedule fields, falling back to free-text parsing.
+ */
+export function deriveStartDate(
+  dayPreference: string,
+  frequency: string,
+  structured?: StructuredSchedule
+): Date {
   const now = new Date();
   const defaultHour = 18;
   const defaultMinute = 0;
 
-  const targetDow = parseDayOfWeek(dayPreference);
   const timeResult = parseHourMinute(dayPreference);
   const hour = timeResult?.hour ?? defaultHour;
   const minute = timeResult?.minute ?? defaultMinute;
 
-  if (targetDow !== null) {
-    // Find the next occurrence of targetDow that is >= tomorrow
-    const result = new Date(now);
-    result.setDate(now.getDate() + 1); // start from tomorrow
-    result.setHours(hour, minute, 0, 0);
-
-    // Advance until we land on the right weekday
-    for (let i = 0; i < 7; i++) {
-      if (result.getDay() === targetDow) break;
-      result.setDate(result.getDate() + 1);
+  // Weekly / biweekly: use structured dayOfWeek if provided
+  if ((frequency === "weekly" || frequency === "biweekly") && structured?.dayOfWeek) {
+    const targetDow = RRULE_DOW_TO_JS[structured.dayOfWeek];
+    if (targetDow !== undefined) {
+      return nextWeekday(targetDow, hour, minute);
     }
-
-    return result;
   }
 
-  // No weekday found — use tomorrow + parsed time (or default)
+  // Monthly: structured fields
+  if (frequency === "monthly" && structured) {
+    if (structured.monthlyType === "day_of_month" && structured.monthlyDayOfMonth) {
+      return nextDayOfMonth(structured.monthlyDayOfMonth, hour, minute);
+    }
+    if (
+      structured.monthlyType === "day_of_week_in_month" &&
+      structured.monthlyWeekOrdinal &&
+      structured.monthlyWeekDay
+    ) {
+      const targetDow = RRULE_DOW_TO_JS[structured.monthlyWeekDay];
+      const ordinal = parseInt(structured.monthlyWeekOrdinal, 10);
+      if (targetDow !== undefined && !isNaN(ordinal)) {
+        return nextOrdinalWeekday(targetDow, ordinal, hour, minute);
+      }
+    }
+  }
+
+  // Fall back to free-text parsing
+  const targetDow = parseDayOfWeek(dayPreference);
+  if (targetDow !== null) {
+    return nextWeekday(targetDow, hour, minute);
+  }
+
+  // Default: tomorrow at defaultHour
   const fallback = new Date(now);
   fallback.setDate(now.getDate() + 1);
   fallback.setHours(hour, minute, 0, 0);

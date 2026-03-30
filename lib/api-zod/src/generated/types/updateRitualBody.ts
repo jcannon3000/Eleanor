@@ -8,11 +8,20 @@
 import type { Participant } from "./participant";
 import type { UpdateRitualBodyFrequency } from "./updateRitualBodyFrequency";
 
+export type DayOfWeekCode = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+export type MonthlyType = "day_of_month" | "day_of_week_in_month";
+export type MonthlyWeekOrdinal = "1" | "2" | "3" | "4" | "-1";
+
 export interface UpdateRitualBody {
   name?: string;
   description?: string;
   frequency?: UpdateRitualBodyFrequency;
   dayPreference?: string;
+  dayOfWeek?: DayOfWeekCode;
+  monthlyType?: MonthlyType;
+  monthlyDayOfMonth?: number;
+  monthlyWeekOrdinal?: MonthlyWeekOrdinal;
+  monthlyWeekDay?: DayOfWeekCode;
   participants?: Participant[];
   intention?: string;
 }

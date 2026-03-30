@@ -114,14 +114,42 @@ router.post("/rituals", async (req, res): Promise<void> => {
       .map(p => p.email)
       .filter(Boolean);
 
-    const recurrenceRule = parsed.data.frequency === "weekly"
-      ? ["RRULE:FREQ=WEEKLY"]
-      : parsed.data.frequency === "biweekly"
-      ? ["RRULE:FREQ=WEEKLY;INTERVAL=2"]
-      : ["RRULE:FREQ=MONTHLY"];
+    // Build RRULE from structured fields
+    const structured = {
+      dayOfWeek: parsed.data.dayOfWeek,
+      monthlyType: parsed.data.monthlyType,
+      monthlyDayOfMonth: parsed.data.monthlyDayOfMonth,
+      monthlyWeekOrdinal: parsed.data.monthlyWeekOrdinal,
+      monthlyWeekDay: parsed.data.monthlyWeekDay,
+    };
 
-    // Derive start date from dayPreference (e.g. "Thursday evenings", "Tuesdays at 7pm")
-    const startDate = deriveStartDate(parsed.data.dayPreference ?? "", parsed.data.frequency);
+    let rrule: string;
+    if (parsed.data.frequency === "weekly") {
+      rrule = parsed.data.dayOfWeek
+        ? `RRULE:FREQ=WEEKLY;BYDAY=${parsed.data.dayOfWeek}`
+        : "RRULE:FREQ=WEEKLY";
+    } else if (parsed.data.frequency === "biweekly") {
+      rrule = parsed.data.dayOfWeek
+        ? `RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=${parsed.data.dayOfWeek}`
+        : "RRULE:FREQ=WEEKLY;INTERVAL=2";
+    } else {
+      // Monthly
+      if (parsed.data.monthlyType === "day_of_month" && parsed.data.monthlyDayOfMonth) {
+        rrule = `RRULE:FREQ=MONTHLY;BYMONTHDAY=${parsed.data.monthlyDayOfMonth}`;
+      } else if (
+        parsed.data.monthlyType === "day_of_week_in_month" &&
+        parsed.data.monthlyWeekOrdinal &&
+        parsed.data.monthlyWeekDay
+      ) {
+        rrule = `RRULE:FREQ=MONTHLY;BYDAY=${parsed.data.monthlyWeekOrdinal}${parsed.data.monthlyWeekDay}`;
+      } else {
+        rrule = "RRULE:FREQ=MONTHLY";
+      }
+    }
+    const recurrenceRule = [rrule];
+
+    // Derive start date from structured fields
+    const startDate = deriveStartDate(parsed.data.dayPreference ?? "", parsed.data.frequency, structured);
 
     createCalendarEvent(sessionUserId, {
       summary: ritual.name,

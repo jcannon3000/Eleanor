@@ -7,12 +7,19 @@
  */
 import type { CreateRitualBodyFrequency } from "./createRitualBodyFrequency";
 import type { Participant } from "./participant";
+import type { DayOfWeekCode, MonthlyType, MonthlyWeekOrdinal } from "./updateRitualBody";
 
 export interface CreateRitualBody {
   name: string;
   description?: string;
   frequency: CreateRitualBodyFrequency;
   dayPreference?: string;
+  dayOfWeek?: DayOfWeekCode;
+  monthlyType?: MonthlyType;
+  monthlyDayOfMonth?: number;
+  monthlyWeekOrdinal?: MonthlyWeekOrdinal;
+  monthlyWeekDay?: DayOfWeekCode;
+  location?: string;
   participants: Participant[];
   intention?: string;
   ownerId: number;

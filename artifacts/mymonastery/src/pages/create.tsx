@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCreateRitual, CreateRitualBodyFrequency } from "@workspace/api-client-react";
+import { useCreateRitual, CreateRitualBodyFrequency, DayOfWeekCode, MonthlyType, MonthlyWeekOrdinal } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
@@ -189,6 +189,13 @@ export default function CreateRitual() {
   const [dayPreference, setDayPreference] = useState("");
   const [locationVal, setLocationVal] = useState("");
 
+  // Structured scheduling state
+  const [dayOfWeek, setDayOfWeek] = useState<DayOfWeekCode | null>(null);
+  const [monthlyType, setMonthlyType] = useState<MonthlyType>("day_of_month");
+  const [monthlyDayOfMonth, setMonthlyDayOfMonth] = useState<number | null>(null);
+  const [monthlyWeekOrdinal, setMonthlyWeekOrdinal] = useState<MonthlyWeekOrdinal | null>(null);
+  const [monthlyWeekDay, setMonthlyWeekDay] = useState<DayOfWeekCode | null>(null);
+
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
@@ -231,7 +238,12 @@ export default function CreateRitual() {
         data: {
           name: name.trim(),
           frequency,
-          dayPreference: dayPreference.trim(),
+          dayPreference: dayPreference.trim() || undefined,
+          dayOfWeek: (frequency === "weekly" || frequency === "biweekly") ? (dayOfWeek ?? undefined) : undefined,
+          monthlyType: frequency === "monthly" ? monthlyType : undefined,
+          monthlyDayOfMonth: frequency === "monthly" && monthlyType === "day_of_month" ? (monthlyDayOfMonth ?? undefined) : undefined,
+          monthlyWeekOrdinal: frequency === "monthly" && monthlyType === "day_of_week_in_month" ? (monthlyWeekOrdinal ?? undefined) : undefined,
+          monthlyWeekDay: frequency === "monthly" && monthlyType === "day_of_week_in_month" ? (monthlyWeekDay ?? undefined) : undefined,
           location: locationVal.trim() || undefined,
           participants: validParticipants,
           ownerId: user.id,
@@ -253,10 +265,21 @@ export default function CreateRitual() {
     }
   };
 
+  const isScheduleValid = () => {
+    if (frequency === "weekly" || frequency === "biweekly") {
+      return dayOfWeek !== null;
+    }
+    if (frequency === "monthly") {
+      if (monthlyType === "day_of_month") return monthlyDayOfMonth !== null;
+      if (monthlyType === "day_of_week_in_month") return monthlyWeekOrdinal !== null && monthlyWeekDay !== null;
+    }
+    return false;
+  };
+
   const isStepValid = () => {
     if (step === 1) return name.trim().length > 0;
     if (step === 2) return participants.some(p => p.name.trim() && p.email.trim());
-    if (step === 3) return dayPreference.trim().length > 0;
+    if (step === 3) return isScheduleValid();
     return true;
   };
 
@@ -415,36 +438,174 @@ export default function CreateRitual() {
                   </div>
 
                   <div className="space-y-6">
+                    {/* Cadence picker */}
                     <div>
                       <label className="block text-sm font-medium mb-3 text-foreground">Cadence</label>
                       <div className="grid grid-cols-3 gap-3">
                         {(["weekly", "biweekly", "monthly"] as CreateRitualBodyFrequency[]).map(freq => (
                           <button
                             key={freq}
-                            onClick={() => setFrequency(freq)}
+                            onClick={() => {
+                              setFrequency(freq);
+                              setDayOfWeek(null);
+                              setMonthlyDayOfMonth(null);
+                              setMonthlyWeekOrdinal(null);
+                              setMonthlyWeekDay(null);
+                              setMonthlyType("day_of_month");
+                            }}
                             className={`py-3 px-4 rounded-xl border font-medium capitalize transition-all ${
                               frequency === freq
                                 ? "bg-primary border-primary text-primary-foreground shadow-md"
                                 : "bg-background border-border text-foreground hover:border-primary/50"
                             }`}
                           >
-                            {freq}
+                            {freq === "biweekly" ? "Every 2 wks" : freq}
                           </button>
                         ))}
                       </div>
                     </div>
 
+                    {/* Weekly / Biweekly: day-of-week picker */}
+                    {(frequency === "weekly" || frequency === "biweekly") && (
+                      <div>
+                        <label className="block text-sm font-medium mb-3 text-foreground">Which day?</label>
+                        <div className="grid grid-cols-7 gap-1.5">
+                          {([
+                            { code: "MO" as DayOfWeekCode, label: "Mon" },
+                            { code: "TU" as DayOfWeekCode, label: "Tue" },
+                            { code: "WE" as DayOfWeekCode, label: "Wed" },
+                            { code: "TH" as DayOfWeekCode, label: "Thu" },
+                            { code: "FR" as DayOfWeekCode, label: "Fri" },
+                            { code: "SA" as DayOfWeekCode, label: "Sat" },
+                            { code: "SU" as DayOfWeekCode, label: "Sun" },
+                          ]).map(({ code, label }) => (
+                            <button
+                              key={code}
+                              onClick={() => setDayOfWeek(code)}
+                              className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                                dayOfWeek === code
+                                  ? "bg-primary border-primary text-primary-foreground shadow-md"
+                                  : "bg-background border-border text-foreground hover:border-primary/50"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Monthly: two radio options */}
+                    {frequency === "monthly" && (
+                      <div className="space-y-4">
+                        <label className="block text-sm font-medium text-foreground">Which day each month?</label>
+
+                        {/* Option 1: specific day-of-month */}
+                        <div
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            monthlyType === "day_of_month"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                          onClick={() => setMonthlyType("day_of_month")}
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              monthlyType === "day_of_month" ? "border-primary" : "border-muted-foreground"
+                            }`}>
+                              {monthlyType === "day_of_month" && (
+                                <div className="w-2 h-2 rounded-full bg-primary" />
+                              )}
+                            </div>
+                            <span className="text-sm font-medium">On a specific date</span>
+                          </div>
+                          {monthlyType === "day_of_month" && (
+                            <select
+                              value={monthlyDayOfMonth ?? ""}
+                              onChange={e => setMonthlyDayOfMonth(e.target.value ? parseInt(e.target.value, 10) : null)}
+                              onClick={e => e.stopPropagation()}
+                              className="w-full px-3 py-2 rounded-lg bg-background border border-border focus:border-primary focus:outline-none text-sm"
+                            >
+                              <option value="">Pick a day…</option>
+                              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                <option key={d} value={d}>
+                                  {d === 1 ? "1st" : d === 2 ? "2nd" : d === 3 ? "3rd" : `${d}th`} of the month
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+
+                        {/* Option 2: ordinal weekday */}
+                        <div
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            monthlyType === "day_of_week_in_month"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                          onClick={() => setMonthlyType("day_of_week_in_month")}
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              monthlyType === "day_of_week_in_month" ? "border-primary" : "border-muted-foreground"
+                            }`}>
+                              {monthlyType === "day_of_week_in_month" && (
+                                <div className="w-2 h-2 rounded-full bg-primary" />
+                              )}
+                            </div>
+                            <span className="text-sm font-medium">On the Nth weekday</span>
+                          </div>
+                          {monthlyType === "day_of_week_in_month" && (
+                            <div className="flex gap-2">
+                              <select
+                                value={monthlyWeekOrdinal ?? ""}
+                                onChange={e => setMonthlyWeekOrdinal(e.target.value ? (e.target.value as MonthlyWeekOrdinal) : null)}
+                                onClick={e => e.stopPropagation()}
+                                className="flex-1 px-3 py-2 rounded-lg bg-background border border-border focus:border-primary focus:outline-none text-sm"
+                              >
+                                <option value="">Which?</option>
+                                <option value="1">First</option>
+                                <option value="2">Second</option>
+                                <option value="3">Third</option>
+                                <option value="4">Fourth</option>
+                                <option value="-1">Last</option>
+                              </select>
+                              <select
+                                value={monthlyWeekDay ?? ""}
+                                onChange={e => setMonthlyWeekDay(e.target.value ? (e.target.value as DayOfWeekCode) : null)}
+                                onClick={e => e.stopPropagation()}
+                                className="flex-1 px-3 py-2 rounded-lg bg-background border border-border focus:border-primary focus:outline-none text-sm"
+                              >
+                                <option value="">Day?</option>
+                                <option value="MO">Monday</option>
+                                <option value="TU">Tuesday</option>
+                                <option value="WE">Wednesday</option>
+                                <option value="TH">Thursday</option>
+                                <option value="FR">Friday</option>
+                                <option value="SA">Saturday</option>
+                                <option value="SU">Sunday</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Time field */}
                     <div>
-                      <label className="block text-sm font-medium mb-3 text-foreground">Preferred day and time</label>
+                      <label className="block text-sm font-medium mb-3 text-foreground">
+                        What time? <span className="text-muted-foreground font-normal">(optional, e.g. 7pm)</span>
+                      </label>
                       <input
                         type="text"
                         value={dayPreference}
                         onChange={e => setDayPreference(e.target.value)}
-                        placeholder="e.g. Thursday evenings, Sunday brunch, Last Sunday at 6pm"
+                        placeholder="e.g. 7pm, 6:30pm, 19:00"
                         className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                       />
                     </div>
 
+                    {/* Location */}
                     <div>
                       <label className="block text-sm font-medium mb-3 text-foreground">
                         📍 Where will you gather? <span className="text-muted-foreground font-normal">(optional)</span>

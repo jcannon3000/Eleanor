@@ -78,6 +78,11 @@ export const CreateRitualBody = zod.object({
   description: zod.string().optional(),
   frequency: zod.enum(["weekly", "biweekly", "monthly"]),
   dayPreference: zod.string().optional(),
+  dayOfWeek: zod.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]).optional(),
+  monthlyType: zod.enum(["day_of_month", "day_of_week_in_month"]).optional(),
+  monthlyDayOfMonth: zod.number().int().min(1).max(31).optional(),
+  monthlyWeekOrdinal: zod.enum(["1", "2", "3", "4", "-1"]).optional(),
+  monthlyWeekDay: zod.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]).optional(),
   location: zod.string().optional(),
   participants: zod.array(
     zod.object({
@@ -158,6 +163,11 @@ export const UpdateRitualBody = zod.object({
   description: zod.string().optional(),
   frequency: zod.enum(["weekly", "biweekly", "monthly"]).optional(),
   dayPreference: zod.string().optional(),
+  dayOfWeek: zod.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]).optional(),
+  monthlyType: zod.enum(["day_of_month", "day_of_week_in_month"]).optional(),
+  monthlyDayOfMonth: zod.number().int().min(1).max(31).optional(),
+  monthlyWeekOrdinal: zod.enum(["1", "2", "3", "4", "-1"]).optional(),
+  monthlyWeekDay: zod.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]).optional(),
   participants: zod
     .array(
       zod.object({
