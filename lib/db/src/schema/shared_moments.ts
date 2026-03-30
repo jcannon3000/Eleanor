@@ -3,7 +3,7 @@ import { ritualsTable } from "./rituals";
 
 export const sharedMomentsTable = pgTable("shared_moments", {
   id: serial("id").primaryKey(),
-  ritualId: integer("ritual_id").notNull().references(() => ritualsTable.id, { onDelete: "cascade" }),
+  ritualId: integer("ritual_id").references(() => ritualsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   intention: text("intention").notNull(),
   loggingType: text("logging_type").notNull().default("photo"),

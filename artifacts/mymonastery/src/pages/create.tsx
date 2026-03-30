@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCreateRitual, useListRituals, CreateRitualBodyFrequency } from "@workspace/api-client-react";
+import { useCreateRitual, CreateRitualBodyFrequency } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
@@ -179,12 +179,8 @@ export default function CreateRitual() {
   const { toast } = useToast();
   const createMutation = useCreateRitual();
 
-  // Type chooser: null = chooser, "circle" = existing wizard, "moment" = circle picker
-  const [createType, setCreateType] = useState<"circle" | "moment" | null>(null);
-
-  const { data: existingRituals } = useListRituals(
-    { ownerId: user?.id },
-  );
+  // Type chooser: null = chooser, "circle" = existing wizard
+  const [createType, setCreateType] = useState<"circle" | null>(null);
 
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
@@ -299,7 +295,7 @@ export default function CreateRitual() {
             </button>
 
             <button
-              onClick={() => setCreateType("moment")}
+              onClick={() => setLocation("/moment/new")}
               className="w-full text-left p-6 bg-card rounded-2xl border-2 border-card-border hover:border-primary/40 hover:bg-primary/5 transition-all group"
             >
               <div className="flex items-start gap-4">
@@ -316,60 +312,6 @@ export default function CreateRitual() {
               </div>
             </button>
           </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // ── SHARED MOMENT → circle picker ───────────────────────────────────────────
-  if (createType === "moment") {
-    const circles = existingRituals ?? [];
-    return (
-      <Layout>
-        <div className="max-w-2xl mx-auto w-full pt-8">
-          <button
-            onClick={() => setCreateType(null)}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-8 transition-colors"
-          >
-            ← Back
-          </button>
-
-          <h2 className="text-3xl font-semibold text-foreground mb-2">Which circle is this for?</h2>
-          <p className="text-muted-foreground mb-8">
-            Shared Moments live inside a circle. Pick the one you want to add this moment to.
-          </p>
-
-          {circles.length === 0 ? (
-            <div className="bg-card rounded-2xl border border-card-border p-8 text-center">
-              <p className="text-4xl mb-3">🌱</p>
-              <p className="font-semibold text-foreground mb-2">No circles yet</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                You need a circle before you can plant a Shared Moment. Start one first.
-              </p>
-              <button
-                onClick={() => setCreateType("circle")}
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
-              >
-                Start a Circle →
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {circles.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => setLocation(`/ritual/${r.id}/moment/plant`)}
-                  className="w-full text-left p-5 bg-card rounded-2xl border-2 border-card-border hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-between group"
-                >
-                  <div>
-                    <p className="font-semibold text-foreground">{r.name}</p>
-                    <p className="text-sm text-muted-foreground capitalize">{r.frequency} · {r.participants?.length ?? 0} people</p>
-                  </div>
-                  <span className="text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">Select →</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </Layout>
     );

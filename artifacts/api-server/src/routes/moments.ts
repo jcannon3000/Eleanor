@@ -240,6 +240,130 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   });
 });
 
+// ─── POST /api/moments — plant a standalone shared moment ───────────────────
+const StandalonePlantSchema = z.object({
+  name: z.string().min(1).max(100),
+  intention: z.string().min(1).max(280),
+  loggingType: z.enum(["photo", "reflection", "both", "checkin"]),
+  reflectionPrompt: z.string().max(200).optional(),
+  frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
+  scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
+  goalDays: z.number().int().min(1).max(365).default(30),
+  participants: z.array(z.object({ name: z.string(), email: z.string().email() })).min(1).max(20),
+});
+
+router.post("/moments", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = StandalonePlantSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+
+  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, goalDays, participants } = parsed.data;
+
+  const momentToken = generateToken();
+
+  const [moment] = await db.insert(sharedMomentsTable).values({
+    ritualId: null,
+    name,
+    intention,
+    loggingType,
+    reflectionPrompt: reflectionPrompt ?? null,
+    frequency,
+    scheduledTime,
+    goalDays,
+    momentToken,
+    windowMinutes: 60,
+  }).returning();
+
+  const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+
+  // Merge organizer into participants, deduplicate by email
+  const allMembers: Array<{ email: string; name: string }> = [
+    { email: organizer.email, name: organizer.name ?? organizer.email },
+    ...participants.map(p => ({ email: p.email, name: p.name || p.email })),
+  ];
+  const seen = new Set<string>();
+  const uniqueMembers = allMembers.filter(m => {
+    if (seen.has(m.email)) return false;
+    seen.add(m.email);
+    return true;
+  });
+
+  const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
+    ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
+    : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+
+  const memberTokenRows = uniqueMembers.map(m => ({
+    momentId: moment.id,
+    email: m.email,
+    name: m.name,
+    userToken: generateToken(),
+  }));
+
+  const insertedTokens = await db.insert(momentUserTokensTable).values(memberTokenRows).returning();
+
+  const freqLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
+  const [hh, mm] = scheduledTime.split(":").map(Number);
+  const timeLabel = new Date(0, 0, 0, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const loggingLabel = { photo: "Share a photo", reflection: "Reflect on a prompt", both: "Photo and reflection", checkin: "Just show up" }[loggingType];
+
+  const linkLines = insertedTokens.map(t => `  ${t.name ?? t.email}: ${baseUrl}/${momentToken}/${t.userToken}`);
+
+  const calDescription = [
+    intention,
+    "",
+    `${freqLabel} at ${timeLabel} · ${goalDays}-day goal`,
+    loggingType === "reflection" || loggingType === "both"
+      ? `Prompt: ${reflectionPrompt ?? "Show up and reflect."}`
+      : `How: ${loggingLabel}`,
+    "",
+    "You have one hour. Tap your personal link:",
+    ...linkLines,
+    "",
+    "No login needed. Just show up. 🌿",
+    "",
+    "Coordinated by Eleanor · eleanor.app",
+  ].join("\n");
+
+  const recurrenceRule = frequency === "daily"
+    ? ["RRULE:FREQ=DAILY"]
+    : frequency === "weekly"
+    ? ["RRULE:FREQ=WEEKLY"]
+    : ["RRULE:FREQ=MONTHLY"];
+
+  const startDate = new Date();
+  startDate.setHours(hh, mm, 0, 0);
+  if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
+  const endDate = new Date(startDate.getTime() + 60 * 60_000);
+
+  const attendeeEmails = uniqueMembers.map(m => m.email);
+
+  const gcalEventId = await createCalendarEvent(sessionUserId, {
+    summary: `🌿 ${name}`,
+    description: calDescription,
+    startDate,
+    endDate,
+    attendees: attendeeEmails,
+    recurrence: recurrenceRule,
+  }).catch(() => null);
+
+  if (gcalEventId) {
+    const organizerTokenRow = insertedTokens.find(t => t.email === organizer.email);
+    if (organizerTokenRow) {
+      await db.update(momentUserTokensTable)
+        .set({ googleCalendarEventId: gcalEventId })
+        .where(eq(momentUserTokensTable.id, organizerTokenRow.id));
+    }
+  }
+
+  res.status(201).json({
+    moment: { ...moment },
+    memberCount: uniqueMembers.length,
+    gcalCreated: !!gcalEventId,
+  });
+});
+
 // ─── GET /api/rituals/:id/moments — list moments for a circle ───────────────
 router.get("/rituals/:id/moments", async (req, res): Promise<void> => {
   const ritualId = parseInt(req.params.id, 10);
