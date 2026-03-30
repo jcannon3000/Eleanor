@@ -261,6 +261,187 @@ function MeditationTimer({
   );
 }
 
+// ─── Intercession prayer + photo page ────────────────────────────────────────
+type IntercessionScreen = "prayer" | "photo";
+
+function IntercessionPrayerPage({
+  topic, fullText, intention, memberCount, todayPostCount, onComplete,
+}: {
+  topic: string;
+  fullText: string;
+  intention: string;
+  memberCount: number;
+  todayPostCount: number;
+  onComplete: (photoUrl: string | null, reflection: string) => void;
+}) {
+  const [screen, setScreen] = useState<IntercessionScreen>("prayer");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoTimestamp, setPhotoTimestamp] = useState<string | null>(null);
+  const [reflection, setReflection] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const now = new Date();
+    const ts = now.toLocaleString("en-US", {
+      month: "long", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+    setPhotoTimestamp(ts);
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  // ── Prayer recitation screen ─────────────────────────────────────────────
+  if (screen === "prayer") {
+    return (
+      <div className="min-h-screen bg-[#F5EDD8] flex flex-col">
+        <div className="flex-1 overflow-y-auto px-6 py-10 max-w-sm mx-auto w-full">
+          {/* Header */}
+          <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-3">
+            Today's intercession
+          </p>
+          <h1 className="text-2xl font-bold text-[#2C1A0E] text-center leading-snug mb-2">
+            {topic}
+          </h1>
+          {intention && (
+            <p className="text-center text-[#6b5c4a] italic font-serif text-sm leading-relaxed mb-6">
+              {intention}
+            </p>
+          )}
+
+          {/* Prayer text — full, read-only, formatted for recitation */}
+          {fullText ? (
+            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-6 mb-6">
+              <p className="font-serif text-[#2C1A0E] text-[15px] leading-[1.9] whitespace-pre-wrap">
+                {fullText}
+              </p>
+              <p className="text-[11px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
+                — The Book of Common Prayer
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-8 mb-6 text-center">
+              <p className="font-serif text-[#2C1A0E] text-base italic">{intention}</p>
+            </div>
+          )}
+
+          {/* Presence */}
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <PresenceDots count={todayPostCount} total={memberCount} />
+            <span className="text-xs text-[#6b5c4a]/70">
+              {todayPostCount} of {memberCount} praying with you
+            </span>
+          </div>
+        </div>
+
+        {/* Sticky button */}
+        <div className="px-6 pb-10 pt-4 bg-[#F5EDD8] border-t border-[#c9b99a]/20 max-w-sm mx-auto w-full">
+          <button
+            onClick={() => setScreen("photo")}
+            className="w-full py-4 bg-[#2C1A0E] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            I prayed this prayer 🙏
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Photo capture screen ─────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#F5EDD8] flex flex-col px-6 py-10">
+      <div className="w-full max-w-sm mx-auto">
+        <button
+          onClick={() => setScreen("prayer")}
+          className="text-sm text-[#6b5c4a] mb-6 flex items-center gap-1 hover:text-[#2C1A0E]"
+        >
+          ← Back to prayer
+        </button>
+
+        <h2 className="text-xl font-bold text-[#2C1A0E] mb-1">Who are you holding?</h2>
+        <p className="text-sm text-[#6b5c4a] mb-6 leading-relaxed">
+          Take a photo of who or what you're bringing in prayer today — a person, a letter, a place.
+        </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handlePhotoCapture}
+          className="hidden"
+        />
+
+        {/* Photo preview with timestamp */}
+        {photoPreview ? (
+          <div className="relative mb-6 rounded-2xl overflow-hidden shadow-md">
+            <img
+              src={photoPreview}
+              alt="Who you're holding in prayer"
+              className="w-full object-cover max-h-72"
+            />
+            {/* Timestamp overlay */}
+            {photoTimestamp && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-4 py-3">
+                <span className="text-xs text-white font-medium tracking-wide">
+                  {photoTimestamp}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setPhotoPreview(null);
+                setPhotoTimestamp(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="absolute top-3 right-3 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white text-sm hover:bg-black/80"
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full border-2 border-dashed border-[#c9b99a]/60 hover:border-[#6B8F71]/50 rounded-2xl p-10 text-center mb-6 transition-colors bg-white/40"
+          >
+            <p className="text-3xl mb-2">📷</p>
+            <p className="font-medium text-[#2C1A0E]">Take a photo</p>
+            <p className="text-xs text-[#6b5c4a]/60 mt-1">A person, a letter, a place</p>
+          </button>
+        )}
+
+        {/* Reflection */}
+        <div className="mb-6">
+          <p className="text-sm font-medium text-[#2C1A0E] mb-2">
+            A few words{" "}
+            <span className="text-[#6b5c4a]/60 font-normal">(optional)</span>
+          </p>
+          <textarea
+            value={reflection}
+            onChange={e => setReflection(e.target.value.slice(0, 280))}
+            placeholder="Who are you holding in prayer today?"
+            rows={3}
+            className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-base leading-relaxed"
+          />
+        </div>
+
+        <button
+          onClick={() => onComplete(photoPreview, reflection)}
+          className="w-full py-4 bg-[#6B8F71] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:bg-[#5a7a60] transition-colors"
+        >
+          I showed up 🙏
+        </button>
+        <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 italic">
+          Photo and reflection are always optional
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function MomentPostPage() {
   const { momentToken, userToken } = useParams<{ momentToken: string; userToken: string }>();
@@ -309,6 +490,14 @@ export default function MomentPostPage() {
     });
   }
 
+  function handleIntercessionComplete(photoUrl: string | null, refl: string) {
+    postMutation.mutate({
+      photoUrl: photoUrl ?? undefined,
+      reflectionText: refl || undefined,
+      isCheckin: true,
+    });
+  }
+
   const canSubmit = () => {
     if (!data) return false;
     const { loggingType } = data.moment;
@@ -349,6 +538,25 @@ export default function MomentPostPage() {
   const actualMemberCount = memberCount ?? mc;
   const actualTodayCount = todayCount ?? todayPostCount;
   const alreadyPosted = posted || !!myPost;
+
+  // ── Intercession — prayer recitation + photo with timestamp ────────────────
+  if (moment.templateType === "intercession" && windowOpen && !alreadyPosted) {
+    return (
+      <IntercessionPrayerPage
+        topic={moment.intercessionTopic ?? moment.name}
+        fullText={moment.intercessionFullText ?? ""}
+        intention={moment.intention}
+        memberCount={actualMemberCount}
+        todayPostCount={actualTodayCount}
+        onComplete={handleIntercessionComplete}
+      />
+    );
+  }
+
+  // ── Outside window for intercession ────────────────────────────────────────
+  if (moment.templateType === "intercession" && !alreadyPosted && !windowOpen) {
+    return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
+  }
 
   // ── Timer pages — full screen, separate from main layout ───────────────────
   if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && windowOpen && !alreadyPosted) {
