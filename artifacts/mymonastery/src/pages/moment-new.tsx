@@ -226,10 +226,34 @@ const TEMPLATES = [
 
 // ─── Milestone goal options ───────────────────────────────────────────────────
 const GOAL_OPTIONS = [
-  { days: 3, emoji: "🌱", label: "Three days", sub: "first roots" },
-  { days: 7, emoji: "🌿", label: "One week", sub: "seven days" },
-  { days: 14, emoji: "🌸", label: "Two weeks", sub: "fourteen days, then renew" },
-  { days: 0, emoji: "✨", label: "Just begin", sub: "no goal, tend freely" },
+  {
+    days: 3, emoji: "🌱", label: "Three days", sub: "A first tender",
+    bg: "#EEF3EF", borderColor: "#c8dac9",
+    dots: Array(3).fill(0), dotLabel: "3 practices together",
+    badge: null,
+    message: "A gentle beginning. Three practices to find your rhythm.",
+  },
+  {
+    days: 7, emoji: "🌿", label: "One week", sub: "Taking root",
+    bg: "#E4EEE6", borderColor: "#b0cdb3",
+    dots: Array(7).fill(0), dotLabel: "7 practices together",
+    badge: "Most chosen 🌿",
+    message: "One week of showing up together. This is where something real begins.",
+  },
+  {
+    days: 14, emoji: "🌸", label: "Two weeks", sub: "In bloom — then renew",
+    bg: "#F7F0E6", borderColor: "#b0cdb3",
+    dots: Array(14).fill(0), dotLabel: "14 practices — then your circle renews the commitment",
+    badge: null, accentBar: true,
+    message: "Two weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.",
+  },
+  {
+    days: 0, emoji: "✨", label: "Just begin", sub: "No goal, tend freely",
+    bg: "#FAF6F0", borderColor: "rgba(0,0,0,0.06)",
+    dots: [], dotLabel: "",
+    badge: null,
+    message: "No pressure. The practice is open. Tend it when you can.",
+  },
 ];
 
 // ─── Logging type options ─────────────────────────────────────────────────────
@@ -1075,26 +1099,125 @@ export default function MomentNew() {
 
               {/* ── Goal ───────────────────────────────────────────── */}
               {step === "goal" && (
-                <div className="space-y-5 flex-1">
+                <div className="flex-1 flex flex-col gap-4">
+                  {/* Header */}
                   <div>
-                    <h2 className="text-2xl font-semibold mb-1">Set a milestone to tend toward 🌿</h2>
-                    <p className="text-sm text-muted-foreground italic">Show up together and watch something grow.</p>
+                    <h2 className="text-[1.6rem] font-bold text-[#2C1A0E] leading-tight mb-1">
+                      How far will you grow together? 🌱
+                    </h2>
+                    <p className="text-sm text-muted-foreground italic">Pick a goal. Eleanor will tend it with you.</p>
                   </div>
-                  <div className="grid gap-3">
-                    {GOAL_OPTIONS.map(g => (
-                      <button key={g.days} onClick={() => setGoalDays(g.days)}
-                        className={`w-full text-left p-5 rounded-2xl border-2 transition-all ${goalDays === g.days ? "border-[#6B8F71] bg-[#6B8F71]/5" : "border-border hover:border-[#6B8F71]/30"}`}>
-                        <div className="flex items-center gap-4">
-                          <span className="text-3xl">{g.emoji}</span>
-                          <div>
-                            <p className="font-semibold text-foreground">{g.label}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{g.sub}</p>
+
+                  {/* Goal cards */}
+                  <div className="space-y-3">
+                    {GOAL_OPTIONS.map(g => {
+                      const selected = goalDays === g.days;
+                      const isJustBegin = g.days === 0;
+                      return (
+                        <motion.button
+                          key={g.days}
+                          onClick={() => setGoalDays(g.days)}
+                          animate={{ y: selected ? -2 : 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="relative w-full text-left rounded-2xl overflow-hidden transition-colors duration-200"
+                          style={{
+                            background: selected ? "#6B8F71" : g.bg,
+                            border: `1px solid ${selected ? "#6B8F71" : g.borderColor}`,
+                            boxShadow: selected ? "0 4px 14px rgba(107,143,113,0.25)" : undefined,
+                          }}
+                        >
+                          {/* Left accent bar for Two weeks */}
+                          {"accentBar" in g && g.accentBar && !selected && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#6B8F71]/40 rounded-l-2xl" />
+                          )}
+
+                          {/* Badge — top right */}
+                          {g.badge && !selected && (
+                            <div className="absolute top-3 right-3 bg-[#C17F24] text-[#F5EDD8] text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-tight">
+                              {g.badge}
+                            </div>
+                          )}
+
+                          {/* Checkmark when selected */}
+                          {selected && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="absolute top-3 right-3 text-[#F5EDD8] font-bold text-base leading-none"
+                            >
+                              ✓
+                            </motion.div>
+                          )}
+
+                          <div className={`flex items-start gap-4 p-5 ${!selected && "accentBar" in g && g.accentBar ? "pl-6" : ""}`}>
+                            {/* Emoji */}
+                            <span className="text-[40px] leading-none shrink-0 mt-0.5">{g.emoji}</span>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-bold text-[15px] leading-snug ${selected ? "text-[#F5EDD8]" : isJustBegin ? "text-muted-foreground font-normal" : "text-[#2C1A0E]"}`}>
+                                {g.label}
+                              </p>
+                              <p className={`text-xs mt-0.5 ${selected ? "text-[#F5EDD8]/70" : "text-muted-foreground"}`}>
+                                {g.sub}
+                              </p>
+
+                              {/* Progress dots — key forces remount & re-fires stagger on selection */}
+                              {g.dots.length > 0 && (
+                                <div key={`dots-${g.days}-${selected}`} className="mt-2.5">
+                                  {/* Row 1 — up to 7 */}
+                                  <div className="flex gap-1">
+                                    {g.dots.slice(0, 7).map((_, i) => (
+                                      <motion.div
+                                        key={i}
+                                        initial={selected ? { scale: 0.3, opacity: 0 } : false}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ delay: selected ? i * 0.05 : 0, duration: 0.18, ease: "easeOut" }}
+                                        className="w-2.5 h-2.5 rounded-full"
+                                        style={{ background: selected ? "rgba(247,240,230,0.85)" : "rgba(107,143,113,0.28)" }}
+                                      />
+                                    ))}
+                                  </div>
+                                  {/* Row 2 — for 14 */}
+                                  {g.dots.length > 7 && (
+                                    <div className="flex gap-1 mt-1">
+                                      {g.dots.slice(7).map((_, i) => (
+                                        <motion.div
+                                          key={i}
+                                          initial={selected ? { scale: 0.3, opacity: 0 } : false}
+                                          animate={{ scale: 1, opacity: 1 }}
+                                          transition={{ delay: selected ? (i + 7) * 0.05 : 0, duration: 0.18, ease: "easeOut" }}
+                                          className="w-2.5 h-2.5 rounded-full"
+                                          style={{ background: selected ? "rgba(247,240,230,0.85)" : "rgba(107,143,113,0.28)" }}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  <p className={`text-[10px] mt-1.5 ${selected ? "text-[#F5EDD8]/55" : "text-muted-foreground/55"}`}>
+                                    {g.dotLabel}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {goalDays === g.days && <span className="ml-auto text-[#6B8F71]">✓</span>}
-                        </div>
-                      </button>
-                    ))}
+                        </motion.button>
+                      );
+                    })}
                   </div>
+
+                  {/* Dynamic message beneath cards */}
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={goalDays}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-sm text-center text-muted-foreground italic px-2 pb-1"
+                    >
+                      {GOAL_OPTIONS.find(g => g.days === goalDays)?.message}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
               )}
 
