@@ -293,15 +293,20 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 // ─── POST /api/moments — plant a standalone shared moment ───────────────────
 const StandalonePlantSchema = z.object({
   name: z.string().min(1).max(100),
-  intention: z.string().min(1).max(280),
-  loggingType: z.enum(["photo", "reflection", "both", "checkin"]),
-  reflectionPrompt: z.string().max(200).optional(),
+  intention: z.string().min(1).max(500),
+  loggingType: z.enum(["photo", "reflection", "both", "checkin", "timer", "timer_reflection"]),
+  reflectionPrompt: z.string().max(300).optional(),
+  templateType: z.string().optional(),
+  intercessionTopic: z.string().max(300).optional(),
+  intercessionSource: z.enum(["bcp", "custom"]).optional(),
+  intercessionFullText: z.string().optional(),
+  timerDurationMinutes: z.number().int().min(1).max(60).optional(),
   frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
-  goalDays: z.number().int().min(1).max(365).default(30),
+  goalDays: z.number().int().min(0).max(365).default(7),
   timezone: z.string().default("UTC"),
-  participants: z.array(z.object({ name: z.string(), email: z.string().email() })).min(1).max(20),
+  participants: z.array(z.object({ name: z.string(), email: z.string().email() })).max(20).default([]),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -311,7 +316,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   const parsed = StandalonePlantSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
 
-  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, dayOfWeek, goalDays, timezone, participants } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, participants } = parsed.data;
 
   const momentToken = generateToken();
 
@@ -321,6 +326,11 @@ router.post("/moments", async (req, res): Promise<void> => {
     intention,
     loggingType,
     reflectionPrompt: reflectionPrompt ?? null,
+    templateType: templateType ?? null,
+    intercessionTopic: intercessionTopic ?? null,
+    intercessionSource: intercessionSource ?? null,
+    intercessionFullText: intercessionFullText ?? null,
+    timerDurationMinutes: timerDurationMinutes ?? 10,
     frequency,
     scheduledTime,
     dayOfWeek: dayOfWeek ?? null,
@@ -670,6 +680,10 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       intention: moment.intention,
       loggingType: moment.loggingType,
       reflectionPrompt: moment.reflectionPrompt,
+      templateType: moment.templateType,
+      intercessionFullText: moment.intercessionFullText,
+      intercessionTopic: moment.intercessionTopic,
+      timerDurationMinutes: moment.timerDurationMinutes ?? 10,
       currentStreak: moment.currentStreak,
       longestStreak: moment.longestStreak,
       state: moment.state,

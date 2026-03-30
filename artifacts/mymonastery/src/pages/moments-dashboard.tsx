@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { apiRequest } from "@/lib/queryClient";
+import { milestoneLabel, milestoneProgress } from "@/lib/utils";
 import { format, parseISO, addDays, startOfDay } from "date-fns";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -50,6 +51,17 @@ function nextWindowDate(m: MomentData): Date {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+const TEMPLATE_EMOJI: Record<string, string> = {
+  morning_prayer: "🌅",
+  evening_prayer: "🌙",
+  intercession: "🙏",
+  breath_together: "🌬️",
+  contemplative_sit: "🌿",
+  walk_together: "🚶",
+  morning_coffee: "☕",
+  custom: "✨",
+};
+
 interface MomentData {
   id: number;
   name: string;
@@ -69,11 +81,9 @@ interface MomentData {
   momentToken: string;
   myUserToken: string | null;
   latestWindow: { status: string; postCount: number } | null;
+  templateType?: string | null;
+  goalDays?: number | null;
 }
-
-const STATUS_ICONS: Record<string, string> = {
-  bloom: "🌸", solo: "👤", wither: "🥀",
-};
 
 // ─── Moment Card ─────────────────────────────────────────────────────────────
 
@@ -84,57 +94,70 @@ function MomentCard({ moment }: { moment: MomentData }) {
     .join(", ");
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
   const nextWindow = !moment.windowOpen ? nextWindowDate(moment) : null;
-  const lastStatus = moment.latestWindow?.status;
+  const templateEmoji = TEMPLATE_EMOJI[moment.templateType ?? "custom"] ?? "✨";
+  const hasGoal = (moment.goalDays ?? 0) > 0;
+  const mLabel = milestoneLabel(moment.currentStreak);
+  const mProgress = milestoneProgress(moment.currentStreak);
 
   return (
     <Link href={`/moments/${moment.id}`}>
-      <div className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 ${
-        moment.windowOpen
-          ? "border-[#C17F24]/40 shadow-[0_0_16px_rgba(193,127,36,0.1)] bg-[#F5F5F0]"
-          : "border-border/60 bg-[#F5F5F0] hover:shadow-md"
-      }`}>
-        {/* Sage left bar, amber when open */}
-        <div className={`w-1 flex-shrink-0 ${moment.windowOpen ? "bg-[#C17F24]" : "bg-[#6B8F71]"}`} />
+      <motion.div
+        whileHover={{ y: -1 }}
+        className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 ${
+          moment.windowOpen
+            ? "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
+            : "border-[#c9b99a]/40 bg-[#FDFCF8] hover:shadow-md"
+        }`}>
+        {/* Left accent bar, amber pulsing when open */}
+        <div className={`w-1.5 flex-shrink-0 ${moment.windowOpen ? "bg-amber-400 animate-pulse" : "bg-[#6B8F71]"}`} />
+
         <div className="flex-1 p-4">
-          <div className="flex items-start justify-between mb-1">
-            <span className="text-base font-semibold text-foreground">{moment.name}</span>
-            <div className="flex items-center gap-1.5 ml-2 shrink-0">
-              {moment.windowOpen && (
-                <span className="text-[11px] font-semibold text-[#C17F24] uppercase tracking-wide animate-pulse">Open</span>
-              )}
-              {lastStatus && !moment.windowOpen && (
-                <span className="text-sm">{STATUS_ICONS[lastStatus] ?? ""}</span>
-              )}
+          {/* Top row */}
+          <div className="flex items-start gap-2 mb-1">
+            <span className="text-xl leading-none mt-0.5">{templateEmoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-base font-semibold text-[#2C1A0E] leading-snug">{moment.name}</span>
+                {moment.windowOpen && (
+                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
+                    Open now
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#6b5c4a]/70 mt-0.5">with {memberNames}{extraMembers}</p>
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-2 line-clamp-1 italic">"{moment.intention}"</p>
+          {/* Intention */}
+          <p className="text-sm italic text-[#6b5c4a]/80 font-serif mb-2 line-clamp-1">"{moment.intention}"</p>
 
-          <p className="text-xs text-muted-foreground mb-3">
-            with {memberNames}{extraMembers}
-          </p>
+          {/* Time info */}
+          {moment.windowOpen ? (
+            <p className="text-sm text-amber-700 font-medium mb-2">
+              {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
+            </p>
+          ) : (
+            <p className="text-xs text-[#6b5c4a]/60 mb-2">
+              {nextWindow ? `Next: ${format(nextWindow, "EEE h:mm a")}` : scheduleLabel(moment)}
+            </p>
+          )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {moment.currentStreak > 0 && (
-                <span className="text-xs text-foreground/70">
-                  🔥 {moment.currentStreak}{moment.longestStreak > moment.currentStreak ? ` · Best: ${moment.longestStreak}` : ""}
-                </span>
-              )}
-              {moment.totalBlooms > 0 && (
-                <span className="text-xs text-muted-foreground">🌸 {moment.totalBlooms}</span>
-              )}
+          {/* Milestone / streak */}
+          {hasGoal ? (
+            <div className="mt-1">
+              <span className="text-[11px] text-[#6b5c4a]/80">{mLabel}</span>
+              <div className="mt-1 w-full h-0.5 bg-[#c9b99a]/30 rounded-full overflow-hidden">
+                <div className="h-full bg-[#6B8F71] rounded-full transition-all"
+                  style={{ width: `${Math.round(mProgress * 100)}%` }} />
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {moment.windowOpen
-                ? `${moment.minutesLeft} min left`
-                : nextWindow
-                  ? `Next: ${format(nextWindow, "EEE h:mm a")}`
-                  : scheduleLabel(moment)}
-            </span>
-          </div>
+          ) : (
+            moment.currentStreak > 0 && (
+              <span className="text-[11px] text-[#6b5c4a]/70">🌿 {moment.currentStreak} in a row</span>
+            )
+          )}
         </div>
-      </div>
+      </motion.div>
     </Link>
   );
 }

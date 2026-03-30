@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { apiRequest } from "@/lib/queryClient";
+import { milestoneLabel, milestoneProgress } from "@/lib/utils";
 import { format, isToday, isTomorrow, isThisWeek, isPast, parseISO, addDays, startOfDay } from "date-fns";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -121,6 +122,17 @@ function GatheringCard({ ritual, dim }: { ritual: ReturnType<typeof useListRitua
   );
 }
 
+const TEMPLATE_EMOJI: Record<string, string> = {
+  morning_prayer: "🌅",
+  evening_prayer: "🌙",
+  intercession: "🙏",
+  breath_together: "🌬️",
+  contemplative_sit: "🌿",
+  walk_together: "🚶",
+  morning_coffee: "☕",
+  custom: "✨",
+};
+
 interface MomentData {
   id: number;
   name: string;
@@ -139,87 +151,94 @@ interface MomentData {
   momentToken: string;
   myUserToken: string | null;
   latestWindow: { status: string; postCount: number } | null;
+  templateType?: string | null;
+  goalDays?: number | null;
 }
 
 function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: boolean; pinned?: boolean }) {
   const [, setLocation] = useLocation();
   const nextWindow = nextMomentWindow(moment);
-  const growthLabel = GROWTH_LABELS[moment.state] ?? moment.state;
   const memberNames = moment.members.slice(0, 3).map(m => (m.name ?? m.email).split(" ")[0]).join(", ");
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
+  const templateEmoji = TEMPLATE_EMOJI[moment.templateType ?? "custom"] ?? "✨";
+  const mLabel = milestoneLabel(moment.currentStreak);
+  const mProgress = milestoneProgress(moment.currentStreak);
+  const hasGoal = (moment.goalDays ?? 0) > 0;
 
   return (
-    <div
+    <motion.div
       onClick={() => setLocation(`/moments/${moment.id}`)}
+      whileHover={{ y: -1 }}
       className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
-      pinned
-        ? "border-[#C17F24]/40 shadow-[0_0_20px_rgba(193,127,36,0.12)] bg-[#F5F5F0]"
-        : `border-border/60 bg-[#F5F5F0] ${dim ? "opacity-60" : ""} hover:shadow-md`
-    }`}>
-      {/* Sage left bar */}
-      <div className={`w-1 flex-shrink-0 ${pinned ? "bg-[#C17F24]" : "bg-[#6B8F71]"}`} />
+        pinned
+          ? "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
+          : `border-[#c9b99a]/40 bg-[#FDFCF8] ${dim ? "opacity-55" : ""} hover:shadow-md`
+      }`}>
+      {/* Left accent bar */}
+      <div className={`w-1.5 flex-shrink-0 ${pinned ? "bg-amber-400 animate-pulse" : "bg-[#6B8F71]"}`} />
+
       <div className="flex-1 p-4">
-        {/* Top row */}
-        <div className="flex items-start justify-between mb-1">
-          <div className="flex items-center gap-2">
-            {pinned && (
-              <span className="text-xs font-semibold text-[#C17F24] uppercase tracking-wide animate-pulse">
-                Open now
-              </span>
-            )}
-            <span className="text-base font-semibold text-foreground">{moment.name}</span>
+        {/* Top row: icon + name + window status */}
+        <div className="flex items-start gap-2 mb-1">
+          <span className="text-xl leading-none mt-0.5">{templateEmoji}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-base font-semibold text-[#2C1A0E] leading-snug">{moment.name}</span>
+              {pinned && (
+                <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
+                  Open now
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[#6b5c4a]/70 mt-0.5">with {memberNames}{extraMembers}</p>
           </div>
-          <span className="text-[11px] font-medium text-muted-foreground/70 bg-white/60 rounded-full px-2 py-0.5 border border-border/40 ml-2 shrink-0">
-            {growthLabel}
-          </span>
         </div>
 
-        {/* Participants */}
-        <p className="text-sm text-muted-foreground mb-2">
-          with {memberNames}{extraMembers}
-        </p>
-
-        {/* Time */}
+        {/* Time / status line */}
         {pinned ? (
-          <p className="text-sm text-[#C17F24] font-medium mb-2">
+          <p className="text-sm text-amber-700 font-medium mt-1 mb-2">
             {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
           </p>
         ) : (
-          <p className="text-sm text-foreground/70 mb-2">
-            {dayLabel(nextWindow)} · {formatTime(moment.scheduledTime)} · 1 hr window
+          <p className="text-xs text-[#6b5c4a]/60 mb-2">
+            {dayLabel(nextWindow)} · {formatTime(moment.scheduledTime)}
           </p>
         )}
 
-        {/* Intention (pinned only) */}
+        {/* Intention (pinned) */}
         {pinned && moment.intention && (
-          <p className="text-sm italic text-muted-foreground mb-3">"{moment.intention}"</p>
+          <p className="text-sm italic text-[#6b5c4a] font-serif mb-3">"{moment.intention}"</p>
         )}
 
-        {/* Progress bar (pinned or if posted today) */}
-        {(pinned || moment.todayPostCount > 0) && (
-          <div className="mb-2">
-            <div className="w-full h-1.5 bg-border/40 rounded-full overflow-hidden">
+        {/* Presence progress bar (pinned) */}
+        {pinned && (
+          <div className="mb-3">
+            <div className="w-full h-1.5 bg-[#c9b99a]/30 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#6B8F71] rounded-full transition-all"
-                style={{ width: `${Math.min(100, (moment.todayPostCount / moment.memberCount) * 100)}%` }}
+                style={{ width: `${Math.min(100, moment.memberCount > 0 ? (moment.todayPostCount / moment.memberCount) * 100 : 0)}%` }}
               />
             </div>
           </div>
         )}
 
-        {/* Bottom row */}
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-3">
-            {moment.currentStreak > 0 && (
-              <span className="text-xs text-muted-foreground">
-                🔥 {moment.currentStreak} in a row{moment.longestStreak > moment.currentStreak ? ` · Best: ${moment.longestStreak}` : ""}
-              </span>
-            )}
-            {moment.latestWindow?.status === "bloom" && !pinned && (
-              <span className="text-xs text-[#6B8F71]">🌸 Bloomed</span>
-            )}
-            {moment.latestWindow?.status === "wither" && !pinned && (
-              <span className="text-xs text-rose-400">🥀 Withered</span>
+        {/* Bottom row: milestone label + CTA */}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <div className="min-w-0 flex-1">
+            {hasGoal ? (
+              <div>
+                <span className="text-[11px] text-[#6b5c4a]/80">{mLabel}</span>
+                <div className="mt-1 w-full h-0.5 bg-[#c9b99a]/30 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#6B8F71] rounded-full transition-all"
+                    style={{ width: `${Math.round(mProgress * 100)}%` }} />
+                </div>
+              </div>
+            ) : (
+              moment.currentStreak > 0 && (
+                <span className="text-[11px] text-[#6b5c4a]/70">
+                  🌿 {moment.currentStreak} in a row
+                </span>
+              )
             )}
           </div>
           {pinned && moment.myUserToken && (
@@ -227,14 +246,14 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
               href={`/moment/${moment.momentToken}/${moment.myUserToken}`}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-              <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 hover:bg-[#5a7a60] transition-colors">
-                Post your moment →
+              <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 hover:bg-[#5a7a60] transition-colors whitespace-nowrap shrink-0">
+                Show up →
               </span>
             </Link>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

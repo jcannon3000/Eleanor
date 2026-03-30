@@ -1,0 +1,824 @@
+Here’s the Replit prompt:
+
+Add spiritual practice templates to Shared Moments in Eleanor
+This is a new addition to the Shared Moments feature. Do not change or break anything that already exists. Add everything described below.
+
+Core structural change — no circles for Shared Moments
+Shared Moments do not use the circle framework. A Shared Moment is a practice that people join directly. Members are associated to a Shared Moment itself — not to a circle first.
+This means:
+When someone creates a Shared Moment they do not select a circle. They name the practice, configure it, and invite people directly to that practice via a unique link. Invitees join the practice, not a circle.
+The data model reflects this:
+
+shared_moments
+  id uuid PK
+  name text
+  intention text
+  template_type text
+  intercession_topic text
+  intercession_source text (bcp | custom)
+  intercession_full_text text
+  logging_type text (photo | reflection | both | timer | timer_reflection | checkin)
+  timer_duration_minutes integer
+  reflection_prompt text
+  ritual_time time
+  ritual_days text[]
+  frequency text (daily | weekly)
+  timezone text
+  created_by uuid FK users
+  created_at timestamptz
+
+moment_members
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  user_id uuid FK users (nullable — guests tracked by token only)
+  name text (for guests who have not logged in)
+  email text
+  joined_at timestamptz
+
+user_moment_tokens
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  moment_member_id uuid FK moment_members
+  token text unique (url-safe, 16 chars)
+  created_at timestamptz
+
+moment_tokens
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  token text unique (url-safe, 12 chars)
+  created_at timestamptz
+
+moment_posts
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  moment_member_id uuid FK moment_members
+  user_moment_token_id uuid FK user_moment_tokens
+  photo_url text
+  reflection_text text
+  timer_completed boolean default false
+  timer_duration_seconds integer
+  is_checkin boolean default false
+  posted_at timestamptz
+  window_date date
+
+moment_streaks
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  current_milestone integer default 0
+  milestone_state text (working_to_3 | reached_3 | working_to_7 | reached_7 | working_to_14 | complete)
+  consecutive_windows integer default 0
+  longest_run integer default 0
+  total_posts integer default 0
+  last_window_date date
+  renewal_count integer default 0
+  last_renewed_at timestamptz
+
+moment_goals
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  target_days integer
+  period text
+  started_at timestamptz
+  ends_at timestamptz
+
+goal_progress
+  id uuid PK
+  moment_goal_id uuid FK moment_goals
+  moment_member_id uuid FK moment_members
+  posts_completed integer default 0
+  status text (tending | needs_water | harvested | withered)
+  last_updated timestamptz
+
+moment_renewals
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  renewed_by uuid FK users
+  previous_intention text
+  new_intention text
+  renewal_count integer
+  renewed_at timestamptz
+
+
+Remove any foreign keys or joins that connect shared_moments to the circles table. Shared Moments are independent entities.
+On the Garden dashboard, display Shared Moments the user has created or joined separately from gathering circles. They are a distinct type of practice, not a feature of a circle.
+
+CRITICAL — NO LOGIN REQUIRED
+Every page accessed via a personal moment link must work completely without login. This includes the posting page, the meditation timer, the intercession prayer page, and the renewal page.
+Eleanor identifies the member via their unique user_moment_token. No login prompt. No redirect. No wall of any kind. If the token is valid, the page loads and the member can participate fully. If the token is invalid, show a warm message explaining how to find their personal link in their calendar invite.
+Guests who have never logged into Eleanor are full participants. Their posts, their streaks, their presence — all tracked via token. If they later create an Eleanor account with the same email, their history connects automatically.
+
+THE PHILOSOPHY
+Shared Moments is Eleanor’s feature for people who are geographically separated but want to maintain a living spiritual or contemplative practice together. The inspiration is liturgical and monastic — the tradition of fixed-hour prayer, the practice of communities calling one another to the same act at the same moment regardless of physical distance.
+This is not a wellness feature. It draws from the Book of Common Prayer, from contemplative tradition, and from the ancient practice of intercession — holding something in prayer together, across distance, with intention and consistency.
+Language that belongs here:
+practice, hold, tend, sit, carry, intercession, contemplation, presence, intention, stillness, breath, threshold, prayer
+Language to avoid:
+wellness, mindfulness, self-care, check-in, session, optimize, gamify
+
+CREATION FLOW
+When a user creates a new Shared Moment the flow is:
+Template selection → Name → Intention → Logging type → Time and frequency → Goal → Invite → Confirmation
+No circle selection step. This practice stands alone.
+
+STEP ONE — Template selection
+First screen of the creation flow.
+Header: “What practice will you tend together? 🌿”
+Muted italic subtitle: “Choose a practice or begin from stillness. Everything can be edited.”
+Scrollable list of template cards. Each card: large emoji, bold name, one muted description line. Tap any card to select and proceed.
+
+THE EIGHT TEMPLATES
+Template 1 — Morning Prayer
+Emoji: 🌅
+Name: Morning Prayer
+Description: “Open the day together in prayer”
+Pre-fills:
+	∙	Name: “Morning Prayer 🌅”
+	∙	Intention: “We open the day together. Before the world begins, we pray.”
+	∙	Logging type: Meditation timer (10 minutes) + reflection
+	∙	Reflection prompt: “What are you carrying into this day?”
+	∙	Suggested time: 7am
+	∙	Frequency: Daily
+
+Template 2 — Evening Prayer
+Emoji: 🌙
+Name: Evening Prayer
+Description: “Close the day together before rest”
+Pre-fills:
+	∙	Name: “Evening Prayer 🌙”
+	∙	Intention: “Before we rest, we release the day together. We pray.”
+	∙	Logging type: Meditation timer (10 minutes) + reflection
+	∙	Reflection prompt: “What are you releasing tonight?”
+	∙	Suggested time: 9pm
+	∙	Frequency: Daily
+
+Template 3 — Intercession
+Emoji: 🙏
+Name: Intercession
+Description: “Hold a shared prayer for something that matters”
+Pre-fills:
+	∙	Name: “Intercession 🙏”
+	∙	Intention: populated from intercession selection flow below
+	∙	Logging type: Meditation timer (5 minutes) + reflection
+	∙	Reflection prompt: “What are you holding today?”
+	∙	Suggested time: 8am
+	∙	Frequency: Daily
+This template has a unique intercession selection flow. After selecting this template and before the name step, show a full screen:
+Header: “What will you hold in prayer together? 🙏”
+Muted subtitle: “Choose a prayer from the Book of Common Prayer, or name your own intention.”
+Two large cards:
+Card A — From the Book of Common Prayer
+📖 From the Book of Common Prayer
+“Choose from the traditional intercessions”
+On select: open a scrollable list fetched from bcponline.org — the online Book of Common Prayer. Display the following intercession categories as section headers with their prayers beneath, full text readable, expandable:
+
+For the Church
+For the Mission of the Church
+For the Nation
+For the World
+For the Natural Order
+For the Poor and Neglected
+For the Sick
+For the Sorrowing
+For Those in Need
+For Prisons and Correctional Institutions
+For Those We Love
+For a Person in Trouble or Bereavement
+For the Human Family
+For Peace
+For the Environment
+For Social Justice
+For Young Persons
+For the Aged
+For Those Who Influence Public Opinion
+
+
+Each prayer displayed as:
+
+[Category — bold, soil]
+[Prayer title — medium]
+[First two lines — muted italic]
+[Read full prayer ↓] — expandable inline
+[Select this prayer →] — sage button
+
+
+When selected: store the full prayer text in intercession_full_text and the title in intercession_topic. Set intercession_source to bcp.
+Pre-fill the intention field with:
+“We hold this together in prayer. [Prayer title] — [first sentence of prayer text].”
+On the posting page during the window, display the full prayer text beneath the intention so members can pray the actual words together.
+Card B — Name your own intention
+✍️ Name your own intention
+“Write what your practice will hold together”
+On select: show a generous text area.
+Label: “What are you praying for together?”
+Rotating examples beneath in muted italic:
+“The climate crisis and those most affected 🌍”
+“Our leaders — that they find courage and wisdom 🕊️”
+“The vulnerable, the forgotten, those who suffer 🌿”
+“The earth and every living thing 🌱”
+“Those fleeing violence and seeking safety”
+“The next generation inheriting this world”
+“Someone we love who is struggling”
+Character limit: 200 characters.
+Store in intercession_topic. Set intercession_source to custom.
+Pre-fill the intention field with:
+“We hold this together in prayer. Today we intercede for: [their text].”
+
+Template 4 — Breath Together
+Emoji: 🌬️
+Name: Breath Together
+Description: “Two minutes of shared breath across the distance”
+Pre-fills:
+	∙	Name: “Breath Together 🌬️”
+	∙	Intention: “Two minutes. Wherever we are. We breathe at the same time and remember we are not alone.”
+	∙	Logging type: Meditation timer (2 minutes) — no reflection
+	∙	Suggested time: 12pm
+	∙	Frequency: Daily
+No reflection for this template. The breath is the practice. Showing up is enough.
+
+Template 5 — Contemplative Sit
+Emoji: 🕯️
+Name: Contemplative Sit
+Description: “Sit together in stillness”
+Pre-fills:
+	∙	Name: “Contemplative Sit 🕯️”
+	∙	Intention: “We sit together in the silence. No agenda. Just presence.”
+	∙	Logging type: Meditation timer (10 minutes) + optional reflection
+	∙	Reflection prompt: “What arose in the stillness?”
+	∙	Suggested time: 7am
+	∙	Frequency: Daily or weekly
+
+Template 6 — Walk Together
+Emoji: 🚶
+Name: Walk Together
+Description: “Ten minutes outside, wherever you are”
+Pre-fills:
+	∙	Name: “Walk Together 🚶”
+	∙	Intention: “Step outside. We are walking at the same time, in different places, under the same sky.”
+	∙	Logging type: Photo + reflection
+	∙	Reflection prompt: “What did you notice?”
+	∙	Suggested time: 12pm
+	∙	Frequency: Daily or weekly
+
+Template 7 — Morning Coffee
+Emoji: ☕
+Name: Morning Coffee
+Description: “Share your first cup across the distance”
+Pre-fills:
+	∙	Name: “Morning Coffee ☕”
+	∙	Intention: “Wherever we are, we are having coffee together. Share your cup.”
+	∙	Logging type: Photo
+	∙	Suggested time: 8am
+	∙	Frequency: Daily
+
+Template 8 — Begin from stillness
+Emoji: 🌱
+Name: Begin from stillness
+Description: “Create your own practice from scratch”
+No pre-fills. Proceeds to the name step. Fully custom.
+
+STEP TWO — Name, intention, logging type, time, frequency
+These steps follow template selection. All fields are pre-filled from the template and fully editable.
+Name step:
+Large centered text input. Space Grotesk bold.
+Pre-filled from template. Fully editable.
+Intention step:
+Large text area. Playfair Display italic when displaying, Space Grotesk when editing.
+Pre-filled from template or intercession flow.
+For BCP intercessions: show the full prayer text beneath the intention in a collapsible section labeled “The full prayer” so the organizer can read what their members will see.
+Logging type step:
+Header: “How will your practice be held? 🌿”
+Four options as large cards:
+📷 Photo
+“A photo of the moment — cup, light, wherever you are”
+✍️ Reflection
+“A written response to a prompt”
+On select: reveals reflection prompt text field
+⏱️ Meditation timer
+“A shared countdown — sit, breathe, or pray together”
+On select: reveals duration selector:
+2 min | 5 min | 10 min | 15 min | 20 min
+Default: 5 min
+Toggle beneath: “Add a reflection after the timer?” — off by default
+✅ Just show up
+“No photo, no words. Mark that you were present.”
+Time and frequency step:
+Time picker — hour and minute and AM/PM
+Timezone selector — defaults to creator’s timezone
+Muted note: “Members receive calendar invites in their own timezone.”
+Frequency:
+📅 Daily — every day
+🗓 Weekly — select days (multi-select pills Mon–Sun)
+Goal step:
+Header: “Set a milestone to tend toward 🌿”
+Subtitle: “Like Duolingo for your practice — show up together and watch something grow.”
+Four large selectable cards:
+🌱 Three days — first roots
+🌿 One week — seven days
+🌸 Two weeks — fourteen days, then renew
+✨ Just begin — no goal, tend freely
+
+STEP THREE — Invite
+After configuration, the organizer invites members directly to the practice.
+Header: “Who will tend this practice with you? 🌿”
+Two methods:
+Share a link:
+Auto-generated invite link displayed prominently:
+eleanor.app/join/[moment_token]
+Copy link button. Share via email, Messages, WhatsApp.
+Invite by email:
+Email input field — type an address and tap Add.
+Multiple emails can be added.
+Eleanor emails each person their personal link directly.
+When someone joins via the link they land on the practice’s join page — no login required to see what the practice is. Login or name entry only required to join and receive their personal link.
+Join page shows:
+	∙	Practice name and intention
+	∙	Template type
+	∙	Frequency and time
+	∙	How many people are already tending this practice
+	∙	CTA: “Join this practice 🌿”
+On joining: Eleanor generates their user_moment_token, adds them to moment_members, creates their calendar invite, and emails them their personal link.
+
+STEP FOUR — Confirmation
+Full screen, soil background, cream text.
+
+🌱
+
+"[Practice name] is planted."
+
+[Frequency] at [time]
+[Milestone goal if set]
+
+Invites are on their way.
+
+"Eleanor will ring the bell when it's time.
+ You just have to show up."
+
+[Done 🌿]
+
+
+CALENDAR INVITES
+Eleanor creates a recurring Google Calendar event for every member who has Google Calendar connected. For members without Google Calendar, Eleanor emails an .ics file that works with Apple Calendar, Outlook, and any standard calendar app.
+Each member gets their own calendar event with their personal link embedded in the description. The link never changes. It is theirs permanently.
+Calendar event format:
+For Morning Prayer:
+
+Title: 🌅 Morning Prayer — [time]
+
+[Intention text]
+
+You have one hour to enter the practice.
+Tap your personal link:
+[personal_url]
+
+No login needed. Just show up. 🌿
+
+
+For Evening Prayer:
+
+Title: 🌙 Evening Prayer — [time]
+
+[Intention text]
+
+You have one hour.
+[personal_url]
+
+No login needed. 🌿
+
+
+For Intercession — BCP prayer:
+
+Title: 🙏 Intercession — [time]
+
+[Intention text]
+
+Today we pray: [Prayer title]
+[First two lines of full prayer text]
+
+You have one hour.
+[personal_url]
+
+No login needed. 🙏
+
+
+For Intercession — custom:
+
+Title: 🙏 Intercession — [time]
+
+We hold this together in prayer.
+Today we intercede for: [intercession_topic]
+
+You have one hour.
+[personal_url]
+
+No login needed. 🙏
+
+
+For Breath Together:
+
+Title: 🌬️ Breath Together — [time]
+
+[Intention text]
+
+Two minutes. Wherever you are.
+[personal_url]
+
+No login needed. 🌿
+
+
+For all other templates:
+
+Title: [emoji] [Practice name] — [time]
+
+[Intention text]
+
+You have one hour.
+[personal_url]
+
+No login needed. 🌿
+
+
+Important: When the intercession topic changes at renewal, update all existing calendar events with the new intention text. Members should see the updated prayer in their calendar going forward.
+
+THE PERSONAL POSTING PAGE
+eleanor.app/moment/[moment_token]/[user_moment_token]
+No login required. Eleanor identifies the member by their token.
+This page changes based on logging type and whether the window is currently open.
+
+During the window — Photo logging:
+Cream background. Warm and minimal.
+
+[Practice name — Space Grotesk bold, soil, 24px]
+
+[Intention — Playfair Display italic, sage, 16px, centered]
+
+[X] minutes remaining — amber
+
+[X of Y] tending with you  ← presence dots, updates live
+
+[Large photo upload area]
+📷 Share your moment
+
+[I showed up 🌿]
+
+
+During the window — Reflection logging:
+
+[Practice name]
+[Intention — italic, sage]
+[X] minutes remaining
+
+[Reflection prompt — Playfair Display italic, sage, larger]
+
+[Generous warm text area]
+placeholder: "Take a moment. Then share..."
+
+[I showed up 🌿]
+
+
+During the window — Meditation timer:
+Full screen. Soil background. Cream text. Nothing else visible. No navigation.
+Before beginning:
+
+[Practice name — Space Grotesk bold, cream, 24px]
+
+[Intention — Playfair Display italic, sage, 18px, centered, max 3 lines]
+
+[If BCP intercession: full prayer text beneath in a scrollable card]
+[Cream card, soil text, 13px, so they can pray the actual words]
+
+        ○
+     [10:00]
+
+  [X of Y] sitting with you
+
+      Begin 🌿
+
+
+The circle is a thin cream ring, unfilled.
+The duration displays centered in Space Grotesk bold.
+Presence counter updates live as others begin their timer.
+Begin is a full-width button, sage background, cream text.
+During the timer:
+The ring fills clockwise in sage green as time passes.
+No countdown visible — only the filling ring.
+Every 60 seconds: a single imperceptible pulse.
+No sound.
+If the user closes the tab: timer pauses.
+On return: resumes from where it stopped.
+“Welcome back. [X:XX] remaining.”
+At completion:
+Ring completes. Single amber pulse.
+Optional single soft chime if device is not on silent.
+Transitions to:
+
+🌿
+
+"[X] minutes of stillness, together."
+
+[X of Y] sat with you.
+
+[If reflection enabled:]
+[Reflection prompt — Playfair Display italic, sage]
+[Warm text area]
+
+      I showed up 🌿
+
+
+Tapping I showed up logs the post. Reflection always optional even when enabled.
+If window closes before timer completes:
+“The window has passed. You began — that is enough. 🌿”
+Still shows I showed up button.
+
+During the window — Just show up:
+
+[Practice name]
+[Intention — italic, sage, centered, large]
+
+[X of Y] here with you
+
+[Single full-width button, soil background, cream text, very generous padding:]
+
+      I showed up 🌿
+
+
+After tapping: 🌿 pulse animation. “You showed up. [X of Y] tended this today.”
+
+Outside the window:
+
+🌿
+
+"This practice is resting."
+
+[Practice name] opens [day] at [time].
+[X hours Y minutes away]
+
+[Add to calendar 📅]  ← downloads .ics for the next occurrence
+
+[If they already posted this window:]
+"🌸 You showed up today."
+"[X of Y] tended this together."
+"Next practice: [time]"
+
+
+Invalid token:
+
+🌿
+
+"This link doesn't look right."
+
+Your personal link is in your calendar invite —
+look for the Eleanor event and tap the link inside.
+
+Or ask the practice organizer to resend your invite.
+
+
+MEDITATION TIMER — BCP PRAYER DISPLAY
+For BCP intercession practices, when a member opens their timer page the full prayer text is displayed in a scrollable card before they begin. This is the most important detail for this template — they should be able to actually pray the prayer, not just know its title.
+Display the full prayer in a cream card with generous padding, Playfair Display italic, soil text, 14px, scrollable if long. Beneath it a muted note:
+“From the Book of Common Prayer”
+The card is collapsible after the first time they see it — tap to expand, tap to collapse — so returning members can go straight to the timer without re-reading every time.
+
+STREAKS — 3, 7, AND 14 DAYS ONLY
+Never show a raw climbing streak number. Only show progress toward the next milestone. Never show anything beyond 14. The goal is approachable not intimidating.
+A window counts toward the streak only if at least two members posted within that window. One person showing up alone does not break the streak — it simply does not count. The streak measures the practice showing up together.
+Three milestones:
+
+🌱 3 days    — first roots
+🌿 7 days    — one week
+🌸 14 days   — renew
+
+
+Display:
+Working toward 3 (consecutive windows 0–2):
+
+🌱 Day [X] of 3
+[░░░░░░░░░░░░░░░]
+
+
+Reached 3, working toward 7 (3–6):
+
+🌱 ✓   🌿 Day [X] of 7
+[████████░░░░░░░]
+
+
+Reached 7, working toward 14 (7–13):
+
+🌱 ✓   🌿 ✓   🌸 Day [X] of 14
+[████████████░░░]
+
+
+On cards in the dashboard show only the current milestone in one short line:
+
+🌿 Day 4 of 7
+
+
+Never display: raw numbers above 14, longest streak history on main view, open-ended counts.
+Streak rules:
+	∙	Window blooms: 2+ members posted → streak increments
+	∙	Window solo: 1 member posted → streak unchanged, individual post saved
+	∙	First consecutive miss → state: needs_water, streak pauses
+	∙	Second consecutive miss → state: dormant, streak resets to zero
+	∙	Next bloom after miss → streak restarts from 1
+
+RENEWAL AT 14 DAYS
+When a practice reaches 14 consecutive bloomed windows, it does not simply continue. It renews. Recommitment keeps the practice alive and chosen rather than merely habitual.
+Trigger:
+On the day the 14th window blooms, every member sees this card on their personal posting page after logging and on the dashboard:
+Warm card, amber border, soil background:
+
+🌸
+
+[Practice name] has reached 14 days.
+
+"[X] days of showing up together.
+ You've grown something real."
+
+      Renew your practice 🌿
+
+[muted: "Renewal begins the milestones again.
+Your history remains."]
+
+
+Renewal page — no login required, accessible via personal token:
+
+🌿  Renewing [Practice name]
+
+Your 14-day practice is complete.
+
+[Current intention — italic, sage]
+
+[If intercession:]
+Would you like to hold this same prayer forward,
+or choose a new one?
+
+○  Continue with this prayer
+○  Choose a new BCP prayer  →  [opens BCP scroll]
+○  Name a new intention  →  [text field]
+
+      Renew 🌸
+
+
+On renewal:
+	∙	Milestone resets to zero — Day 1 begins again
+	∙	All history preserved in journal — nothing lost
+	∙	If intercession topic updated: all future calendar invites update
+	∙	New journal entry created: “🌸 [Practice name] renewed — Day 1”
+	∙	All members receive email:
+
+Subject: 🌸 [Practice name] — renewed
+
+Your practice continues.
+
+[New or continued intention]
+
+Day 1 begins [tomorrow's date].
+
+See you there. 🌿
+Eleanor
+
+
+If not renewed within 3 days of reaching 14:
+State shifts to dormant. Eleanor sends a gentle email on day 2:
+
+Subject: 🌿 [Practice name] is waiting
+
+Your 14-day practice is complete.
+When you're ready, renew it and begin again.
+
+[renewal_url]
+
+No rush. The practice is patient. 🌿
+Eleanor
+
+
+DASHBOARD DISPLAY
+On the Garden home screen, Shared Moments appear in the timeline feed separately from gathering circles. They have a distinct visual identity.
+Shared Moment card:
+	∙	Left accent bar: sage #6B8F71
+	∙	Background: slightly cooler off-white #F5F5F0
+	∙	Icon: the template emoji (🌅 🌙 🙏 🌬️ etc)
+Card displays:
+
+[emoji]  [Practice name]          [🌱 Day 2 of 3]
+         [X] members · [frequency] at [time]
+         
+         [Intention — muted, truncated to one line]
+         
+         🌿 Day 2 of 3
+         [░░░░░░░░░░░░░░░]
+
+
+If window currently open: amber pulsing border + “Open now · [X] min left”
+If window recently closed: muted “Closed · Next [time]”
+If member already posted: “🌸 You showed up today”
+
+ELEANOR’S VOICE FOR SPIRITUAL PRACTICES
+All emails and nudges for spiritual practice moments use this register:
+✅ “Your Morning Prayer hasn’t been tended in 3 days. The practice is waiting when you are. 🌿”
+✅ ”[X] days of Evening Prayer together. Something is taking root. 🌙”
+✅ “One more day and your practice reaches 7 days. Show up together. 🌿”
+✅ “The window is open. [X] members are already sitting. 🙏”
+✅ “Your Intercession practice is ready to renew. What will you hold next? 🌿”
+❌ “Your streak is about to break!”
+❌ “Don’t forget to check in!”
+❌ “You’re falling behind!”
+
+JOURNAL
+Every completed window saves to the journal automatically.
+Timer practice entry:
+
+[Date · Time]  ·  [Practice name]
+
+🕯️ [X] minutes held together
+
+[Intention — italic, sage]
+[If BCP: "From: [Prayer title]" — muted]
+
+[X of Y] showed up  ·  🌿 Day [milestone]
+
+[Anonymous reflections if any — warm cards, no names]
+
+
+Anonymous reflections are displayed without attribution. The words float free of their authors. Over time a practice’s journal becomes a collective interior document — a shared record of what was held, what arose, what was released. No names needed. The practice is enough.
+
+EMAILS — all sent without requiring login
+Welcome email when someone joins a practice:
+
+Subject: 🌿 You've been invited to [Practice name]
+
+[Inviter name] is tending a practice and wants you to join.
+
+[Practice name]
+[Frequency] at [time]
+
+[Intention — italic]
+
+Eleanor will send a calendar invite to your inbox shortly.
+When the time comes, tap your personal link. No login needed.
+
+Your personal link (bookmark this):
+[personal_url]
+
+See you there. 🌿
+Eleanor
+
+
+Reminder if member hasn’t shown up in 2 consecutive windows:
+
+Subject: 🌿 [Practice name] is being tended without you
+
+Your practice is still going. Come back when you can.
+
+[personal_url]
+
+No login needed. 🌿
+
+
+Goal progress — halfway:
+
+Subject: 🌿 Halfway — [Practice name]
+
+[X] days tended. [X] to go.
+Show up together. 🌿
+
+
+Goal at risk:
+
+Subject: 💧 [Practice name] needs tending
+
+[X] days left to reach your goal.
+Don't let it wither.
+
+[personal_url]
+
+
+BUILD ORDER
+	1.	Create all new tables: shared_moments (standalone, no circle_id), moment_members, user_moment_tokens, moment_tokens, moment_streaks, moment_goals, goal_progress, moment_renewals
+	2.	Remove circle dependency from shared_moments entirely
+	3.	Template selection screen — first screen of creation flow, eight templates
+	4.	Intercession selection flow — BCP prayer fetch from bcponline.org, full prayer display, custom intention option
+	5.	Full creation flow — name, intention, logging type, duration selector for timer, time, frequency, goal, invite
+	6.	Invite system — shareable link + email invite, join page without login
+	7.	Token generation on joining — user_moment_token created, calendar invite sent, welcome email sent
+	8.	Calendar invite generation — Google Calendar for connected users, .ics email for all others, personal URL embedded
+	9.	Personal posting page at /moment/[moment_token]/[user_moment_token] — no login required
+	10.	Photo logging page — upload, presence counter, submit
+	11.	Reflection logging page — prompt display, text area, submit
+	12.	Meditation timer page — pre-begin screen with BCP prayer if applicable, timer with filling ring, completion screen, optional reflection, submit
+	13.	Just show up page — intention display, single button
+	14.	Window open/closed logic — one hour window, outside window page
+	15.	Real-time presence counter — updates across all members during window
+	16.	Streak logic — 2+ members required, milestone-based display, 3/7/14 only
+	17.	Goal tracking — progress bar, state transitions, at-risk detection
+	18.	Renewal trigger — fires when 14th window blooms
+	19.	Renewal page — no login required, intercession update option, BCP re-selection
+	20.	Renewal email, dormant trigger, dormant email
+	21.	Dashboard display — Shared Moments in timeline feed, distinct from gathering circles
+	22.	Journal — automatic entry per window, anonymous reflection display
+	23.	All emails — welcome, calendar invite, reminder, goal progress, renewal
+	24.	Eleanor voice — update all nudge language for spiritual practice register
+	25.	Test full flow on mobile without login — join via link, receive calendar invite, open link from calendar notification, complete practice, see journal entry
+
+THE ONE THING TO GET RIGHT
+The personal link in the calendar invite must work flawlessly on any device, in any browser, without login, every single time. Someone receives a calendar notification on their phone at 7am for Morning Prayer, taps the link in the event, and lands immediately in the practice. If the link requires login, the practice dies. If the link errors, the practice dies. If the page is slow to load, the practice dies.
+Build that path first. Test it on a real phone before anything else. Everything else depends on it working.​​​​​​​​​​​​​​​​
