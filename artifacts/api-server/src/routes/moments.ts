@@ -367,28 +367,20 @@ router.post("/moments", async (req, res): Promise<void> => {
 
   const insertedTokens = await db.insert(momentUserTokensTable).values(memberTokenRows).returning();
 
-  const freqLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
+  const freqLabel = frequency === "daily" ? "every day" : frequency === "weekly" ? "every week" : "every month";
+  const freqCapLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
   const [hh, mm] = scheduledTime.split(":").map(Number);
   const timeLabel = new Date(0, 0, 0, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const loggingLabel = { photo: "Share a photo", reflection: "Reflect on a prompt", both: "Photo and reflection", checkin: "Just show up" }[loggingType];
 
-  const linkLines = insertedTokens.map(t => `  ${t.name ?? t.email}: ${baseUrl}/${momentToken}/${t.userToken}`);
-
-  const calDescription = [
-    intention,
-    "",
-    `${freqLabel} at ${timeLabel} · ${goalDays}-day goal`,
-    loggingType === "reflection" || loggingType === "both"
-      ? `Prompt: ${reflectionPrompt ?? "Show up and reflect."}`
-      : `How: ${loggingLabel}`,
-    "",
-    "You have one hour. Tap your personal link:",
-    ...linkLines,
-    "",
-    "No login needed. Just show up. 🌿",
-    "",
-    "Coordinated by Eleanor · eleanor.app",
-  ].join("\n");
+  const loggingDesc: Record<string, string> = {
+    photo: "Take a photo to mark the moment",
+    reflection: "Write a short reflection",
+    both: "Share a photo and a reflection",
+    checkin: "Just tap to say you showed up",
+    timer: "Sit together for a few minutes",
+    timer_reflection: "Sit together, then share a brief reflection",
+  };
+  const howLine = loggingDesc[loggingType] ?? "Show up";
 
   const recurrenceRule = frequency === "daily"
     ? ["RRULE:FREQ=DAILY"]
@@ -400,18 +392,81 @@ router.post("/moments", async (req, res): Promise<void> => {
   const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, tz);
   const startDate = new Date(); // fallback
 
-  const attendeeEmails = uniqueMembers.map(m => m.email);
+  // ─── Build a personalised description for each member ──────────────────────
+  function buildDescription(memberToken: string, memberName: string): string {
+    const personalLink = `${baseUrl}/${momentToken}/${memberToken}`;
+    const goalLine = goalDays > 0 ? `${goalDays}-day shared goal` : "Open-ended practice";
+    const lines = [
+      `${organizer.name ?? organizer.email} invited you to ${name}.`,
+      "",
+      "── WHAT IS ELEANOR? ──────────────────────────────",
+      "Eleanor is a simple app that helps close friends and family",
+      "show up for small, recurring practices together — no matter",
+      "the distance. Think of it like a shared habit, tended quietly",
+      "across time. You don't need to download anything or create",
+      "an account.",
+      "",
+      "── THIS PRACTICE ─────────────────────────────────",
+      `"${intention}"`,
+      "",
+      `  When:    ${freqCapLabel} at ${timeLabel}`,
+      `  Window:  1 hour to log each time`,
+      `  Goal:    ${goalLine}`,
+      `  How:     ${howLine}`,
+      ...(reflectionPrompt ? [`  Prompt:  "${reflectionPrompt}"`] : []),
+      "",
+      "── HOW IT WORKS ──────────────────────────────────",
+      `This practice opens ${freqLabel} at ${timeLabel}. When it does,`,
+      "you'll have one hour to open your personal link, do the",
+      "practice, and log it. Eleanor quietly tracks when everyone",
+      "shows up — so you can feel each other's presence over time,",
+      "even from a distance.",
+      "",
+      "── YOUR PERSONAL LINK ───────────────────────────",
+      `This link is yours, ${memberName}. Tap it when the window opens:`,
+      "",
+      `  ${personalLink}`,
+      "",
+      "No login required. Just open it and show up. 🌿",
+      "",
+      "──────────────────────────────────────────────────",
+      "Eleanor — a shared practice companion",
+    ];
+    return lines.join("\n");
+  }
 
+  // ─── Create one personalised calendar event per member ─────────────────────
+  // (Like Calendly: each invitee gets their own event with only their link)
   const gcalEventId = await createCalendarEvent(sessionUserId, {
     summary: `🌿 ${name}`,
-    description: calDescription,
+    description: buildDescription(
+      insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "",
+      organizer.name ?? organizer.email
+    ),
     startDate,
     startLocalStr,
     endLocalStr,
     timeZone: tz,
-    attendees: attendeeEmails,
+    attendees: uniqueMembers.map(m => m.email),
     recurrence: recurrenceRule,
   }).catch(() => null);
+
+  // Create individual personalised events for non-organizer members
+  const guestTokens = insertedTokens.filter(t => t.email !== organizer.email);
+  await Promise.allSettled(
+    guestTokens.map(t =>
+      createCalendarEvent(sessionUserId, {
+        summary: `🌿 ${name}`,
+        description: buildDescription(t.userToken, t.name ?? t.email),
+        startDate,
+        startLocalStr,
+        endLocalStr,
+        timeZone: tz,
+        attendees: [t.email],
+        recurrence: recurrenceRule,
+      })
+    )
+  );
 
   if (gcalEventId) {
     const organizerTokenRow = insertedTokens.find(t => t.email === organizer.email);
