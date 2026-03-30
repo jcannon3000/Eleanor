@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, ritualsTable, inviteTokensTable, scheduleResponsesTable, meetupsTable, usersTable } from "@workspace/db";
+import {
+  db, ritualsTable, inviteTokensTable, scheduleResponsesTable, meetupsTable, usersTable,
+} from "@workspace/db";
 import { updateCalendarEvent } from "../lib/calendar";
 
 const router: IRouter = Router();
@@ -17,14 +19,14 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
   if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
 
-  const [organizer] = await db.select({ name: usersTable.name, email: usersTable.email })
-    .from(usersTable).where(eq(usersTable.id, ritual.ownerId));
+  const [organizer] = await db
+    .select({ name: usersTable.name, email: usersTable.email })
+    .from(usersTable)
+    .where(eq(usersTable.id, ritual.ownerId));
 
-  const existingResponse = await db
-    .select()
-    .from(scheduleResponsesTable)
+  const allResponses = await db.select().from(scheduleResponsesTable)
     .where(eq(scheduleResponsesTable.ritualId, ritual.id));
-  const myResponse = existingResponse.find((r) => r.guestEmail === invite.email) ?? null;
+  const myResponse = allResponses.find((r) => r.guestEmail === invite.email) ?? null;
 
   res.json({
     ritualId: ritual.id,
@@ -50,6 +52,7 @@ const RespondBody = z.object({
   chosenTime: z.string().optional(),
   unavailable: z.boolean().optional(),
   comment: z.string().optional(),
+  isUpdate: z.boolean().optional(),
 });
 
 router.post("/invite/:token/respond", async (req, res): Promise<void> => {
@@ -65,46 +68,69 @@ router.post("/invite/:token/respond", async (req, res): Promise<void> => {
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, invite.ritualId));
   if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
 
-  // Save the response
-  await db.insert(scheduleResponsesTable).values({
-    ritualId: ritual.id,
-    guestName: invite.name ?? invite.email,
-    guestEmail: invite.email,
-    chosenTime: parsed.data.chosenTime ?? null,
-    unavailable: parsed.data.unavailable ? 1 : 0,
-  });
+  const chosenTime = parsed.data.chosenTime ?? null;
+  const isUnavailable = parsed.data.unavailable ? 1 : 0;
+  const isUpdate = parsed.data.isUpdate ?? false;
 
-  await db.update(inviteTokensTable).set({ respondedAt: new Date() }).where(eq(inviteTokensTable.token, token));
+  // Upsert: update if already exists, otherwise insert
+  const existing = await db.select().from(scheduleResponsesTable)
+    .where(eq(scheduleResponsesTable.ritualId, ritual.id));
+  const myExisting = existing.find((r) => r.guestEmail === invite.email);
 
-  // Update the organizer's Google Calendar event with the response — async, non-blocking
+  if (myExisting) {
+    await db.update(scheduleResponsesTable)
+      .set({ chosenTime, unavailable: isUnavailable })
+      .where(eq(scheduleResponsesTable.id, myExisting.id));
+  } else {
+    await db.insert(scheduleResponsesTable).values({
+      ritualId: ritual.id,
+      guestName: invite.name ?? invite.email,
+      guestEmail: invite.email,
+      chosenTime,
+      unavailable: isUnavailable,
+    });
+  }
+
+  await db.update(inviteTokensTable)
+    .set({ respondedAt: new Date() })
+    .where(eq(inviteTokensTable.token, token));
+
+  // Update organizer's Google Calendar event — async, non-blocking
   updateCalendarEventWithResponses({
     ritual,
     organizerUserId: ritual.ownerId,
     newResponse: {
       name: invite.name ?? invite.email,
       email: invite.email,
-      chosenTime: parsed.data.chosenTime ?? null,
-      unavailable: parsed.data.unavailable ?? false,
+      chosenTime,
+      unavailable: isUnavailable === 1,
+      isUpdate,
     },
   }).catch(() => {});
 
   res.status(201).json({ success: true });
 });
 
-// Fetch all responses and update the organizer's GCal event description
+// ─── Helper: rebuild GCal event description with all responses ───────────
 async function updateCalendarEventWithResponses(opts: {
   ritual: typeof ritualsTable.$inferSelect;
   organizerUserId: number;
-  newResponse: { name: string; email: string; chosenTime: string | null; unavailable: boolean };
+  newResponse: {
+    name: string;
+    email: string;
+    chosenTime: string | null;
+    unavailable: boolean;
+    isUpdate: boolean;
+  };
 }) {
   const { ritual, organizerUserId, newResponse } = opts;
 
-  // Find the planned meetup that has a GCal event ID
+  // Find the planned meetup with a GCal event ID
   const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritual.id));
   const planned = meetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
   if (!planned?.googleCalendarEventId) return;
 
-  // Fetch all responses so far
+  // Fetch all responses (already updated in DB)
   const allResponses = await db.select().from(scheduleResponsesTable)
     .where(eq(scheduleResponsesTable.ritualId, ritual.id));
 
@@ -112,8 +138,11 @@ async function updateCalendarEventWithResponses(opts: {
 
   function fmtTime(iso: string) {
     const d = new Date(iso);
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-      + " at " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return (
+      d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
+      " at " +
+      d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    );
   }
 
   const lines: string[] = [];
@@ -144,25 +173,37 @@ async function updateCalendarEventWithResponses(opts: {
   }
   lines.push("");
 
-  // Highlight the latest response
+  // Highlight the change
   if (newResponse.unavailable) {
-    lines.push(`📌 Latest: ${newResponse.name} marked unavailable`);
+    lines.push(
+      newResponse.isUpdate
+        ? `🔄 Update: ${newResponse.name} changed to unavailable`
+        : `📌 New: ${newResponse.name} marked unavailable`
+    );
   } else if (newResponse.chosenTime) {
-    lines.push(`📌 Latest: ${newResponse.name} picked ${fmtTime(newResponse.chosenTime)}`);
+    lines.push(
+      newResponse.isUpdate
+        ? `🔄 Update: ${newResponse.name} changed their preference → ${fmtTime(newResponse.chosenTime)}`
+        : `📌 New: ${newResponse.name} picked ${fmtTime(newResponse.chosenTime)}`
+    );
   }
   lines.push("", "Coordinated by Eleanor · eleanor.app");
 
   const description = lines.join("\n");
-  const newSummary = newResponse.chosenTime && !newResponse.unavailable
+
+  // Update the event title to reflect the latest selected time if available
+  const latestTime = newResponse.chosenTime && !newResponse.unavailable
+    ? new Date(newResponse.chosenTime)
+    : planned.scheduledDate;
+
+  const summary = newResponse.chosenTime && !newResponse.unavailable
     ? `${ritual.name} — ${new Date(newResponse.chosenTime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
     : ritual.name;
 
   await updateCalendarEvent(organizerUserId, planned.googleCalendarEventId, {
-    summary: newSummary,
+    summary,
     description,
-    startDate: newResponse.chosenTime
-      ? new Date(newResponse.chosenTime)
-      : planned.scheduledDate,
+    startDate: latestTime,
   });
 }
 
