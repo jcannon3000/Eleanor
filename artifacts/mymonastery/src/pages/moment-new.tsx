@@ -144,8 +144,18 @@ export default function MomentNew() {
   const [reflectionPrompt, setReflectionPrompt] = useState("");
   const [reflectionExampleIdx, setReflectionExampleIdx] = useState(0);
   const [frequency, setFrequency] = useState<Frequency>("weekly");
-  const [scheduledTime, setScheduledTime] = useState("08:00");
+  const [scheduledHour, setScheduledHour] = useState(8);
+  const [scheduledMinute, setScheduledMinute] = useState(0);
+  const [scheduledAmPm, setScheduledAmPm] = useState<"AM" | "PM">("AM");
+  const [dayOfWeek, setDayOfWeek] = useState<string>("");
   const [goalDays, setGoalDays] = useState(30);
+
+  const scheduledTime = (() => {
+    let h = scheduledHour % 12;
+    if (scheduledAmPm === "PM") h += 12;
+    if (h === 12 && scheduledAmPm === "AM") h = 0;
+    return `${String(h).padStart(2, "0")}:${String(scheduledMinute).padStart(2, "0")}`;
+  })();
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -184,7 +194,10 @@ export default function MomentNew() {
       if (loggingType === "reflection" || loggingType === "both") return reflectionPrompt.trim().length >= 1;
       return true;
     }
-    if (step === 4) return scheduledTime.length === 5;
+    if (step === 4) {
+      if (frequency === "weekly" && !dayOfWeek) return false;
+      return scheduledTime.length === 5;
+    }
     if (step === 5) return goalDays >= 1;
     return true;
   };
@@ -198,6 +211,7 @@ export default function MomentNew() {
       reflectionPrompt: (loggingType === "reflection" || loggingType === "both") ? reflectionPrompt.trim() : undefined,
       frequency,
       scheduledTime,
+      dayOfWeek: frequency === "weekly" && dayOfWeek ? dayOfWeek : undefined,
       goalDays,
       participants: validParticipants,
     });
@@ -405,26 +419,87 @@ export default function MomentNew() {
                     <p className="text-muted-foreground">Everyone has one hour to post after this time.</p>
                   </div>
                   <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground mb-2">Time</label>
-                      <input
-                        type="time" value={scheduledTime}
-                        onChange={e => setScheduledTime(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all text-lg"
-                      />
-                    </div>
+                    {/* Frequency */}
                     <div>
                       <label className="block text-sm font-medium text-muted-foreground mb-2">How often</label>
                       <div className="flex gap-3">
                         {(["daily", "weekly", "monthly"] as Frequency[]).map(f => (
-                          <button
-                            key={f}
-                            onClick={() => setFrequency(f)}
-                            className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/30 text-foreground"}`}
-                          >
+                          <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setDayOfWeek(""); }}
+                            className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/30 text-foreground"}`}>
                             {f}
                           </button>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Day of week — only when weekly */}
+                    {frequency === "weekly" && (
+                      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+                        <label className="block text-sm font-medium text-muted-foreground mb-2">Which day</label>
+                        <div className="grid grid-cols-7 gap-1.5">
+                          {[
+                            { label: "Mo", value: "MO" }, { label: "Tu", value: "TU" },
+                            { label: "We", value: "WE" }, { label: "Th", value: "TH" },
+                            { label: "Fr", value: "FR" }, { label: "Sa", value: "SA" },
+                            { label: "Su", value: "SU" },
+                          ].map(d => (
+                            <button key={d.value} onClick={() => setDayOfWeek(d.value)}
+                              className={`py-3 rounded-xl border-2 font-medium text-sm transition-all ${dayOfWeek === d.value ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/20 text-foreground"}`}>
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Styled time picker */}
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">What time</label>
+                      <div className="space-y-3">
+                        {/* Hour row */}
+                        <div>
+                          <p className="text-xs text-muted-foreground/70 mb-1.5">Hour</p>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => (
+                              <button key={h} onClick={() => setScheduledHour(h)}
+                                className={`py-2 rounded-lg border text-sm font-medium transition-all ${scheduledHour === h ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/20 text-foreground"}`}>
+                                {h}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Minute row */}
+                        <div>
+                          <p className="text-xs text-muted-foreground/70 mb-1.5">Minute</p>
+                          <div className="flex gap-2">
+                            {[0, 15, 30, 45].map(m => (
+                              <button key={m} onClick={() => setScheduledMinute(m)}
+                                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${scheduledMinute === m ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/20 text-foreground"}`}>
+                                :{String(m).padStart(2, "0")}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {/* AM/PM */}
+                        <div className="flex gap-2">
+                          {(["AM", "PM"] as const).map(ap => (
+                            <button key={ap} onClick={() => setScheduledAmPm(ap)}
+                              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${scheduledAmPm === ap ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/20 text-foreground"}`}>
+                              {ap}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Time preview */}
+                        <p className="text-center text-base font-medium text-foreground/70">
+                          Window opens at <span className="text-primary font-semibold">
+                            {scheduledHour}:{String(scheduledMinute).padStart(2, "0")} {scheduledAmPm}
+                          </span>
+                          {frequency === "weekly" && dayOfWeek && (
+                            <> every <span className="text-primary font-semibold">
+                              {{"MO":"Monday","TU":"Tuesday","WE":"Wednesday","TH":"Thursday","FR":"Friday","SA":"Saturday","SU":"Sunday"}[dayOfWeek]}
+                            </span></>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -453,7 +528,7 @@ export default function MomentNew() {
                     <p className="font-medium text-foreground">Summary</p>
                     <p>🌿 <span className="text-foreground">{name}</span></p>
                     <p>👥 {participants.filter(p => p.email.trim()).length + 1} people (including you)</p>
-                    <p>⏰ {frequency === "daily" ? "Every day" : frequency === "weekly" ? "Every week" : "Every month"} at {(() => { const [h, m] = scheduledTime.split(":").map(Number); return new Date(0, 0, 0, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); })()}</p>
+                    <p>⏰ {frequency === "daily" ? "Every day" : frequency === "weekly" && dayOfWeek ? `Every ${{"MO":"Monday","TU":"Tuesday","WE":"Wednesday","TH":"Thursday","FR":"Friday","SA":"Saturday","SU":"Sunday"}[dayOfWeek]}` : "Every month"} at {scheduledHour}:{String(scheduledMinute).padStart(2,"0")} {scheduledAmPm}</p>
                     <p>✨ {LOGGING_OPTIONS.find(o => o.type === loggingType)?.label}</p>
                     <p>🎯 {goalDays}-day goal</p>
                   </div>

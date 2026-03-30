@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db, ritualsTable, inviteTokensTable, usersTable,
@@ -248,6 +248,7 @@ const StandalonePlantSchema = z.object({
   reflectionPrompt: z.string().max(200).optional(),
   frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
+  dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
   goalDays: z.number().int().min(1).max(365).default(30),
   participants: z.array(z.object({ name: z.string(), email: z.string().email() })).min(1).max(20),
 });
@@ -259,7 +260,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   const parsed = StandalonePlantSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
 
-  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, goalDays, participants } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, dayOfWeek, goalDays, participants } = parsed.data;
 
   const momentToken = generateToken();
 
@@ -271,6 +272,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     reflectionPrompt: reflectionPrompt ?? null,
     frequency,
     scheduledTime,
+    dayOfWeek: dayOfWeek ?? null,
     goalDays,
     momentToken,
     windowMinutes: 60,
@@ -329,7 +331,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   const recurrenceRule = frequency === "daily"
     ? ["RRULE:FREQ=DAILY"]
     : frequency === "weekly"
-    ? ["RRULE:FREQ=WEEKLY"]
+    ? [`RRULE:FREQ=WEEKLY${dayOfWeek ? `;BYDAY=${dayOfWeek}` : ""}`]
     : ["RRULE:FREQ=MONTHLY"];
 
   const startDate = new Date();
@@ -362,6 +364,53 @@ router.post("/moments", async (req, res): Promise<void> => {
     memberCount: uniqueMembers.length,
     gcalCreated: !!gcalEventId,
   });
+});
+
+// ─── GET /api/moments — list all standalone moments the user participates in ─
+router.get("/moments", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Find all moment_user_tokens for this user's email
+  const userTokenRows = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.email, user.email));
+
+  const momentIds = [...new Set(userTokenRows.map(t => t.momentId))];
+  if (momentIds.length === 0) { res.json({ moments: [] }); return; }
+
+  const flatMoments = (await db.select().from(sharedMomentsTable)
+    .where(inArray(sharedMomentsTable.id, momentIds)))
+    .filter(m => m.ritualId === null);
+
+  const enriched = await Promise.all(flatMoments.map(async (m) => {
+    const allMembers = await db.select().from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.momentId, m.id));
+
+    const todayPosts = await db.select().from(momentPostsTable)
+      .where(and(eq(momentPostsTable.momentId, m.id), eq(momentPostsTable.windowDate, todayDate())));
+
+    const windows = await db.select().from(momentWindowsTable)
+      .where(eq(momentWindowsTable.momentId, m.id));
+    const latestWindow = windows.sort((a, b) => b.windowDate.localeCompare(a.windowDate))[0] ?? null;
+
+    const myToken = userTokenRows.find(t => t.momentId === m.id);
+
+    return {
+      ...m,
+      memberCount: allMembers.length,
+      members: allMembers.map(t => ({ name: t.name, email: t.email })),
+      todayPostCount: todayPosts.length,
+      windowOpen: isWindowOpen(m),
+      minutesLeft: minutesRemaining(m),
+      latestWindow,
+      myUserToken: myToken?.userToken ?? null,
+    };
+  }));
+
+  res.json({ moments: enriched });
 });
 
 // ─── GET /api/rituals/:id/moments — list moments for a circle ───────────────

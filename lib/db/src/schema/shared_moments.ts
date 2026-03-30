@@ -12,6 +12,7 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   scheduledTime: text("scheduled_time").notNull().default("08:00"),
   windowMinutes: integer("window_minutes").notNull().default(60),
   goalDays: integer("goal_days").notNull().default(30),
+  dayOfWeek: text("day_of_week"),
   momentToken: text("moment_token").notNull().unique(),
   currentStreak: integer("current_streak").notNull().default(0),
   longestStreak: integer("longest_streak").notNull().default(0),

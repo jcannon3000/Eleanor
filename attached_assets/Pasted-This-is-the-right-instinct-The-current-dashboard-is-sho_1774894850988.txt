@@ -1,0 +1,164 @@
+This is the right instinct. The current dashboard is showing circles as objects to manage. What you actually want is a living timeline of what’s happening — past, present, and coming up. Less like a folder structure, more like a Strava activity feed crossed with a garden journal.
+The “Ready to plant” label is particularly broken — these rituals exist, they’re active, calling them “ready to plant” implies nothing has happened yet. And showing two nearly identical cards with no differentiation between in-person gathering and shared moment is a missed opportunity — these are fundamentally different experiences and the dashboard should feel that way.
+Here’s the Replit prompt to reimagine it:
+
+Reimagine the Garden dashboard — timeline view
+Do not change the underlying data or any other screens. Only redesign the home dashboard (Your Garden).
+
+The new concept
+The dashboard is a living timeline — not a list of circles or rituals to manage, but a chronological feed of what has happened, what is happening now, and what is coming up. Like a Strava activity feed but for your relationships. The user scrolls through time. Past moments that bloomed. The current window if one is open. Upcoming gatherings and moment windows.
+Every event on the timeline is either a Gathering (in-person) or a Shared Moment (decentralized ritual). They look visually distinct at a glance. No confusion between the two.
+
+Remove completely
+	∙	“Ready to plant” label — never show this on an active ritual
+	∙	Circle-based card grouping — the timeline is event-based not circle-based
+	∙	“Just planted” as a primary label — move growth state to a subtle secondary position
+
+Timeline structure
+The feed has three sections flowing continuously, no hard section breaks, just subtle time anchors:
+
+↑ PAST — what bloomed and what withered
+  (most recent first, scrollable upward history)
+
+NOW — if a window is currently open, pinned here
+
+↑ COMING UP — next 7 days of scheduled events
+  (soonest first)
+
+
+Each section has a small floating time anchor label — muted, small, left-aligned:
+
+Yesterday
+Today
+This week
+
+
+These appear as sticky labels as you scroll, like a Strava feed date divider. Subtle, not heavy.
+
+Two card types — visually distinct
+Gathering card — in-person
+Left accent bar: amber #C17F24
+Background: warm cream #F7F0E6
+Icon: the activity emoji chosen at creation (🏃 🍕 🚶 ☕ etc)
+
+[🏃] Monday Run                    [🌿 Taking root]
+     Sarah, Tom, Dev
+     
+     Monday 14 April · 7am
+     Regent's Park
+     
+     🔥 3 in a row
+
+
+Status states:
+	∙	Upcoming: clean, no status bar
+	∙	Confirmed: small sage dot + “Confirmed — in everyone’s calendar ✅”
+	∙	Completed: full width sage bar at bottom, muted “Bloomed 🌸”
+	∙	Missed: full width blush bar at bottom, muted “Withered 🥀”
+
+Shared Moment card — decentralized
+Left accent bar: sage #6B8F71
+Background: slightly cooler off-white #F5F5F0
+Icon: 🌿 always — this is Eleanor’s ritual not an activity
+
+[🌿] Morning Coffee                [☕ Daily]
+     with James, Clara
+     
+     Today · 8am · 45 min left
+     
+     [████████░░] 2 of 3 showed up
+     🔥 12 in a row
+
+
+Status states:
+	∙	Upcoming: shows time until window opens
+	∙	Window open: amber pulsing indicator + countdown + live post count bar
+	∙	Completed (bloomed): sage bar + “🌸 Both showed up — streak counts”
+	∙	Solo (one person): muted bar + “🌿 Only you showed up — streak resting”
+	∙	Missed: blush bar + “🥀 No one showed up”
+The visual distinction between amber left bar (gathering) and sage left bar (shared moment) means at a glance the user reads the timeline without needing to parse text.
+
+The NOW state — pinned when a window is open
+If a Shared Moment window is currently open, it pins to the top of the feed above everything else with a gentle amber glow border:
+
+╔════════════════════════════════╗
+║ 🌿 OPEN NOW · 23 min left     ║
+║                                ║
+║ Morning Coffee ☕              ║
+║ with James, Clara              ║
+║                                ║
+║ "Share your morning coffee     ║
+║  together"                     ║
+║                                ║
+║ [████░░░░░░] 1 of 3 posted    ║
+║                                ║
+║ [Post your moment →]           ║
+╚════════════════════════════════╝
+
+
+The intention text shows here — this is the moment the member sees why they’re showing up. The CTA takes them directly to their personal posting page. This card disappears when the window closes and moves into the past feed as a completed or withered entry.
+
+The header
+Replace the current header with something simpler and warmer:
+
+Eleanor 🌿                    [avatar]
+
+[today's date, written out: Monday, 14 April]
+
+[X] things happening this week
+
+
+Remove “Your Garden” as the H1 — the timeline IS the garden. The quote “The rituals you tend now become the traditions you’ll remember” is lovely but it’s taking up prime real estate. Move it to an empty state only — shown when there are no events yet.
+
+Empty state
+When a user has no circles or rituals yet, show the quote and a single CTA:
+
+🌱
+
+"The rituals you tend now become 
+the traditions you'll remember."
+
+[Plant your first ritual]
+[Join a circle]
+
+
+The + button
+Keep the sage green floating + button bottom right. On tap show two options as a small menu rising from the button:
+
+🌿 Plant a Shared Moment
+📅 Plan a Gathering
+
+
+Growth state placement
+Keep growth states but move them to a subtle pill in the top right of each card — small, muted, not the dominant element. The dominant elements are the event name, the people, the time, and the status. Growth state is context not headline.
+
+Streak display
+Show streak on every card but sized appropriately — not as large as the Strava-style display on the circle detail screen. On the timeline card it is secondary information:
+
+🔥 12 in a row  ·  Best: 18
+
+
+One line, muted, below the participant names.
+
+Past events
+Past events show in the feed with reduced opacity — about 70% — so the visual weight naturally pulls toward upcoming and present. Completed ones have a sage tint. Withered ones have a blush tint. Both are readable but clearly historical.
+Tapping any past event opens the journal entry for that window or gathering.
+
+Build order
+	1.	Replace the circle-card dashboard with the timeline feed component
+	2.	Build Gathering card component with amber left bar and status states
+	3.	Build Shared Moment card component with sage left bar and status states
+	4.	Build the NOW pinned card with open window state
+	5.	Build time anchor labels — Yesterday, Today, This week
+	6.	Update the header — simpler, date-forward
+	7.	Update empty state with quote and two CTAs
+	8.	Update + button to show two options
+	9.	Move growth state to subtle pill top right on both card types
+	10.	Apply past event reduced opacity
+
+The feeling to aim for
+Opening Eleanor should feel like opening a garden journal that is also a calendar that is also a Strava feed. You see what bloomed yesterday. You see what’s open right now. You see what’s coming up this week. Everything is alive and in motion. Nothing feels like an object waiting to be managed.
+The amber and sage left bars do the work of differentiation without explanation. The timeline does the work of orientation without navigation. The NOW card does the work of urgency without pressure.
+It should feel like your relationships are alive and Eleanor is tending them quietly while you live your life.
+
+Run this as a single prompt. It is a visual redesign only — no data model changes, no logic changes, just the dashboard component rebuilt around a timeline rather than a circle list.​​​​​​​​​​​​​​​​
