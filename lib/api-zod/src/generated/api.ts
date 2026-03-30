@@ -78,6 +78,7 @@ export const CreateRitualBody = zod.object({
   description: zod.string().optional(),
   frequency: zod.enum(["weekly", "biweekly", "monthly"]),
   dayPreference: zod.string().optional(),
+  location: zod.string().optional(),
   participants: zod.array(
     zod.object({
       name: zod.string(),

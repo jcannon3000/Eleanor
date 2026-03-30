@@ -229,10 +229,10 @@ export default function CreateRitual() {
           name: name.trim(),
           frequency,
           dayPreference: dayPreference.trim(),
+          location: locationVal.trim() || undefined,
           participants: validParticipants,
           ownerId: user.id,
-          ...(locationVal.trim() ? { location: locationVal.trim() } : {}),
-        } as Parameters<typeof createMutation.mutateAsync>[0]["data"]
+        },
       });
 
       toast({

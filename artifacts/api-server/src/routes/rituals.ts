@@ -68,7 +68,7 @@ router.post("/rituals", async (req, res): Promise<void> => {
   }
 
   const schedulingToken = randomUUID();
-  const location = typeof req.body.location === "string" ? req.body.location.trim() || null : null;
+  const location = parsed.data.location?.trim() || null;
 
   const [ritual] = await db
     .insert(ritualsTable)
@@ -95,16 +95,16 @@ router.post("/rituals", async (req, res): Promise<void> => {
     nextMeetupDate: enriched.nextMeetupDate,
   };
 
-  try {
-    const welcome = await getWelcomeMessage(ctx);
-    await db.insert(ritualMessagesTable).values({
-      ritualId: ritual.id,
-      role: "assistant",
-      content: welcome,
-    });
-  } catch (err) {
-    req.log.warn({ err }, "Failed to generate welcome message");
-  }
+  // Fire-and-forget: generate welcome message (non-blocking)
+  getWelcomeMessage(ctx)
+    .then(async (welcome) => {
+      await db.insert(ritualMessagesTable).values({
+        ritualId: ritual.id,
+        role: "assistant",
+        content: welcome,
+      });
+    })
+    .catch((err: unknown) => req.log.warn({ err }, "Failed to generate welcome message"));
 
   // Fire-and-forget: create a recurring Google Calendar event with all participants as attendees.
   // Always use the authenticated session user's ID for calendar access — never trust client-supplied ownerId.
