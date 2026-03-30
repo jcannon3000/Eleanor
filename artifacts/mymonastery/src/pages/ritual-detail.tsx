@@ -1,21 +1,54 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { format, parseISO, formatDistanceToNow, isPast } from "date-fns";
-import { CheckCircle2, XCircle, Settings, Sprout, CalendarCheck, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Settings, Sprout, CalendarCheck, RefreshCw, Flower2, Plus } from "lucide-react";
 import { clsx } from "clsx";
 import {
   useGetRitual,
   useUpdateRitual,
   useDeleteRitual,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiRequest } from "@/lib/queryClient";
 
-type Tab = "timeline" | "settings";
+type Tab = "timeline" | "moments" | "settings";
+
+const LOGGING_ICONS: Record<string, string> = {
+  photo: "📷",
+  reflection: "✍️",
+  both: "📷✍️",
+  checkin: "✅",
+};
+
+const STATE_META: Record<string, { label: string; style: string }> = {
+  active: { label: "Active", style: "bg-green-50 text-green-700 border-green-200" },
+  needs_water: { label: "Needs tending", style: "bg-amber-50 text-amber-700 border-amber-200" },
+  dormant: { label: "Dormant", style: "bg-secondary text-muted-foreground border-border" },
+};
+
+type SharedMoment = {
+  id: number;
+  name: string;
+  intention: string;
+  loggingType: string;
+  reflectionPrompt: string | null;
+  frequency: string;
+  scheduledTime: string;
+  goalDays: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalBlooms: number;
+  state: string;
+  momentToken: string;
+  latestWindow: { status: string; windowDate: string } | null;
+  todayPostCount: number;
+  windowOpen: boolean;
+};
 
 interface TimelineMeetup {
   id: number;
@@ -54,6 +87,12 @@ export default function RitualDetail() {
 
   const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [isEditing, setIsEditing] = useState(false);
+
+  const { data: momentsData, isLoading: momentsLoading } = useQuery<{ moments: SharedMoment[] }>({
+    queryKey: [`/api/rituals/${ritualId}/moments`],
+    queryFn: () => apiRequest("GET", `/api/rituals/${ritualId}/moments`),
+    enabled: activeTab === "moments" && !!ritualId,
+  });
   const [editName, setEditName] = useState("");
   const [editIntention, setEditIntention] = useState("");
 
@@ -207,13 +246,14 @@ export default function RitualDetail() {
         <div className="flex gap-1 p-1 bg-secondary rounded-2xl mb-6">
           {[
             { id: "timeline", label: "📅 Timeline" },
+            { id: "moments", label: "🌿 Moments" },
             { id: "settings", label: "⚙️ Settings" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
               className={clsx(
-                "flex-1 py-2.5 px-4 rounded-xl font-medium text-sm transition-all",
+                "flex-1 py-2.5 px-3 rounded-xl font-medium text-sm transition-all",
                 activeTab === tab.id
                   ? "bg-background shadow-sm text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -409,6 +449,105 @@ export default function RitualDetail() {
                   </div>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === "moments" && (
+            <motion.div
+              key="moments"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              {/* Plant CTA */}
+              <Link
+                href={`/ritual/${ritualId}/moment/plant`}
+                className="flex items-center justify-between p-5 bg-card rounded-2xl border border-card-border hover:border-primary/30 transition-colors group"
+              >
+                <div>
+                  <p className="font-semibold text-foreground">Plant a Shared Moment</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    A recurring micro-ritual your whole circle shows up for together.
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 ml-4 group-hover:bg-primary/20 transition-colors">
+                  <Plus size={18} className="text-primary" />
+                </div>
+              </Link>
+
+              {/* Streak rule note */}
+              <p className="text-xs text-muted-foreground italic text-center px-4">
+                The streak blooms when at least two of you show up together.
+              </p>
+
+              {/* Moments list */}
+              {momentsLoading && (
+                <div className="space-y-3">
+                  {[1, 2].map(i => <div key={i} className="h-32 bg-card rounded-2xl border border-card-border animate-pulse" />)}
+                </div>
+              )}
+
+              {!momentsLoading && momentsData && momentsData.moments.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-3">🌿</div>
+                  <p className="font-medium text-foreground mb-1">No moments planted yet</p>
+                  <p className="text-sm text-muted-foreground">Plant your first Shared Moment to start gathering together.</p>
+                </div>
+              )}
+
+              {!momentsLoading && momentsData?.moments.map((m: SharedMoment) => {
+                const stateMeta = STATE_META[m.state] ?? STATE_META.active;
+                const loggingIcon = LOGGING_ICONS[m.loggingType] ?? "🌿";
+                const [hh, mm] = m.scheduledTime.split(":").map(Number);
+                const timeLabel = new Date(0, 0, 0, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+                return (
+                  <div key={m.id} className="bg-card rounded-2xl border border-card-border p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-lg">{loggingIcon}</span>
+                          <h3 className="font-semibold text-foreground">{m.name}</h3>
+                          <span className={clsx("text-xs px-2 py-0.5 rounded-full border font-medium", stateMeta.style)}>
+                            {stateMeta.label}
+                          </span>
+                          {m.windowOpen && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium animate-pulse">
+                              Window open now
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-[var(--color-sage)] italic leading-relaxed line-clamp-2">{m.intention}</p>
+                      </div>
+                      <div className="text-center flex-shrink-0">
+                        <p className="text-2xl font-bold text-primary leading-none">{m.currentStreak}</p>
+                        <p className="text-xs text-muted-foreground">streak</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="capitalize">{m.frequency} · {timeLabel}</span>
+                      <span>{m.totalBlooms} bloom{m.totalBlooms !== 1 ? "s" : ""} · {m.goalDays}-day goal</span>
+                    </div>
+
+                    {m.windowOpen && (
+                      <div className="pt-3 border-t border-border/50">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            {m.todayPostCount >= 2
+                              ? `🌸 ${m.todayPostCount} showed up — this window counts`
+                              : m.todayPostCount === 1
+                              ? "🌿 1 person showed up — waiting for more"
+                              : "No one has shown up yet today"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </motion.div>
           )}
 

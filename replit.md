@@ -57,6 +57,10 @@ artifacts-monorepo/
 - `ritual_messages` — id, ritual_id, role (user/assistant), content, created_at
 - `schedule_responses` — id, ritual_id, guest_name, guest_email, chosen_time, unavailable (int), created_at
 - `invite_tokens` — id, ritual_id, email, name, token (uuid), responded_at, created_at
+- `shared_moments` — id, ritual_id, name, intention (140 char), logging_type (photo|reflection|both|checkin), reflection_prompt, frequency, scheduled_time (HH:MM), window_minutes (60), goal_days, moment_token (unique), current_streak, longest_streak, total_blooms, state (active|needs_water|dormant), created_at
+- `moment_user_tokens` — id, moment_id, email, name, user_token (unique), google_calendar_event_id, created_at
+- `moment_posts` — id, moment_id, window_date (YYYY-MM-DD), user_token, guest_name, photo_url, reflection_text, is_checkin (int), created_at
+- `moment_windows` — id, moment_id, window_date, status (bloom|solo|wither), post_count, closed_at, created_at
 
 ## API Routes
 
@@ -84,7 +88,25 @@ POST /api/schedule/:token/respond  — guest submits time choice or unavailabili
 
 GET  /api/invite/:token          — public invite info by token (no auth)
 POST /api/invite/:token/respond  — invitee submits time choice or unavailability
+
+POST /api/rituals/:id/moments          — plant a shared moment; creates user tokens + GCal recurring event
+GET  /api/rituals/:id/moments          — list moments for a circle (auth required)
+GET  /api/rituals/:id/moments/:id/journal — window history with posts per window
+GET  /api/moment/:momentToken/:userToken      — public posting page data (no auth)
+POST /api/moment/:momentToken/:userToken/post — submit a post (photo URL / reflection / checkin)
 ```
+
+## Shared Moments Feature
+
+Micro-rituals members can show up to individually each day/week in a 1-hour window:
+
+- **Planting flow** (`/ritual/:id/moment/plant`): 5-step wizard — Name → Intention → Logging Type → Time → Goal
+- **Logging types**: `photo` (upload), `reflection` (prompt + text), `both`, `checkin` (just show up)
+- **Intention text**: 140 chars, shown at top of posting page + in calendar description
+- **Public posting page** (`/moment/:momentToken/:userToken`): no auth, renders per logging type, presence dots, countdown
+- **Streak rules**: Streak increments only when 2+ people post in same window (bloom). Solo post = streak rests. No posts = wither. Two consecutive withers → dormant + streak resets
+- **Window statuses**: 🌸 bloom (2+ showed up), 🌿 solo (1 showed up), 🥀 wither (0 showed up)
+- **Moments tab** in ritual detail: shows all moments, streak, state, today's count, "plant a moment" CTA
 
 ## Google Calendar Integration
 

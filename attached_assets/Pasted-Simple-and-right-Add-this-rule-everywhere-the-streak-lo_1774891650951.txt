@@ -1,0 +1,99 @@
+Simple and right. Add this rule everywhere the streak logic lives.
+
+Here's the precise update to give Replit:
+
+---
+
+**Update streak rules for Shared Moments**
+
+Find the streak logic in the Shared Moments feature and apply this rule everywhere streaks are calculated and displayed.
+
+---
+
+**The rule**
+
+A window counts toward the streak only if at least two circle members posted within that window.
+
+One person showing up alone does not increment the streak. It does not break the streak either. It simply does not count.
+
+The streak measures the circle showing up together — not individual participation.
+
+---
+
+**Updated streak logic**
+
+```
+After each window closes:
+
+Count posts for that window_date on this shared_moment_id.
+
+If posts >= 2:
+  Window is a BLOOM
+  Increment current_streak by 1
+  Update longest_streak if current_streak > longest_streak
+  Increment total_posts
+  Update last_post_date
+  If state was needs_water or dormant → return to previous state
+
+If posts == 1:
+  Window is a SOLO
+  Streak neither increments nor resets
+  State unchanged
+  Post is saved and visible in journal
+  Individual streak for that user increments
+  Display note: "Only you showed up this time 🌿"
+
+If posts == 0:
+  Window is a WITHER
+  First consecutive wither → state: needs_water, streak pauses
+  Second consecutive wither → state: dormant, streak resets to 0
+```
+
+---
+
+**Update the posting page**
+
+During the window, update the presence counter language to reflect this:
+
+While only one person has posted:
+> "You're the first one here 🌿 — the streak blooms when two of you show up"
+
+When two or more have posted:
+> "🌸 [X of Y] showed up — this window counts"
+
+After the window closes with only one post, show on the posting page and in Eleanor:
+> "Only you showed up this time. The streak is resting — tend it together next time. 🌿"
+
+---
+
+**Update the circle detail Shared Moments section**
+
+Below the streak display add a muted line in italic:
+
+*"The streak blooms when at least two of you show up together."*
+
+This sets the expectation clearly without feeling like a rule. It is a gentle reminder that this is a collective practice not an individual one.
+
+---
+
+**Update the journal**
+
+Tag each journal entry with its window status:
+
+🌸 Bloomed — two or more showed up, streak counted
+🌿 Solo — one person showed up, streak rested
+🥀 Withered — no one showed up
+
+This makes the journal an honest record of the collective practice — the blooms and the rests and the withers, all visible, all meaningful.
+
+---
+
+**Why this rule matters**
+
+The streak is not a personal achievement. It is proof that people keep showing up for each other. One person posting alone every day for thirty days is admirable but it is not the same thing as two people showing up together. The streak measures the relationship. The relationship requires at least two.
+
+This rule also creates a gentle social dynamic that nudges participation without being extractive. If you know your friend already posted, you feel the pull to show up so the streak counts. That pull is healthy — it is the same pull that makes a running partner more effective than a solo training plan. You are not accountable to an app. You are accountable to a person.
+
+---
+
+That is the complete update. One rule, applied consistently across streak calculation, the posting page display, the circle detail, and the journal. Give this to Replit as a standalone prompt and it will know exactly where to apply it.

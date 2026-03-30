@@ -1,0 +1,298 @@
+This reframe is beautiful and it actually deepens the product significantly.
+
+You've just moved Shared Moments from a photo-sharing mechanic into something closer to a shared contemplative practice. The coffee photo is one expression of it. But someone doing five minutes of climate meditation and answering "what came up for you today" is a completely different register of intimacy — and arguably more meaningful. You're not just proving you showed up. You're sharing what the moment meant.
+
+This also aligns the product directly with the How We Gather research in a way the photo-only version didn't fully capture. Ter Kuile and Thurston found that the communities with deepest belonging combined presence with reflection — you showed up AND you made meaning together. The logging options let each circle define what showing up means for them.
+
+Here's the updated prompt for just this feature:
+
+---
+
+**Update the Shared Moments feature — logging types and moment intention**
+
+Do not rebuild what already exists. Update the planting flow and posting page to support multiple logging types and a moment intention.
+
+---
+
+**The core addition**
+
+When creating a Shared Moment, the organizer defines two things that didn't exist before:
+
+**The intention** — a short description of what this moment is and why it matters. This appears on every member's posting page when the window opens. It sets the tone. It is the thing everyone holds together.
+
+**The logging type** — how members record their participation. The organizer chooses one of four options at creation. Every member uses the same logging type for that Shared Moment.
+
+---
+
+**Add to the planting flow — Step 1.5 after naming**
+
+After the name step and before the time step, insert:
+
+**"What is this moment about? 🌿"**
+
+Subtitle in muted text:
+"This will appear for your circle when the window opens. It sets the intention."
+
+Large text area, generous padding, warm cream background.
+
+Placeholder text cycling gently between examples:
+*"Share your morning coffee together ☕"*
+*"Five minutes of stillness before the day starts 🌿"*
+*"Breathe together. Pray together. Show up together."*
+*"A moment of gratitude, wherever you are 🌸"*
+*"Walk outside and notice something beautiful 🚶"*
+
+Character limit: 140 characters. Intentionally short — this is a prompt not an essay.
+
+This field is required. Every Shared Moment needs an intention.
+
+---
+
+**New step in planting flow — "How will your circle log this?"**
+
+Insert between the time step and the goal step.
+
+Header: **"How will your circle show up? 📷"**
+Subtitle: "Choose how members log their moment. Everyone uses the same format."
+
+Four large selectable cards:
+
+**📷 Photo**
+"A photo of the moment — coffee cup, morning light, wherever you are."
+Best for: coffee rituals, walks, meals, anything visual
+
+**✍️ Reflection**
+"A short written response to a prompt you set."
+Best for: prayer, meditation, gratitude, climate moments
+On select: reveals a secondary input field:
+  "What's your prompt?"
+  Placeholder: "How was your experience today?"
+  "What are you grateful for right now?"
+  "What did you notice in your five minutes?"
+  "What came up for you?"
+  Character limit: 100 characters
+
+**📷 + ✍️ Both**
+"A photo and a short reflection — presence and meaning together."
+Best for: circles that want the image and the words
+
+**✅ Just show up**
+"No photo, no words. Just mark that you were here."
+Best for: meditation, prayer, breathing practices where the doing is enough
+
+---
+
+**Update the posting page**
+
+The posting page at `/moment/[moment_token]/[user_token]` changes based on logging type.
+
+All logging types share the same top section:
+
+```
+🌿 [Moment name]
+[Circle name] · [day] at [time]
+
+[Intention text — displayed prominently, centered, slightly larger, sage green]
+
+[X] minutes remaining  ←  amber countdown
+[X of Y] circle members have shown up  ←  presence dots
+```
+
+The intention is the first thing they read when they open the page. It is the shared anchor. It is what makes this moment meaningful rather than mechanical.
+
+Then below, the logging section changes per type:
+
+---
+
+**📷 Photo logging**
+
+Large centered upload area:
+"📷 Share your moment"
+Tap to open camera or photo library
+After upload: photo preview with gentle bloom animation
+CTA: "I showed up 🌿"
+
+---
+
+**✍️ Reflection logging**
+
+The prompt the organizer set, displayed in Playfair Display italic, sage green:
+*"How was your experience today?"*
+
+Large warm text area below:
+Placeholder: "Take a moment. Then share..."
+Minimum: 1 character — no pressure, just presence
+Maximum: 280 characters
+
+CTA: "I showed up 🌿"
+
+After posting: reflection appears briefly on screen
+"🌿 You showed up."
+Then the gentle close.
+
+---
+
+**📷 + ✍️ Both**
+
+Photo upload first
+Then the reflection prompt below
+Both required before submitting
+CTA: "I showed up 🌿"
+
+---
+
+**✅ Just show up**
+
+The intention displayed large and centered.
+
+Below it, a single large button — full width, soil background, cream text, generous padding:
+
+**"I showed up 🌿"**
+
+That's it. No photo. No words. Just presence marked.
+
+After tapping:
+Large 🌿 centered, brief pulse animation
+"You showed up."
+"[X of Y] circle members have shown up today."
+
+---
+
+**Update the database**
+
+Add to `shared_moments` table:
+```
+intention text (required, 140 char max)
+logging_type text (photo | reflection | both | checkin)
+reflection_prompt text (required if logging_type is reflection or both)
+```
+
+Add to `moment_posts` table:
+```
+reflection_text text (populated for reflection and both types)
+is_checkin boolean default false (true for just show up type)
+```
+
+---
+
+**Update the calendar invite description**
+
+The intention should appear in every calendar event:
+
+```
+Title: 🌿 [Moment name] — time to gather
+
+[Intention text]
+
+You have one hour. Tap your personal link:
+[unique_user_moment_url]
+
+No login needed. Just show up. 🌿
+```
+
+The intention in the calendar description means members see the purpose of the moment before they even open the app. The calendar notification carries the meaning.
+
+---
+
+**Update the welcome email**
+
+```
+Subject: 🌱 [Your name] planted a Shared Moment — [moment name]
+
+[Circle name] has a new ritual.
+
+[Moment name]
+[Frequency] at [time]
+Goal: [X days]
+
+[Intention text — displayed prominently, sage green]
+
+[How will your circle log: "Share a photo" / "Reflect on a prompt" / "Photo and reflection" / "Just show up"]
+
+Eleanor will send a calendar invite shortly.
+When the time comes, tap your link and show up.
+
+Your personal link (bookmark this):
+[url]
+
+🌿 Eleanor
+```
+
+---
+
+**Update the journal**
+
+Each journal entry now shows the logging type and content appropriately.
+
+Photo entry: photo displayed full width
+Reflection entry: prompt shown in italic, responses below in warm cards — each member's reflection, no names attached, just the words
+Both entry: photo grid with reflections beneath each
+Check-in entry: presence dots only — [X of Y] showed up — clean and simple
+
+The reflection journal is particularly powerful over time. Months of responses to "what are you grateful for right now" from a circle of friends, accumulated, becomes an extraordinary shared document of a friendship. Not a chat history. Not a photo album. A record of meaning-making done together.
+
+---
+
+**Tone notes for reflection prompts**
+
+The reflection prompt the organizer sets should be open and generous not extractive. Suggest these examples in the UI as inspiration:
+
+For contemplative moments:
+*"What came up for you today?"*
+*"What did you notice in your five minutes?"*
+*"What are you carrying right now?"*
+
+For gratitude rituals:
+*"What are you grateful for in this moment?"*
+*"Name one small thing that was good today."*
+
+For climate and justice practices:
+*"What did you hold in your heart today?"*
+*"What gave you hope this week?"*
+*"What are you called to tend?"*
+
+For social moments:
+*"How was your coffee? ☕"*
+*"Where are you right now?"*
+*"What's one word for your morning?"*
+
+Display three rotating examples in muted italic beneath the reflection prompt input field during creation so organizers feel the range of possibility.
+
+---
+
+**Update the Shared Moments section on circle detail**
+
+For reflection and both type moments, show the most recent reflection from each member in the feed — truncated to one line, full text on tap. Warm card style, no names attached to specific reflections (intentional — the anonymity makes sharing feel safer and the collective voice more powerful).
+
+For check-in type moments, show a simple presence record: date, how many showed up, gentle and clean.
+
+---
+
+**Do not build**
+
+Comments or replies on reflections
+Likes or reactions on any post type
+Visible attribution of specific reflections to specific members (anonymity is intentional)
+Any feature not listed above
+
+---
+
+**Build order addition**
+
+After the existing build order, add:
+
+14. Intention field in planting flow
+15. Logging type selector in planting flow — with conditional reflection prompt input
+16. Update posting page to render correct logging interface per type
+17. Update moment_posts schema for reflection_text and is_checkin
+18. Update calendar invite and welcome email to include intention
+19. Update journal entries to display per logging type
+20. Update circle detail feed for reflection and check-in display
+
+---
+
+**The one thing to get right**
+
+The intention text is the soul of the feature. It appears in the calendar notification. It appears at the top of the posting page. It appears in the journal. It is what makes this more than a photo app or a check-in tool. It answers the question: why are we doing this together? Every Shared Moment has an answer to that question. Build every screen so the intention is the first thing a member encounters.
+
+Someone opening their calendar at 7am, seeing "Five minutes of stillness before the day starts 🌿" in an Eleanor event, tapping the link, landing on a page that shows them that same intention and a quiet text field asking "what did you notice in your five minutes" — that is a different product from anything else in the market. That is Eleanor.

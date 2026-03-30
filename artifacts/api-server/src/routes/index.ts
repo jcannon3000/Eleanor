@@ -7,6 +7,7 @@ import peopleRouter from "./people";
 import contactsRouter from "./contacts";
 import scheduleRouter from "./schedule";
 import inviteRouter from "./invite";
+import momentsRouter from "./moments";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(peopleRouter);
 router.use(contactsRouter);
 router.use(scheduleRouter);
 router.use(inviteRouter);
+router.use(momentsRouter);
 
 export default router;
