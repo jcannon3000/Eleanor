@@ -61,7 +61,7 @@ export default function Onboarding() {
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 text-primary text-sm font-medium mb-6 border border-primary/15">
               <Sprout size={13} />
-              <span>A garden for your community</span>
+              <span>A personal assistant for community building</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-serif text-foreground leading-tight mb-6">
@@ -70,9 +70,7 @@ export default function Onboarding() {
             </h1>
 
             <p className="text-lg text-muted-foreground mb-10 max-w-md mx-auto md:mx-0 leading-relaxed">
-              Eleanor helps you turn recurring intentions into lasting traditions —
-              less friction, more follow-through, and gentle nudges that keep your
-              rituals in bloom.
+              Eleanor turns one-time plans into traditions — coordinating everyone's calendars so the things worth repeating actually do.
             </p>
 
             {authError && (
