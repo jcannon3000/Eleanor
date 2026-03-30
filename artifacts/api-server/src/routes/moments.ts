@@ -310,15 +310,19 @@ const StandalonePlantSchema = z.object({
   goalDays: z.number().int().min(0).max(365).default(7),
   timezone: z.string().default("UTC"),
   timeOfDay: z.enum(["morning", "midday", "afternoon", "night"]).optional(),
-  participants: z.array(z.object({ name: z.string(), email: z.string().email() })).max(20).default([]),
+  participants: z.array(z.object({ name: z.string(), email: z.string().min(3) })).max(20).default([]),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
+  try {
   const sessionUserId = req.user ? (req.user as { id: number }).id : null;
   if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const parsed = StandalonePlantSchema.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+  if (!parsed.success) {
+    console.error("POST /api/moments validation error:", parsed.error.flatten());
+    res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
+  }
 
   const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants } = parsed.data;
 
@@ -488,6 +492,10 @@ router.post("/moments", async (req, res): Promise<void> => {
     memberCount: uniqueMembers.length,
     gcalCreated: !!gcalEventId,
   });
+  } catch (err) {
+    console.error("POST /api/moments error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ─── GET /api/moments — list all standalone moments the user participates in ─
