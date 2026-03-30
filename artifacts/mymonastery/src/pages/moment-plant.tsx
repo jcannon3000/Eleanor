@@ -7,7 +7,7 @@ import { Layout } from "@/components/layout";
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
 
-type LoggingType = "photo" | "reflection" | "both" | "checkin";
+type LoggingType = "reflection" | "checkin";
 type Frequency = "daily" | "weekly" | "monthly";
 
 const INTENTION_PLACEHOLDERS = [
@@ -34,31 +34,17 @@ const LOGGING_OPTIONS: {
   bestFor: string;
 }[] = [
   {
-    type: "photo",
-    icon: "📷",
-    label: "Photo",
-    description: "A photo of the moment — coffee cup, morning light, wherever you are.",
-    bestFor: "Coffee rituals, walks, meals, anything visual",
-  },
-  {
     type: "reflection",
     icon: "✍️",
     label: "Reflection",
     description: "A short written response to a prompt you set.",
-    bestFor: "Prayer, meditation, gratitude, climate moments",
-  },
-  {
-    type: "both",
-    icon: "📷✍️",
-    label: "Photo + Reflection",
-    description: "A photo and a short reflection — presence and meaning together.",
-    bestFor: "Circles that want the image and the words",
+    bestFor: "Prayer, meditation, gratitude, walks",
   },
   {
     type: "checkin",
     icon: "✅",
     label: "Just show up",
-    description: "No photo, no words. Just mark that you were here.",
+    description: "No words needed. Just mark that you were here.",
     bestFor: "Meditation, prayer, breathing practices",
   },
 ];
@@ -74,7 +60,7 @@ export default function MomentPlant() {
   const [name, setName] = useState("");
   const [intention, setIntention] = useState("");
   const [intentionPlaceholderIdx, setIntentionPlaceholderIdx] = useState(0);
-  const [loggingType, setLoggingType] = useState<LoggingType>("photo");
+  const [loggingType, setLoggingType] = useState<LoggingType>("reflection");
   const [reflectionPrompt, setReflectionPrompt] = useState("");
   const [reflectionExampleIdx, setReflectionExampleIdx] = useState(0);
   const [frequency, setFrequency] = useState<Frequency>("weekly");
@@ -107,7 +93,7 @@ export default function MomentPlant() {
     if (step === 0) return name.trim().length >= 2;
     if (step === 1) return intention.trim().length >= 1;
     if (step === 2) {
-      if (loggingType === "reflection" || loggingType === "both") {
+      if (loggingType === "reflection") {
         return reflectionPrompt.trim().length >= 1;
       }
       return true;
@@ -122,7 +108,7 @@ export default function MomentPlant() {
       name: name.trim(),
       intention: intention.trim(),
       loggingType,
-      reflectionPrompt: (loggingType === "reflection" || loggingType === "both") ? reflectionPrompt.trim() : undefined,
+      reflectionPrompt: loggingType === "reflection" ? reflectionPrompt.trim() : undefined,
       frequency,
       scheduledTime,
       goalDays,
@@ -276,7 +262,7 @@ export default function MomentPlant() {
               </div>
 
               {/* Reflection prompt input */}
-              {(loggingType === "reflection" || loggingType === "both") && (
+              {loggingType === "reflection" && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}

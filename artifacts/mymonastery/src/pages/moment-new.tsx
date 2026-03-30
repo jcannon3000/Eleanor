@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite";
-type LoggingType = "photo" | "reflection" | "both" | "timer" | "timer_reflection" | "checkin";
+type LoggingType = "reflection" | "timer" | "timer_reflection" | "checkin";
 type Frequency = "daily" | "weekly";
 type TimeOfDay = "morning" | "midday" | "afternoon" | "night";
 
@@ -197,7 +197,7 @@ const TEMPLATES = [
     prefill: {
       name: "Walk Together 🚶",
       intention: "Step outside. We are walking at the same time, in different places, under the same sky.",
-      loggingType: "both" as LoggingType,
+      loggingType: "reflection" as LoggingType,
       timerDuration: 10,
       reflectionPrompt: "What did you notice?",
       scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
@@ -210,7 +210,7 @@ const TEMPLATES = [
     prefill: {
       name: "Morning Coffee ☕",
       intention: "Wherever we are, we are having coffee together. Share your cup.",
-      loggingType: "photo" as LoggingType,
+      loggingType: "checkin" as LoggingType,
       timerDuration: 10,
       reflectionPrompt: "",
       scheduledHour: 8, scheduledAmPm: "AM" as "AM" | "PM",
@@ -234,10 +234,9 @@ const GOAL_OPTIONS = [
 
 // ─── Logging type options ─────────────────────────────────────────────────────
 const LOGGING_OPTIONS: { type: LoggingType; icon: string; label: string; description: string }[] = [
-  { type: "photo", icon: "📷", label: "Photo", description: "A photo of the moment — cup, light, wherever you are" },
   { type: "reflection", icon: "✍️", label: "Reflection", description: "A written response to a prompt" },
   { type: "timer", icon: "⏱️", label: "Meditation timer", description: "A shared countdown — sit, breathe, or pray together" },
-  { type: "checkin", icon: "✅", label: "Just show up", description: "No photo, no words. Mark that you were present." },
+  { type: "checkin", icon: "✅", label: "Just show up", description: "No words needed. Mark that you were present." },
 ];
 
 const TIMER_DURATIONS = [2, 5, 10, 15, 20];
@@ -408,7 +407,7 @@ export default function MomentNew() {
   // Core fields
   const [name, setName] = useState("");
   const [intention, setIntention] = useState("");
-  const [loggingType, setLoggingType] = useState<LoggingType>("photo");
+  const [loggingType, setLoggingType] = useState<LoggingType>("reflection");
   const [timerDuration, setTimerDuration] = useState(10);
   const [hasReflectionAfterTimer, setHasReflectionAfterTimer] = useState(false);
   const [reflectionPrompt, setReflectionPrompt] = useState("");
@@ -509,7 +508,7 @@ export default function MomentNew() {
     if (step === "name") return name.trim().length >= 2;
     if (step === "intention") return intention.trim().length >= 4;
     if (step === "logging") {
-      if (loggingType === "reflection" || loggingType === "both") return reflectionPrompt.trim().length >= 1;
+      if (loggingType === "reflection") return reflectionPrompt.trim().length >= 1;
       return true;
     }
     if (step === "schedule") {
@@ -551,7 +550,7 @@ export default function MomentNew() {
       name: name.trim(),
       intention: intention.trim(),
       loggingType: effectiveLoggingType,
-      reflectionPrompt: (effectiveLoggingType === "reflection" || effectiveLoggingType === "both" || effectiveLoggingType === "timer_reflection")
+      reflectionPrompt: (effectiveLoggingType === "reflection" || effectiveLoggingType === "timer_reflection")
         ? reflectionPrompt.trim() || undefined
         : undefined,
       templateType: templateId,
@@ -923,8 +922,8 @@ export default function MomentNew() {
                     </motion.div>
                   )}
 
-                  {/* Reflection prompt for reflection / both */}
-                  {(loggingType === "reflection" || loggingType === "both") && (
+                  {/* Reflection prompt */}
+                  {loggingType === "reflection" && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                       <label className="block text-sm font-medium text-foreground mb-2">Your reflection prompt</label>
                       <input autoFocus type="text" value={reflectionPrompt}

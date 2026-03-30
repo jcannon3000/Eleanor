@@ -1,0 +1,141 @@
+Here’s the updated prompt:
+
+Redesign the + button flow — Plant a Practice and Plant a Tradition
+Find the + button on the Garden dashboard that currently shows “Plant a Shared Moment” and “Plan a Gathering.” Replace these two options with “Plant a Practice” and “Plant a Tradition.” These are two distinct creation flows described below. Do not change any other screens or logic beyond what is described here.
+
+THE CORE DISTINCTION — communicate this everywhere
+Eleanor has two ways of tending relationships across distance and time.
+Practices are for when you cannot be together. They are spiritual and contemplative rituals — prayer, breath, stillness, intercession — that two or more people do simultaneously from wherever they are. You are not in the same room. But you are doing the same thing, at the same time, holding the same intention. The practice is what keeps the connection alive between gatherings.
+Traditions are what bring you together. They are recurring shared activities — a Friday dinner, a monthly walk, a standing coffee — where showing up means actually being in the same place, or at least the same call. Traditions are the gathering itself. They are what Eleanor coordinates so the thing you keep meaning to do actually happens, again and again, until it becomes part of who you are to each other.
+This distinction should be felt on every screen in these two flows. Practices feel contemplative, interior, quiet. Traditions feel social, celebratory, anticipatory.
+
+THE + BUTTON MENU
+When the + button is tapped show two options rising from the button:
+
+🌿 Plant a Practice
+    For when you can't be together
+
+🌱 Plant a Tradition
+    To bring you together
+
+
+The one-line descriptions beneath each option are important. They communicate the distinction immediately before the user goes any further.
+
+PLANT A PRACTICE
+Opening screen before the template list — full width warm card, sage tint background:
+
+🌿
+
+"Practices are for the distance between gatherings.
+ You're not in the same room — but you're doing
+ the same thing, at the same time, together."
+
+
+Display this for 1.5 seconds on first use only, then proceed to template selection. On subsequent uses go directly to template selection.
+Template selection screen:
+Header: “What will you tend together? 🌿”
+Muted italic subtitle: “Spiritual practices for when you can’t be in the same place. Everything can be edited.”
+Cards in this exact order:
+
+🌅  Morning Prayer
+    Open the day together in prayer
+
+🌙  Evening Prayer
+    Close the day together before rest
+
+🙏  Intercession
+    Hold a shared prayer for something that matters
+
+🌬️  Breath Together
+    Shared breath across the distance
+
+🕯️  Contemplative Sit
+    Sit together in stillness
+
+🚶  Walk Together
+    Move outside, wherever you are
+
+🌱  Begin from stillness
+    Create your own practice from scratch
+
+
+No suggested times on any card. No time information visible on this screen. Time is configured only after a template is selected, inside the creation flow, by the user.
+Each card: emoji, name, one-line description, arrow →. Everything is editable once inside.
+
+PLANT A TRADITION
+Opening screen before the template list — full width warm card, amber tint background:
+
+🌱
+
+"Traditions bring you together.
+ A recurring gathering — dinner, a walk, a coffee —
+ that Eleanor tends so it actually keeps happening."
+
+
+Display for 1.5 seconds on first use only. On subsequent uses go directly to template selection.
+Template selection screen:
+Header: “What tradition will you plant? 🌱”
+Muted italic subtitle: “Recurring gatherings that bring you together, again and again. Everything can be edited.”
+Cards in this exact order:
+
+☕  Morning Coffee
+    Share your first cup, in person or wherever you are
+
+🍕  Friday Dinner
+    A standing dinner, week after week
+
+🚶  Weekly Walk
+    Move together on a regular day
+
+📚  Book Club
+    Read together, gather to talk
+
+🎉  Monthly Gathering
+    Come together once a month
+
+🌅  Weekend Ritual
+    A recurring moment on the weekend
+
+🌱  Plant your own
+    Create a tradition from scratch
+
+
+No suggested times on any card. No time or day information visible on this screen. All configured inside the flow.
+Each card: emoji, name, one-line description, arrow →. Everything editable once inside.
+
+INSIDE THE CREATION FLOWS
+Once a template is selected the user enters a creation flow. No defaults shown for time or day — these fields start empty and the user fills them in.
+For Practice flows: existing Shared Moments creation flow with time of day selector (Morning / Midday / Afternoon / Night) and personal time selection. No pre-filled times.
+For Tradition flows: existing gathering circle creation flow with day selector and time picker. No pre-filled days or times.
+Only the name and intention pre-fill from templates. Everything else starts blank.
+
+LANGUAGE ON BOTH FLOWS — reinforce the distinction throughout
+On Practice screens use language that evokes shared interiority across distance:
+“Tending together from wherever you are”
+“Doing this at the same time”
+“Holding this together”
+“The practice connects you even when distance separates you”
+On Tradition screens use language that evokes anticipation and gathering:
+“Coming together”
+“Showing up in the same place”
+“Something to look forward to”
+“Eleanor tends this so it actually keeps happening”
+
+DASHBOARD
+Update section labels:
+
+Your practices 🌿 →
+"For the distance between gatherings"
+
+Your traditions 🌱 →
+"What brings you together"
+
+
+Show the subtitle beneath each section header in muted italic. It reinforces the distinction passively every time the user looks at their garden.
+Cards in practices: sage left accent bar.
+Cards in traditions: amber left accent bar.
+
+WHAT DOES NOT CHANGE
+All existing data models, streak logic, calendar invite logic, posting pages, and journal entries remain exactly as they are. This is a navigation and entry-point redesign only.
+
+Run this as a single focused prompt. The distinction between practices and traditions is the heart of it — make sure that distinction is felt from the moment the user taps + all the way through every screen in both flows.​​​​​​​​​​​​​​​​

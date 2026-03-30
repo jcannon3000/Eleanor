@@ -11,7 +11,6 @@ import { apiRequest } from "@/lib/queryClient";
 
 interface WindowPost {
   guestName: string | null;
-  photoUrl: string | null;
   reflectionText: string | null;
   isCheckin: boolean;
 }
@@ -130,18 +129,10 @@ function WindowEntry({ win }: { win: MomentWindow }) {
                 <span className="text-xs font-medium text-foreground/80 shrink-0 mt-0.5">
                   {(post.guestName ?? "Someone").split(" ")[0]}
                 </span>
-                {post.photoUrl && (
-                  <img
-                    src={post.photoUrl}
-                    alt=""
-                    className="w-12 h-12 rounded-lg object-cover border border-border/40 shrink-0"
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                )}
                 {post.reflectionText && (
                   <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
                 )}
-                {post.isCheckin && !post.photoUrl && !post.reflectionText && (
+                {post.isCheckin && !post.reflectionText && (
                   <span className="text-xs text-muted-foreground">✓ showed up</span>
                 )}
               </div>
@@ -161,7 +152,6 @@ export default function MomentDetail() {
   const { user, isLoading: authLoading } = useAuth();
   const qc = useQueryClient();
   const [seedText, setSeedText] = useState("");
-  const [seedPhotoUrl, setSeedPhotoUrl] = useState("");
   const [showSeedForm, setShowSeedForm] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -173,12 +163,10 @@ export default function MomentDetail() {
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/moments/${id}/seed-post`, {
       reflectionText: seedText.trim() || undefined,
-      photoUrl: seedPhotoUrl.trim() || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
       setSeedText("");
-      setSeedPhotoUrl("");
       setShowSeedForm(false);
     },
   });
@@ -322,7 +310,7 @@ export default function MomentDetail() {
               <div className="bg-[#F4F9F5] border border-[#6B8F71]/30 rounded-2xl p-5 mb-4">
                 <p className="text-sm font-semibold text-[#4a6b50] mb-1">🌱 Set the tone</p>
                 <p className="text-xs text-[#4a6b50]/70 mb-3">
-                  No windows have opened yet. Plant a seed — share a photo or thought that inspires the group before the first window.
+                  No windows have opened yet. Plant a seed — share a thought or intention that inspires the group before the first window.
                 </p>
 
                 {seedPosts.length > 0 && (
@@ -332,14 +320,6 @@ export default function MomentDetail() {
                         <span className="text-xs font-medium text-[#4a6b50] shrink-0">
                           {(post.guestName ?? "Someone").split(" ")[0]}
                         </span>
-                        {post.photoUrl && (
-                          <img
-                            src={post.photoUrl}
-                            alt=""
-                            className="w-16 h-16 rounded-xl object-cover border border-[#6B8F71]/30 shrink-0"
-                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                          />
-                        )}
                         {post.reflectionText && (
                           <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
                         )}
@@ -363,17 +343,10 @@ export default function MomentDetail() {
                       placeholder="Share a thought or intention..."
                       className="w-full text-xs rounded-xl border border-[#6B8F71]/30 bg-white p-3 resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[#6B8F71]/50"
                     />
-                    <input
-                      type="url"
-                      value={seedPhotoUrl}
-                      onChange={e => setSeedPhotoUrl(e.target.value)}
-                      placeholder="Photo URL (optional)"
-                      className="w-full text-xs rounded-xl border border-[#6B8F71]/30 bg-white p-3 focus:outline-none focus:ring-1 focus:ring-[#6B8F71]/50"
-                    />
                     <div className="flex gap-2">
                       <button
                         onClick={() => seedMutation.mutate()}
-                        disabled={seedMutation.isPending || (!seedText.trim() && !seedPhotoUrl.trim())}
+                        disabled={seedMutation.isPending || !seedText.trim()}
                         className="text-xs text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors disabled:opacity-50"
                       >
                         {seedMutation.isPending ? "Planting…" : "Plant 🌱"}
@@ -405,14 +378,6 @@ export default function MomentDetail() {
                         <span className="text-xs font-medium text-[#4a6b50] shrink-0">
                           {(post.guestName ?? "Someone").split(" ")[0]}
                         </span>
-                        {post.photoUrl && (
-                          <img
-                            src={post.photoUrl}
-                            alt=""
-                            className="w-14 h-14 rounded-lg object-cover border border-[#6B8F71]/30 shrink-0"
-                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                          />
-                        )}
                         {post.reflectionText && (
                           <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
                         )}
