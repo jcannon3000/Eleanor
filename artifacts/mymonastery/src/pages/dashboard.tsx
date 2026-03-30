@@ -155,6 +155,8 @@ interface MomentData {
   goalDays?: number | null;
 }
 
+const SPIRITUAL_TEMPLATE_IDS_MAIN = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+
 function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: boolean; pinned?: boolean }) {
   const [, setLocation] = useLocation();
   const nextWindow = nextMomentWindow(moment);
@@ -164,6 +166,7 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
   const mLabel = milestoneLabel(moment.currentStreak);
   const mProgress = milestoneProgress(moment.currentStreak);
   const hasGoal = (moment.goalDays ?? 0) > 0;
+  const isSpiritual = SPIRITUAL_TEMPLATE_IDS_MAIN.has(moment.templateType ?? "");
 
   return (
     <motion.div
@@ -171,11 +174,17 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
       whileHover={{ y: -1 }}
       className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer ${
         pinned
-          ? "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
+          ? isSpiritual
+            ? "border-[#6B8F71]/60 shadow-[0_0_18px_rgba(107,143,113,0.18)] bg-[#FDFCF8]"
+            : "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
           : `border-[#c9b99a]/40 bg-[#FDFCF8] ${dim ? "opacity-55" : ""} hover:shadow-md`
       }`}>
       {/* Left accent bar */}
-      <div className={`w-1.5 flex-shrink-0 ${pinned ? "bg-amber-400 animate-pulse" : "bg-[#6B8F71]"}`} />
+      <div className={`w-1.5 flex-shrink-0 ${
+        pinned
+          ? isSpiritual ? "bg-[#6B8F71] animate-pulse" : "bg-amber-400 animate-pulse"
+          : "bg-[#6B8F71]"
+      }`} />
 
       <div className="flex-1 p-4">
         {/* Top row: icon + name + window status */}
@@ -185,9 +194,15 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-base font-semibold text-[#2C1A0E] leading-snug">{moment.name}</span>
               {pinned && (
-                <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
-                  Open now
-                </span>
+                isSpiritual ? (
+                  <span className="text-[11px] font-bold text-[#6B8F71] uppercase tracking-wide shrink-0">
+                    Practice day 🌿
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
+                    Open now
+                  </span>
+                )
               )}
             </div>
             <p className="text-xs text-[#6b5c4a]/70 mt-0.5">with {memberNames}{extraMembers}</p>
@@ -196,12 +211,21 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
 
         {/* Time / status line */}
         {pinned ? (
-          <p className="text-sm text-amber-700 font-medium mt-1 mb-2">
-            {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
-          </p>
+          isSpiritual ? (
+            <p className="text-sm text-[#6B8F71] font-medium mt-1 mb-2">
+              {moment.todayPostCount} of {moment.memberCount} practiced today
+            </p>
+          ) : (
+            <p className="text-sm text-amber-700 font-medium mt-1 mb-2">
+              {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
+            </p>
+          )
         ) : (
           <p className="text-xs text-[#6b5c4a]/60 mb-2">
-            {dayLabel(nextWindow)} · {formatTime(moment.scheduledTime)}
+            {isSpiritual
+              ? nextWindow ? `Next practice: ${dayLabel(nextWindow)}` : moment.frequency
+              : `${dayLabel(nextWindow)} · ${formatTime(moment.scheduledTime)}`
+            }
           </p>
         )}
 

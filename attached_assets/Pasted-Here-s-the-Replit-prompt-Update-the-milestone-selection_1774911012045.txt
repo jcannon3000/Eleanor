@@ -1,0 +1,98 @@
+Here’s the Replit prompt:
+
+Update the milestone selection screen to feel more like Duolingo goal-setting
+Find the “Set a milestone to tend toward” screen in the Shared Moments creation flow. Redesign it only. Do not change any other screens or logic.
+
+The problem with the current design
+It feels like a settings screen. Four quiet cards with no energy, no aspiration, no sense of what you’re committing to. Duolingo’s goal screen makes you feel something before you tap. It shows you the outcome, not just the option. It uses size, color, and visual weight to communicate that some choices are more ambitious than others.
+
+The new design
+Header:
+Large, bold, Space Grotesk:
+“How far will you grow together? 🌱”
+Beneath in muted italic:
+“Pick a goal. Eleanor will tend it with you.”
+
+Four goal cards — stacked, full width, visually differentiated by ambition
+Each card is larger and more visual than the current version. The cards escalate in visual weight and color intensity as the commitment grows. Like Duolingo’s goal tiers — Casual, Regular, Serious, Intense — but in Eleanor’s language.
+
+Card 1 — Three days
+Background: lightest sage tint #EEF3EF
+Border: subtle, 1px sage
+Left side: large emoji 🌱 (40px)
+Right side:
+Bold title: Three days
+Subtitle in muted: “A first tender”
+Below the title, a small progress visualization:
+Three small circles in a row: ○ ○ ○
+Muted beneath: “3 practices together”
+Feeling: gentle, inviting, no pressure. This is the easy entry.
+
+Card 2 — One week
+Background: slightly richer sage tint #E4EEE6
+Border: sage, slightly more visible
+Left side: 🌿 (40px)
+Right side:
+Bold title: One week
+Subtitle: “Taking root”
+Progress visualization:
+Seven small circles: ○ ○ ○ ○ ○ ○ ○
+Muted beneath: “7 practices together”
+Feeling: the most natural choice. Should read as the recommended option without explicitly labeling it that.
+Add a small amber pill top right of this card:
+“Most chosen 🌿”
+Amber background #C17F24, cream text, 11px, pill shaped.
+
+Card 3 — Two weeks
+Background: warm cream #F7F0E6 with a sage left accent bar (4px, full height)
+Border: sage, more prominent
+Left side: 🌸 (40px)
+Right side:
+Bold title: Two weeks
+Subtitle: “In bloom — then renew”
+Progress visualization:
+Fourteen circles in two rows of seven: ○ ○ ○ ○ ○ ○ ○ / ○ ○ ○ ○ ○ ○ ○
+Muted beneath: “14 practices — then your circle renews the commitment”
+Feeling: aspirational, serious, but not intimidating. The renewal framing makes it feel cyclical rather than daunting.
+
+Card 4 — Just begin
+Background: plain white #FAF6F0
+Border: very subtle, almost invisible
+Left side: ✨ (40px)
+Right side:
+Title in muted (not bold): Just begin
+Subtitle in lighter muted: “No goal, tend freely”
+No progress visualization. Just space. The visual absence communicates freedom.
+Feeling: clearly the least committed option. Visually quieter than the others. Not judged but gently deprioritized.
+
+Selected state
+When a card is selected:
+	∙	Background shifts to solid sage #6B8F71
+	∙	All text shifts to cream #F7F0E6
+	∙	Emoji remains as is
+	∙	Progress circles fill in sage green from left to right — animated, one by one, quickly, like Duolingo filling in a progress bar
+	∙	A checkmark appears top right, cream, bold
+	∙	The card lifts very slightly — 2px upward shift, subtle
+The selected animation is the most important moment on this screen. The circles filling in left to right, quickly, is the Duolingo mechanic. It makes the commitment feel real before they tap Continue.
+
+Below the cards
+A single line of muted italic text that updates based on which card is selected:
+Three days selected:
+“A gentle beginning. Three practices to find your rhythm.”
+One week selected:
+“One week of showing up together. This is where something real begins.”
+Two weeks selected:
+“Two weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.”
+Just begin selected:
+“No pressure. The practice is open. Tend it when you can.”
+
+Continue button
+Full width, sage background, cream text, Space Grotesk bold.
+“Continue →”
+Disabled and muted until a card is selected.
+On select it activates with a gentle pulse — the button brightening as if waking up.
+
+What stays the same
+The underlying logic — three days, seven days, fourteen days with renewal, no goal — does not change. Only the visual design of this screen changes. All data stored exactly as before.
+
+Run this as a single focused prompt. One screen. Make it feel like a commitment worth making.​​​​​​​​​​​​​​​​

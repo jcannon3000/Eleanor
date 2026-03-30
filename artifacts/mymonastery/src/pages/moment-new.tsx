@@ -10,6 +10,16 @@ import { useAuth } from "@/hooks/useAuth";
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite";
 type LoggingType = "photo" | "reflection" | "both" | "timer" | "timer_reflection" | "checkin";
 type Frequency = "daily" | "weekly";
+type TimeOfDay = "morning" | "midday" | "afternoon" | "night";
+
+const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+
+const TIME_OF_DAY_OPTIONS: { id: TimeOfDay; emoji: string; label: string; sub: string; range: string }[] = [
+  { id: "morning",   emoji: "🌅", label: "Morning",   sub: "As the day begins",              range: "Roughly 6am – 10am" },
+  { id: "midday",    emoji: "☀️",  label: "Midday",    sub: "A pause at the center of the day", range: "Roughly 11am – 2pm" },
+  { id: "afternoon", emoji: "🌤", label: "Afternoon", sub: "Before the day winds down",       range: "Roughly 2pm – 6pm" },
+  { id: "night",     emoji: "🌙", label: "Night",     sub: "As the day releases",             range: "Roughly 7pm – 10pm" },
+];
 
 interface ContactSuggestion { name: string; email: string; }
 
@@ -407,8 +417,17 @@ export default function MomentNew() {
   const [scheduledHour, setScheduledHour] = useState(8);
   const [scheduledMinute, setScheduledMinute] = useState(0);
   const [scheduledAmPm, setScheduledAmPm] = useState<"AM" | "PM">("AM");
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
   const [goalDays, setGoalDays] = useState(7);
   const [participants, setParticipants] = useState([{ name: "", email: "" }]);
+
+  // Organizer personal time (after creation for spiritual templates)
+  const [showPersonalTimePrompt, setShowPersonalTimePrompt] = useState(false);
+  const [personalTimeDone, setPersonalTimeDone] = useState(false);
+  const [personalHour, setPersonalHour] = useState(8);
+  const [personalMinute, setPersonalMinute] = useState(0);
+  const [personalAmPm, setPersonalAmPm] = useState<"AM" | "PM">("AM");
+  const [personalTimezone, setPersonalTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   const scheduledTime = (() => {
     let h = scheduledHour % 12;
@@ -418,6 +437,7 @@ export default function MomentNew() {
   })();
 
   const dayOfWeek = frequency === "weekly" && scheduledDays.length === 1 ? scheduledDays[0] : undefined;
+  const isSpiritual = SPIRITUAL_TEMPLATES.has(templateId ?? "");
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -493,6 +513,7 @@ export default function MomentNew() {
       return true;
     }
     if (step === "schedule") {
+      if (isSpiritual) return timeOfDay !== null;
       if (frequency === "weekly" && scheduledDays.length === 0) return false;
       return true;
     }
@@ -503,10 +524,20 @@ export default function MomentNew() {
 
   // ─── Submit ──────────────────────────────────────────────────────────────────
   const plantMutation = useMutation({
-    mutationFn: (data: object) => apiRequest<{ moment: { id: number } }>("POST", "/api/moments", data),
+    mutationFn: (data: object) => apiRequest<{ moment: { id: number; momentToken: string } }>("POST", "/api/moments", data),
     onSuccess: (data) => {
       setCreatedMomentId(data.moment.id);
       setDone(true);
+      if (isSpiritual) setShowPersonalTimePrompt(true);
+    },
+  });
+
+  const personalTimeMutation = useMutation({
+    mutationFn: (data: object) =>
+      apiRequest<{ ok: boolean }>("POST", `/api/moments/${createdMomentId}/personal-time`, data),
+    onSuccess: () => {
+      setShowPersonalTimePrompt(false);
+      setPersonalTimeDone(true);
     },
   });
 
@@ -529,12 +560,21 @@ export default function MomentNew() {
       intercessionFullText: intercessionFullText.trim() || undefined,
       timerDurationMinutes: (loggingType === "timer" || loggingType === "timer_reflection") ? timerDuration : undefined,
       frequency,
-      scheduledTime,
+      scheduledTime: isSpiritual ? "08:00" : scheduledTime,
       dayOfWeek,
       goalDays,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeOfDay: isSpiritual ? timeOfDay : undefined,
       participants: validParticipants,
     });
+  }
+
+  function handleSavePersonalTime() {
+    let h = personalHour % 12;
+    if (personalAmPm === "PM") h += 12;
+    if (h === 12 && personalAmPm === "AM") h = 0;
+    const ptStr = `${String(h).padStart(2, "0")}:${String(personalMinute).padStart(2, "0")}`;
+    personalTimeMutation.mutate({ personalTime: ptStr, personalTimezone });
   }
 
   const sv = { initial: { opacity: 0, x: 20 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -20 } };
@@ -547,6 +587,88 @@ export default function MomentNew() {
     const [h, m] = scheduledTime.split(":").map(Number);
     const timeLabel = new Date(0, 0, 0, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     const goalLabel = GOAL_OPTIONS.find(g => g.days === goalDays);
+    const todEmoji = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.emoji ?? "🌿";
+    const todLabel = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.label?.toLowerCase() ?? "morning";
+
+    // ── Organizer personal time prompt (spiritual templates only) ────────────
+    if (showPersonalTimePrompt) {
+      return (
+        <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-sm w-full text-[#F5EDD8]"
+          >
+            <div className="text-5xl mb-4 text-center">{todEmoji}</div>
+            <h2 className="text-2xl font-semibold text-center mb-2">You've planted a {todLabel} practice.</h2>
+            <p className="text-[#c9b99a] text-center text-sm mb-8">
+              When in the {todLabel} works best for you?
+            </p>
+
+            <div className="bg-[#3a2410] rounded-2xl p-6 space-y-5">
+              {/* Hour */}
+              <div>
+                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Hour</label>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {[1,2,3,4,5,6,7,8,9,10,11,12].map(hv => (
+                    <button key={hv} onClick={() => setPersonalHour(hv)}
+                      className={`py-2 rounded-lg border text-sm font-medium transition-all ${personalHour === hv ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
+                      {hv}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Minute */}
+              <div>
+                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Minute</label>
+                <div className="flex gap-2">
+                  {[0, 15, 30, 45].map(mv => (
+                    <button key={mv} onClick={() => setPersonalMinute(mv)}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${personalMinute === mv ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
+                      :{String(mv).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* AM/PM */}
+              <div className="flex gap-3">
+                {(["AM", "PM"] as const).map(p => (
+                  <button key={p} onClick={() => setPersonalAmPm(p)}
+                    className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all ${personalAmPm === p ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+              {/* Timezone */}
+              <div>
+                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Your timezone</label>
+                <select value={personalTimezone} onChange={e => setPersonalTimezone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-[#2C1A0E] border border-[#5a3d28] text-[#F5EDD8] focus:border-[#6B8F71] focus:outline-none text-sm">
+                  {Intl.supportedValuesOf("timeZone").map(tz => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-[#c9b99a]/60 italic text-center">
+                This is when Eleanor will put it in your calendar.<br />
+                Everyone in this practice chooses their own time.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSavePersonalTime}
+              disabled={personalTimeMutation.isPending}
+              className="w-full mt-6 py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors disabled:opacity-40"
+            >
+              {personalTimeMutation.isPending ? "Saving..." : "Add to my calendar 🌿"}
+            </button>
+            {personalTimeMutation.isError && (
+              <p className="text-xs text-red-400 text-center mt-2">Something went wrong. Please try again.</p>
+            )}
+          </motion.div>
+        </div>
+      );
+    }
 
     return (
       <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center px-4">
@@ -557,13 +679,17 @@ export default function MomentNew() {
         >
           <div className="text-6xl mb-6">🌱</div>
           <h2 className="text-3xl font-semibold mb-3">{name} is planted.</h2>
-          <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : frequency === "weekly" ? `Weekly` : "Monthly"} at {timeLabel}</p>
+          {isSpiritual && timeOfDay ? (
+            <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : "Weekly"} · {todEmoji} {todLabel} practice</p>
+          ) : (
+            <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : frequency === "weekly" ? `Weekly` : "Monthly"} at {timeLabel}</p>
+          )}
           {goalDays > 0 && goalLabel && (
             <p className="text-[#c9b99a] mb-6">{goalLabel.emoji} {goalLabel.label}</p>
           )}
           <p className="text-[#c9b99a] mb-8 text-sm leading-relaxed">
             Invites are on their way.<br />
-            Eleanor will ring the bell when it's time.<br />
+            {isSpiritual ? "Each person will choose their own time." : "Eleanor will ring the bell when it's time."}<br />
             You just have to show up.
           </p>
           <button
@@ -814,6 +940,65 @@ export default function MomentNew() {
               {/* ── Schedule ───────────────────────────────────────── */}
               {step === "schedule" && (
                 <div className="space-y-6 flex-1">
+                  {isSpiritual ? (
+                    <>
+                      <div>
+                        <h2 className="text-2xl font-semibold mb-1">When does this practice happen?</h2>
+                        <p className="text-sm text-muted-foreground">Choose the time of day. Each person will set their own specific time.</p>
+                      </div>
+
+                      {/* Frequency */}
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
+                        <div className="flex gap-3">
+                          {(["daily", "weekly"] as Frequency[]).map(f => (
+                            <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setScheduledDays([]); }}
+                              className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
+                              {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Day pills for weekly */}
+                      {frequency === "weekly" && (
+                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+                          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days</label>
+                          <div className="flex flex-wrap gap-2">
+                            {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
+                              <button key={val} onClick={() => setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])}
+                                className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays.includes(val) ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Time of day cards */}
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">Time of day</label>
+                        <div className="grid gap-3">
+                          {TIME_OF_DAY_OPTIONS.map(opt => (
+                            <button key={opt.id} onClick={() => setTimeOfDay(opt.id)}
+                              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${timeOfDay === opt.id ? "border-[#6B8F71] bg-[#6B8F71]/5" : "border-border hover:border-[#6B8F71]/30"}`}>
+                              <div className="flex items-center gap-4">
+                                <span className="text-2xl">{opt.emoji}</span>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-foreground text-sm">{opt.label}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">"{opt.sub}"</p>
+                                  <p className="text-xs text-muted-foreground/60 mt-0.5">{opt.range}</p>
+                                </div>
+                                {timeOfDay === opt.id && <span className="text-[#6B8F71]">✓</span>}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground/60 italic">This describes the spirit of when the practice happens. Each person chooses their own specific time when they join.</p>
+                    </>
+                  ) : (
+                    <>
                   <div>
                     <h2 className="text-2xl font-semibold mb-1">When does the window open?</h2>
                     <p className="text-sm text-muted-foreground">Everyone has one hour to show up.</p>
@@ -884,6 +1069,8 @@ export default function MomentNew() {
                   </div>
 
                   <p className="text-xs text-muted-foreground/60 italic">Members receive calendar invites in their own timezone.</p>
+                    </>
+                  )}
                 </div>
               )}
 

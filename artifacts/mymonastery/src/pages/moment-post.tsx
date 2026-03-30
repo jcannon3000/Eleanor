@@ -8,6 +8,9 @@ import clsx from "clsx";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type LoggingType = "photo" | "reflection" | "both" | "checkin" | "timer" | "timer_reflection";
 
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+const RRULE_DAY_MAP: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
 type MomentData = {
   moment: {
     id: number;
@@ -22,6 +25,9 @@ type MomentData = {
     currentStreak: number;
     longestStreak: number;
     state: string;
+    frequency: string;
+    dayOfWeek: string | null;
+    timeOfDay: string | null;
   };
   ritualName: string;
   windowDate: string;
@@ -539,8 +545,34 @@ export default function MomentPostPage() {
   const actualTodayCount = todayCount ?? todayPostCount;
   const alreadyPosted = posted || !!myPost;
 
+  // ── Spiritual template logic: open all day on practice days ─────────────────
+  const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
+  const isPracticeDay = (() => {
+    if (!isSpiritual) return true;
+    if (moment.frequency === "daily") return true;
+    if (moment.frequency === "weekly" && moment.dayOfWeek) {
+      const todayDow = new Date().getDay();
+      return RRULE_DAY_MAP[moment.dayOfWeek] === todayDow;
+    }
+    return true;
+  })();
+  const effectiveWindowOpen = isSpiritual ? isPracticeDay : windowOpen;
+
+  // ── Spiritual practice — rests today (not a practice day) ──────────────────
+  if (isSpiritual && !isPracticeDay && !alreadyPosted) {
+    return (
+      <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
+        <div className="text-center max-w-xs">
+          <p className="text-5xl mb-5">🌿</p>
+          <p className="text-xl font-semibold text-[#2C1A0E] mb-3">This practice rests today.</p>
+          <p className="text-sm text-[#6b5c4a] italic">{moment.name}</p>
+        </div>
+      </div>
+    );
+  }
+
   // ── Intercession — prayer recitation + photo with timestamp ────────────────
-  if (moment.templateType === "intercession" && windowOpen && !alreadyPosted) {
+  if (moment.templateType === "intercession" && effectiveWindowOpen && !alreadyPosted) {
     return (
       <IntercessionPrayerPage
         topic={moment.intercessionTopic ?? moment.name}
@@ -554,12 +586,12 @@ export default function MomentPostPage() {
   }
 
   // ── Outside window for intercession ────────────────────────────────────────
-  if (moment.templateType === "intercession" && !alreadyPosted && !windowOpen) {
+  if (moment.templateType === "intercession" && !alreadyPosted && !effectiveWindowOpen) {
     return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
   }
 
   // ── Timer pages — full screen, separate from main layout ───────────────────
-  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && windowOpen && !alreadyPosted) {
+  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && effectiveWindowOpen && !alreadyPosted) {
     return (
       <MeditationTimer
         durationMinutes={moment.timerDurationMinutes}
@@ -576,7 +608,7 @@ export default function MomentPostPage() {
   }
 
   // ── Outside window or already posted for timer ──────────────────────────────
-  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && !alreadyPosted && !windowOpen) {
+  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && !alreadyPosted && !effectiveWindowOpen) {
     return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
   }
 
@@ -595,12 +627,18 @@ export default function MomentPostPage() {
           <p className="text-base leading-relaxed text-[#6B8F71] font-serif italic">{moment.intention}</p>
         </div>
 
-        {/* Window status */}
-        {windowOpen && !alreadyPosted && (
+        {/* Window / practice day status */}
+        {effectiveWindowOpen && !alreadyPosted && (
           <div className="flex items-center justify-between mb-5">
-            <span className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
-              {minutesRemaining} min remaining
-            </span>
+            {isSpiritual ? (
+              <span className="text-sm font-medium text-[#6B8F71] bg-[#6B8F71]/10 border border-[#6B8F71]/30 px-3 py-1.5 rounded-full">
+                Practice day 🌿
+              </span>
+            ) : (
+              <span className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+                {minutesRemaining} min remaining
+              </span>
+            )}
             <div className="flex items-center gap-2">
               <PresenceDots count={actualTodayCount} total={actualMemberCount} />
               <span className="text-xs text-[#6b5c4a]">{actualTodayCount} of {actualMemberCount}</span>
@@ -609,7 +647,7 @@ export default function MomentPostPage() {
         )}
 
         {/* Outside window — not timer */}
-        {!windowOpen && !alreadyPosted && (
+        {!effectiveWindowOpen && !alreadyPosted && (
           <OutsideWindowContent moment={moment} minutesRemaining={minutesRemaining} />
         )}
 
@@ -655,8 +693,8 @@ export default function MomentPostPage() {
           )}
         </AnimatePresence>
 
-        {/* Logging section — visible when window is open and not yet posted */}
-        {!alreadyPosted && windowOpen && (
+        {/* Logging section — visible when window/practice day is open and not yet posted */}
+        {!alreadyPosted && effectiveWindowOpen && (
           <div className="space-y-4">
 
             {/* Photo */}

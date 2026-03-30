@@ -85,6 +85,8 @@ interface MomentData {
   goalDays?: number | null;
 }
 
+const SPIRITUAL_TEMPLATE_IDS_DASH = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+
 // ─── Moment Card ─────────────────────────────────────────────────────────────
 
 function MomentCard({ moment }: { moment: MomentData }) {
@@ -98,6 +100,7 @@ function MomentCard({ moment }: { moment: MomentData }) {
   const hasGoal = (moment.goalDays ?? 0) > 0;
   const mLabel = milestoneLabel(moment.currentStreak);
   const mProgress = milestoneProgress(moment.currentStreak);
+  const isSpiritual = SPIRITUAL_TEMPLATE_IDS_DASH.has(moment.templateType ?? "");
 
   return (
     <Link href={`/moments/${moment.id}`}>
@@ -105,11 +108,17 @@ function MomentCard({ moment }: { moment: MomentData }) {
         whileHover={{ y: -1 }}
         className={`relative flex rounded-2xl overflow-hidden border transition-all duration-200 ${
           moment.windowOpen
-            ? "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
+            ? isSpiritual
+              ? "border-[#6B8F71]/60 shadow-[0_0_18px_rgba(107,143,113,0.18)] bg-[#FDFCF8]"
+              : "border-amber-400/60 shadow-[0_0_18px_rgba(193,127,36,0.18)] bg-[#FDFCF8]"
             : "border-[#c9b99a]/40 bg-[#FDFCF8] hover:shadow-md"
         }`}>
-        {/* Left accent bar, amber pulsing when open */}
-        <div className={`w-1.5 flex-shrink-0 ${moment.windowOpen ? "bg-amber-400 animate-pulse" : "bg-[#6B8F71]"}`} />
+        {/* Left accent bar */}
+        <div className={`w-1.5 flex-shrink-0 ${
+          moment.windowOpen
+            ? isSpiritual ? "bg-[#6B8F71] animate-pulse" : "bg-amber-400 animate-pulse"
+            : "bg-[#6B8F71]"
+        }`} />
 
         <div className="flex-1 p-4">
           {/* Top row */}
@@ -119,9 +128,15 @@ function MomentCard({ moment }: { moment: MomentData }) {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-base font-semibold text-[#2C1A0E] leading-snug">{moment.name}</span>
                 {moment.windowOpen && (
-                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
-                    Open now
-                  </span>
+                  isSpiritual ? (
+                    <span className="text-[11px] font-bold text-[#6B8F71] uppercase tracking-wide shrink-0">
+                      Practice day 🌿
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide shrink-0 animate-pulse">
+                      Open now
+                    </span>
+                  )
                 )}
               </div>
               <p className="text-xs text-[#6b5c4a]/70 mt-0.5">with {memberNames}{extraMembers}</p>
@@ -133,12 +148,21 @@ function MomentCard({ moment }: { moment: MomentData }) {
 
           {/* Time info */}
           {moment.windowOpen ? (
-            <p className="text-sm text-amber-700 font-medium mb-2">
-              {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
-            </p>
+            isSpiritual ? (
+              <p className="text-sm text-[#6B8F71] font-medium mb-2">
+                {moment.todayPostCount} of {moment.memberCount} practiced today
+              </p>
+            ) : (
+              <p className="text-sm text-amber-700 font-medium mb-2">
+                {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
+              </p>
+            )
           ) : (
             <p className="text-xs text-[#6b5c4a]/60 mb-2">
-              {nextWindow ? `Next: ${format(nextWindow, "EEE h:mm a")}` : scheduleLabel(moment)}
+              {isSpiritual
+                ? nextWindow ? `Next practice: ${format(nextWindow, "EEE")}` : scheduleLabel(moment)
+                : nextWindow ? `Next: ${format(nextWindow, "EEE h:mm a")}` : scheduleLabel(moment)
+              }
             </p>
           )}
 

@@ -1,0 +1,389 @@
+Here’s the Replit prompt:
+
+Update Shared Moments — time of day system, personalized calendar scheduling, and rolling calendar invites
+Do not change or break anything that already exists. Apply these changes to the Shared Moments feature only.
+
+THE CORE CHANGE
+Spiritual practice Shared Moments do not have a fixed clock time and a one-hour window. Instead they have a time of day. Each member chooses what that time of day means for their own schedule. The calendar is personal — Eleanor puts events on each person’s calendar at the time that works for them, not a synchronized clock time.
+This reflects how spiritual practice actually works. Morning Prayer is a morning practice. When exactly in the morning is between you and your calendar.
+
+TIME OF DAY SYSTEM
+Replace the time picker in the creation flow for all spiritual practice templates with a time of day selector.
+Four options displayed as large cards:
+
+🌅 Morning
+   "As the day begins"
+   Roughly 6am — 10am
+
+☀️ Midday
+   "A pause at the center of the day"
+   Roughly 11am — 2pm
+
+🌤 Afternoon
+   "Before the day winds down"
+   Roughly 2pm — 6pm
+
+🌙 Night
+   "As the day releases"
+   Roughly 7pm — 10pm
+
+
+This is the practice’s time of day. It describes the spirit of when the practice happens. It is not a clock time.
+Store as:
+
+time_of_day text (morning | midday | afternoon | night)
+
+
+Remove ritual_time time from the shared_moments table for spiritual practice templates. Keep it only for non-spiritual templates like Morning Coffee and Walk Together where a specific time makes sense.
+
+EACH MEMBER PICKS THEIR OWN TIME
+When someone joins a spiritual practice Shared Moment — either as the creator or via invite link — they are asked to choose what time within that time of day works best for them.
+This happens on the join page for invitees and immediately after creation for the organizer.
+Join page addition:
+After the member taps “Join this practice 🌿” and enters their name and email, show:
+
+🌅 [Practice name] is a Morning practice.
+
+When in the morning works best for you?
+
+[Time picker — hour and minute and AM/PM]
+[Timezone selector — auto-detects, editable]
+
+This is when Eleanor will put it in your calendar.
+Everyone in this practice chooses their own time.
+
+      Set my time 🌿
+
+
+For the organizer, immediately after the confirmation screen show the same prompt:
+
+🌅 You've planted a Morning Prayer practice.
+
+When in the morning works best for you?
+
+[Time picker]
+[Timezone selector]
+
+      Add to my calendar 🌿
+
+
+Store each member’s chosen time in:
+
+moment_members
+  (add) personal_time time
+  (add) personal_timezone text
+
+
+ROLLING CALENDAR SYSTEM — TWO EVENTS IN ADVANCE
+Eleanor never puts the full recurring series on anyone’s calendar. Instead Eleanor maintains exactly two upcoming calendar events per member per practice at all times.
+The rule:
+At any given moment each member has exactly two upcoming Eleanor calendar events for each spiritual practice they belong to.
+When a member logs their practice Eleanor immediately adds a new event further in advance so the count returns to two.
+When a member joins Eleanor immediately adds their next two upcoming events.
+How this works technically:
+Store each calendar event Eleanor creates:
+
+moment_calendar_events
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  moment_member_id uuid FK moment_members
+  google_calendar_event_id text
+  scheduled_for timestamptz
+  logged boolean default false
+  logged_at timestamptz
+  created_at timestamptz
+
+
+On member joining:
+Calculate the next two occurrences of the practice based on their personal_time and the practice frequency.
+Create two Google Calendar events — one for the next occurrence and one for the one after.
+On member logging:
+Mark the current event as logged.
+Calculate the next occurrence after the furthest existing event.
+Create one new calendar event for that occurrence.
+Total count of upcoming events returns to two.
+If a member has not logged and a scheduled event passes:
+Mark it as missed.
+Do not automatically add a replacement — the count drops to one.
+When they next log, restore to two.
+This keeps the calendar clean. Members never see a months-long recurring series stretching into the future. They see the next practice and the one after. Nothing more.
+
+CALENDAR EVENT FORMAT — FIRST EVENT (joining or first time)
+The first calendar event a member receives has a different description from all subsequent ones. It acknowledges that they have just joined something.
+For the organizer’s first event:
+
+Title: [emoji] [Practice name] — [their personal time]
+
+You planted this practice. 🌱
+
+[Intention — italic]
+
+[If intercession — BCP:]
+Today we pray: [Prayer title]
+[First two lines of prayer text]
+
+[If intercession — custom:]
+We intercede for: [intercession_topic]
+
+Tap to enter the practice:
+[personal_url]
+
+No login needed. 🌿
+
+
+For an invitee’s first event:
+
+Title: [emoji] [Practice name] — [their personal time]
+
+You're in. 🌿
+
+[Inviter name] planted this practice and you've joined.
+
+[Intention — italic]
+
+[If intercession — BCP:]
+Today we pray: [Prayer title]
+[First two lines of prayer text]
+
+[If intercession — custom:]
+We intercede for: [intercession_topic]
+
+Tap to enter the practice:
+[personal_url]
+
+No login needed. 🌿
+
+
+The “You’re in. 🌿” line is the emotional acknowledgment. This is the moment they know they belong to this practice.
+
+CALENDAR EVENT FORMAT — ALL SUBSEQUENT EVENTS
+Every event after the first focuses on logging. No re-introduction. Just the practice and the action.
+
+Title: [emoji] [Practice name] — [their personal time]
+
+[Intention — one line, italic]
+
+[If intercession — BCP:]
+[Prayer title] · [First line of prayer]
+
+[If intercession — custom:]
+We hold: [intercession_topic]
+
+Tap to log your practice:
+[personal_url]
+
+🌿 [X of Y] members tending this
+
+
+The last line — how many members are tending — is fetched at event creation time. It gives a sense of the living community without requiring the member to open the app.
+
+NO WINDOW FOR SPIRITUAL PRACTICES
+Spiritual practice Shared Moments do not have a one-hour window. The posting page is open all day on the day of the practice.
+A day counts as bloomed if the member logs at any point during that calendar day in their timezone.
+If a member opens their personal link on a day when no practice is scheduled show:
+
+🌿
+
+"This practice rests today."
+
+[Next practice: Day, date at their personal time]
+
+📅 It's in your calendar.
+
+
+If a member opens their personal link on a practice day and has already logged show:
+
+🌸
+
+"You showed up today."
+
+[X of Y] members tended this practice.
+[Current milestone progress]
+
+Next practice: [Day, date]
+
+
+If a member opens their personal link on a practice day and has not yet logged show the full logging experience regardless of what time it is.
+
+THE POSTING PAGE — updated for no window
+The posting page removes all countdown timers and window language. Replace with:
+Header:
+
+[Practice name — Space Grotesk bold, soil, 24px]
+
+[Intention — Playfair Display italic, sage, 16px, centered]
+
+[If BCP intercession:]
+[Full prayer text in collapsible cream card]
+["From the Book of Common Prayer" — muted]
+
+[X of Y] tending this practice today
+
+
+No countdown. No urgency. The practice is available all day.
+For timer-based logging:
+
+[Practice name]
+[Intention]
+
+        ○
+     [10:00]
+
+  [X of Y] sitting today
+
+      Begin 🌿
+
+
+Same filling ring mechanic. Same completion flow. But no countdown pressure. Just the practice and the invitation to begin.
+
+STREAK LOGIC UPDATE
+A day counts toward the group streak if at least two members log on that practice day in their respective timezones.
+Because members are in different timezones and have different personal times the streak window is the full calendar day in each member’s timezone. Eleanor checks at the end of each day whether the threshold was met.
+Store streak evaluation results:
+
+moment_streak_days
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  practice_date date
+  members_logged integer
+  bloomed boolean
+  evaluated_at timestamptz
+
+
+Evaluate at midnight UTC each day for all practices that had a scheduled occurrence that day.
+If bloomed: increment consecutive_windows, update milestone_state.
+If missed: apply existing miss rules.
+
+FREQUENCY UPDATE
+For spiritual practice templates frequency options are:
+📅 Daily — every day
+🗓 Weekly — select days
+For daily practices each member gets two upcoming daily events.
+For weekly practices each member gets two upcoming weekly events.
+The next event is always calculated from the member’s personal_time and personal_timezone not from any shared clock time.
+
+WHAT CHANGES ON EXISTING SCREENS
+Creation flow — time of day replaces time picker for spiritual templates:
+Spiritual templates (morning_prayer, evening_prayer, intercession, breath, contemplative, walk):
+Show time of day selector (Morning / Midday / Afternoon / Night)
+Remove specific time picker
+Remove timezone selector from creation — each member sets their own timezone when they join
+Non-spiritual templates (coffee, custom):
+Keep the existing specific time picker
+Keep timezone selector
+Keep the existing one-hour window behavior
+Confirmation screen — add calendar prompt for organizer:
+After the confirmation screen immediately prompt the organizer to set their personal time and add to calendar. Do not skip this. The organizer is also a member.
+Dashboard card — remove window language:
+Replace “Open now · [X] min left” with “Practice day 🌿 — tap to begin”
+Replace “Next window in [X hours]” with “Next practice: [Day] at [their personal time]”
+Journal — remove window references:
+Replace “window” with “practice day” everywhere in journal entries and emails.
+
+EMAIL UPDATES
+Welcome email:
+
+Subject: 🌿 You've joined [Practice name]
+
+[Inviter name] planted this practice and you've joined.
+
+[Practice name]
+[Time of day] practice · [Frequency]
+
+[Intention — italic]
+
+Eleanor is adding this to your calendar now.
+Two upcoming events are on their way to your inbox.
+
+Your personal link — bookmark this:
+[personal_url]
+
+No login needed. Just show up. 🌿
+Eleanor
+
+
+Calendar invite email (when Google Calendar not connected):
+Send the .ics file for the next two occurrences as two separate email attachments.
+Subject line for each:
+First: 🌿 [Practice name] — [date] at [their personal time] (You're in)
+Second: 🌿 [Practice name] — [date] at [their personal time]
+After logging — confirmation email:
+
+Subject: 🌸 [Practice name] — you showed up
+
+[X of Y] members tended this today.
+
+[Milestone progress — one line]
+
+Your next practice is [Day, date] at [their personal time].
+It's in your calendar. 🌿
+
+
+Nudge if not logged on practice day by 8pm member’s local time:
+
+Subject: 🌿 [Practice name] — still today
+
+Your practice is still open today.
+
+[personal_url]
+
+No login needed. 🌿
+
+
+DATA MODEL ADDITIONS
+Add to moment_members:
+
+personal_time time
+personal_timezone text
+calendar_connected boolean default false
+
+
+Add new table:
+
+moment_calendar_events
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  moment_member_id uuid FK moment_members
+  google_calendar_event_id text
+  ics_sent boolean default false
+  scheduled_for timestamptz
+  is_first_event boolean default false
+  logged boolean default false
+  logged_at timestamptz
+  created_at timestamptz
+
+
+Add new table:
+
+moment_streak_days
+  id uuid PK
+  shared_moment_id uuid FK shared_moments
+  practice_date date
+  members_logged integer default 0
+  bloomed boolean default false
+  evaluated_at timestamptz
+
+
+BUILD ORDER
+	1.	Add personal_time, personal_timezone, calendar_connected to moment_members
+	2.	Add moment_calendar_events table
+	3.	Add moment_streak_days table
+	4.	Replace time picker with time of day selector in creation flow for spiritual templates
+	5.	Add personal time selection for organizer immediately after confirmation screen
+	6.	Add personal time selection to join page for invitees
+	7.	Calendar event creation on joining — two upcoming events per member at their personal time
+	8.	First event uses “You’re in 🌿” format, all subsequent use logging format
+	9.	Rolling calendar logic — on logging create one new event to maintain two in advance
+	10.	Remove window logic from spiritual practices — posting page open all day
+	11.	Update posting page — remove countdown, remove window language, add practice day language
+	12.	Update timer page — same mechanic, no countdown pressure
+	13.	Streak evaluation — midnight UTC job, checks each practice day, bloomed if 2+ logged
+	14.	moment_streak_days records created and evaluated daily
+	15.	Update dashboard cards — remove window language, show personal time and next practice day
+	16.	Update journal — replace window with practice day throughout
+	17.	Update all emails — welcome, calendar, logging confirmation, nudge
+	18.	Test on real phone — join via link, set personal time, receive two calendar invites, log practice, confirm third calendar event appears
+
+THE ONE THING TO GET RIGHT
+The two-event rolling calendar system is the heart of this update. When a member logs their practice they should receive a new calendar event almost immediately — within a minute — so the next two practices are always visible in their calendar. The calendar is Eleanor’s primary communication channel for spiritual practices. It has to stay current.
+Test this: join a practice, receive two calendar invites, log the first one, confirm that a third event appears in the calendar within 60 seconds. If that loop works everything else follows.​​​​​​​​​​​​​​​​

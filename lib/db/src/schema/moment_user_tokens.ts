@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { sharedMomentsTable } from "./shared_moments";
 
 export const momentUserTokensTable = pgTable("moment_user_tokens", {
@@ -8,6 +8,9 @@ export const momentUserTokensTable = pgTable("moment_user_tokens", {
   name: text("name"),
   userToken: text("user_token").notNull().unique(),
   googleCalendarEventId: text("google_calendar_event_id"),
+  personalTime: text("personal_time"),
+  personalTimezone: text("personal_timezone"),
+  calendarConnected: boolean("calendar_connected").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

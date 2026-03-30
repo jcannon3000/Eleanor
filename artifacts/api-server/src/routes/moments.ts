@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import {
   db, ritualsTable, inviteTokensTable, usersTable,
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
+  momentCalendarEventsTable,
 } from "@workspace/db";
 import { createCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
@@ -291,6 +292,8 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 });
 
 // ─── POST /api/moments — plant a standalone shared moment ───────────────────
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
+
 const StandalonePlantSchema = z.object({
   name: z.string().min(1).max(100),
   intention: z.string().min(1).max(500),
@@ -306,6 +309,7 @@ const StandalonePlantSchema = z.object({
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
   goalDays: z.number().int().min(0).max(365).default(7),
   timezone: z.string().default("UTC"),
+  timeOfDay: z.enum(["morning", "midday", "afternoon", "night"]).optional(),
   participants: z.array(z.object({ name: z.string(), email: z.string().email() })).max(20).default([]),
 });
 
@@ -316,8 +320,9 @@ router.post("/moments", async (req, res): Promise<void> => {
   const parsed = StandalonePlantSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, participants } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants } = parsed.data;
 
+  const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
   const momentToken = generateToken();
 
   const [moment] = await db.insert(sharedMomentsTable).values({
@@ -336,8 +341,9 @@ router.post("/moments", async (req, res): Promise<void> => {
     dayOfWeek: dayOfWeek ?? null,
     goalDays,
     timezone,
+    timeOfDay: isSpiritual ? (timeOfDay ?? null) : null,
     momentToken,
-    windowMinutes: 60,
+    windowMinutes: isSpiritual ? 1440 : 60,
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -865,6 +871,214 @@ router.get("/rituals/:id/moments/:momentId/journal", async (req, res): Promise<v
   );
 
   res.json({ windows: enriched, moment });
+});
+
+// ─── Rolling calendar event helper ──────────────────────────────────────────
+
+function nextOccurrences(personalTime: string, personalTimezone: string, frequency: string, dayOfWeek: string | null, count: number): Date[] {
+  const [hh, mm] = personalTime.split(":").map(Number);
+  const results: Date[] = [];
+  const now = new Date();
+  const dateWeekdayMap: Record<string, string> = { Su: "SU", Mo: "MO", Tu: "TU", We: "WE", Th: "TH", Fr: "FR", Sa: "SA" };
+
+  let candidate = new Date();
+  candidate.setUTCHours(0, 0, 0, 0);
+
+  for (let day = 0; results.length < count && day < 730; day++) {
+    const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: personalTimezone }).format(candidate);
+
+    let included = false;
+    if (frequency === "daily") {
+      included = true;
+    } else if (frequency === "weekly") {
+      const wdCode = dateWeekdayMap[new Intl.DateTimeFormat("en-US", { timeZone: personalTimezone, weekday: "short" }).format(candidate).slice(0, 2)] ?? "";
+      included = dayOfWeek ? wdCode === dayOfWeek : true;
+    }
+
+    if (included) {
+      const tzOffsetMs = getTimezoneOffsetMs(personalTimezone, new Date(`${localDate}T00:00:00`));
+      const eventUtc = new Date(`${localDate}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`);
+      eventUtc.setTime(eventUtc.getTime() - tzOffsetMs);
+      if (eventUtc > now) results.push(eventUtc);
+    }
+
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+
+  return results;
+}
+
+function getTimezoneOffsetMs(timezone: string, date: Date): number {
+  try {
+    const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+    const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
+    return utcDate.getTime() - tzDate.getTime();
+  } catch {
+    return 0;
+  }
+}
+
+// ─── POST /api/moments/:id/personal-time — set organizer personal time ────────
+const PersonalTimeSchema = z.object({
+  personalTime: z.string().regex(/^\d{2}:\d{2}$/),
+  personalTimezone: z.string(),
+});
+
+router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = PersonalTimeSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+    if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+    const { personalTime, personalTimezone } = parsed.data;
+
+    const [myTokenRow] = await db.select().from(momentUserTokensTable)
+      .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+    if (!myTokenRow) { res.status(403).json({ error: "Not a member" }); return; }
+
+    await db.update(momentUserTokensTable)
+      .set({ personalTime, personalTimezone })
+      .where(eq(momentUserTokensTable.id, myTokenRow.id));
+
+    // Create 2 rolling calendar events
+    const occurrences = nextOccurrences(personalTime, personalTimezone, moment.frequency, moment.dayOfWeek ?? null, 2);
+    for (let i = 0; i < occurrences.length; i++) {
+      await db.insert(momentCalendarEventsTable).values({
+        sharedMomentId: momentId,
+        momentMemberId: myTokenRow.id,
+        scheduledFor: occurrences[i],
+        isFirstEvent: i === 0,
+      });
+    }
+
+    res.json({ ok: true, calendarEventsCreated: occurrences.length });
+  } catch (err) {
+    console.error("POST /moments/:id/personal-time error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/moments/:momentToken/info — public practice info ──────────────
+router.get("/moments/:momentToken/info", async (req, res): Promise<void> => {
+  const { momentToken } = req.params;
+
+  try {
+    const [moment] = await db.select().from(sharedMomentsTable)
+      .where(eq(sharedMomentsTable.momentToken, momentToken));
+    if (!moment) { res.status(404).json({ error: "Not found" }); return; }
+
+    const members = await db.select().from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.momentId, moment.id));
+
+    res.json({
+      id: moment.id,
+      name: moment.name,
+      intention: moment.intention,
+      templateType: moment.templateType,
+      timeOfDay: moment.timeOfDay,
+      frequency: moment.frequency,
+      dayOfWeek: moment.dayOfWeek,
+      goalDays: moment.goalDays,
+      loggingType: moment.loggingType,
+      intercessionTopic: moment.intercessionTopic,
+      memberCount: members.length,
+    });
+  } catch (err) {
+    console.error("GET /moments/:momentToken/info error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── POST /api/moments/:momentToken/join — join a practice ──────────────────
+const JoinSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+  personalTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  personalTimezone: z.string().optional(),
+});
+
+router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
+  const { momentToken } = req.params;
+
+  const parsed = JoinSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+
+  try {
+    const [moment] = await db.select().from(sharedMomentsTable)
+      .where(eq(sharedMomentsTable.momentToken, momentToken));
+    if (!moment) { res.status(404).json({ error: "Practice not found" }); return; }
+
+    const { name, email, personalTime, personalTimezone } = parsed.data;
+
+    const existing = await db.select().from(momentUserTokensTable)
+      .where(and(eq(momentUserTokensTable.momentId, moment.id), eq(momentUserTokensTable.email, email)));
+
+    let tokenRow;
+    if (existing.length > 0) {
+      tokenRow = existing[0];
+      if (personalTime) {
+        await db.update(momentUserTokensTable)
+          .set({ personalTime, personalTimezone: personalTimezone ?? null, name })
+          .where(eq(momentUserTokensTable.id, tokenRow.id));
+        tokenRow = { ...tokenRow, personalTime, personalTimezone: personalTimezone ?? null };
+      }
+    } else {
+      const userToken = generateToken();
+      const [inserted] = await db.insert(momentUserTokensTable).values({
+        momentId: moment.id,
+        email,
+        name,
+        userToken,
+        personalTime: personalTime ?? null,
+        personalTimezone: personalTimezone ?? null,
+      }).returning();
+      tokenRow = inserted;
+    }
+
+    // Create 2 rolling calendar events if personalTime provided
+    if (personalTime && personalTimezone) {
+      const existingEvents = await db.select().from(momentCalendarEventsTable)
+        .where(and(
+          eq(momentCalendarEventsTable.sharedMomentId, moment.id),
+          eq(momentCalendarEventsTable.momentMemberId, tokenRow.id),
+        ));
+      if (existingEvents.length === 0) {
+        const occurrences = nextOccurrences(personalTime, personalTimezone, moment.frequency, moment.dayOfWeek ?? null, 2);
+        for (let i = 0; i < occurrences.length; i++) {
+          await db.insert(momentCalendarEventsTable).values({
+            sharedMomentId: moment.id,
+            momentMemberId: tokenRow.id,
+            scheduledFor: occurrences[i],
+            isFirstEvent: i === 0,
+          });
+        }
+      }
+    }
+
+    const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
+      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
+      : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+
+    res.status(201).json({
+      userToken: tokenRow.userToken,
+      personalLink: `${baseUrl}/${momentToken}/${tokenRow.userToken}`,
+      momentName: moment.name,
+    });
+  } catch (err) {
+    console.error("POST /moments/:momentToken/join error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;
