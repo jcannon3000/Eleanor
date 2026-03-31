@@ -1660,32 +1660,36 @@ export default function MomentNew() {
                         <p className="text-sm text-muted-foreground">Choose the time of day. Each person will set their own specific time.</p>
                       </div>
 
-                      {/* Frequency */}
-                      <div>
-                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
-                        <div className="flex gap-3">
-                          {(["daily", "weekly"] as Frequency[]).map(f => (
-                            <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setScheduledDays([]); }}
-                              className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                              {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Day pills for weekly */}
-                      {frequency === "weekly" && (
-                        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                          <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days</label>
-                          <div className="flex flex-wrap gap-2">
-                            {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
-                              <button key={val} onClick={() => setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])}
-                                className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays.includes(val) ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                                {label}
-                              </button>
-                            ))}
+                      {/* Frequency — only shown for non-intercession spiritual (intercession already has its own step) */}
+                      {templateId !== "intercession" && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
+                            <div className="flex gap-3">
+                              {(["daily", "weekly"] as Frequency[]).map(f => (
+                                <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setScheduledDays([]); }}
+                                  className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
+                                  {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </motion.div>
+
+                          {/* Day pills for weekly */}
+                          {frequency === "weekly" && (
+                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+                              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days</label>
+                              <div className="flex flex-wrap gap-2">
+                                {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
+                                  <button key={val} onClick={() => setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])}
+                                    className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays.includes(val) ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </>
                       )}
 
                       {/* Time of day cards */}
