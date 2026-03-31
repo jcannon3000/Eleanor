@@ -41,6 +41,10 @@ interface MomentDetail {
     state: string;
     createdAt: string;
     momentToken: string;
+    templateType: string | null;
+    intercessionTopic: string | null;
+    timezone?: string | null;
+    practiceDays?: string | string[] | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -64,11 +68,27 @@ const DAY_NAMES: Record<string, string> = {
   FR: "Friday", SA: "Saturday", SU: "Sunday",
 };
 
-function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null): string {
+const DAY_DOW: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "custom"]);
+
+function parsePracticeDays(raw: string | string[] | null | undefined): string[] | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch { return null; }
+}
+
+function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null): string {
   const time = formatTime(scheduledTime);
   if (frequency === "daily") return `Every day at ${time}`;
-  if (frequency === "weekly" && dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} at ${time}`;
-  if (frequency === "weekly") return `Weekly at ${time}`;
+  if (frequency === "weekly") {
+    if (practiceDays && practiceDays.length > 1) {
+      const names = practiceDays.map(d => DAY_NAMES[d]?.slice(0, 3) ?? d).join(", ");
+      return `${names} at ${time}`;
+    }
+    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} at ${time}`;
+    return `Weekly at ${time}`;
+  }
   return `Monthly at ${time}`;
 }
 
@@ -79,21 +99,58 @@ function goalProgress(createdAt: string, goalDays: number): number {
   return Math.min(100, Math.round((daysSince / goalDays) * 100));
 }
 
-const STATUS_ICON: Record<string, string> = {
-  bloom: "🌸",
-  solo: "👤",
-  wither: "🥀",
-};
-const STATUS_LABEL: Record<string, string> = {
-  bloom: "Bloomed",
-  solo: "Solo",
-  wither: "Withered",
-};
-const STATUS_COLOR: Record<string, string> = {
-  bloom: "text-[#6B8F71]",
-  solo: "text-amber-600",
-  wither: "text-rose-400/80",
-};
+// Is it currently past the scheduled time today? (client-side, user's local clock)
+function isPastScheduledTime(scheduledTime: string): boolean {
+  const [h, m] = scheduledTime.split(":").map(Number);
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes() >= h * 60 + m;
+}
+
+// Is today a practice day for this moment?
+function isTodayPracticeDay(frequency: string, dayOfWeek?: string | null, practiceDays?: string[] | null): boolean {
+  if (frequency === "daily") return true;
+  if (frequency === "weekly") {
+    const todayDow = new Date().getDay();
+    if (practiceDays && practiceDays.length > 0) {
+      return practiceDays.some(d => DAY_DOW[d] === todayDow);
+    }
+    if (dayOfWeek) return DAY_DOW[dayOfWeek] === todayDow;
+  }
+  return true;
+}
+
+// Next practice description
+function nextPracticeLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null): string {
+  const time = formatTime(scheduledTime);
+  const today = new Date().getDay(); // 0=Sun
+  const pastTime = isPastScheduledTime(scheduledTime);
+
+  if (frequency === "daily") {
+    return pastTime ? `Tomorrow at ${time}` : `Today at ${time}`;
+  }
+
+  if (frequency === "weekly") {
+    const days = practiceDays && practiceDays.length > 0 ? practiceDays : (dayOfWeek ? [dayOfWeek] : []);
+    if (days.length === 0) return `Next practice at ${time}`;
+
+    // Find the next occurrence
+    for (let i = 0; i <= 7; i++) {
+      const checkDow = (today + i) % 7;
+      const isDayMatch = days.some(d => DAY_DOW[d] === checkDow);
+      if (isDayMatch) {
+        if (i === 0 && !pastTime) return `Today at ${time}`;
+        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow at ${time}`;
+        const name = Object.keys(DAY_DOW).find(k => DAY_DOW[k] === checkDow);
+        return `${name ? DAY_NAMES[name] : "Next"} at ${time}`;
+      }
+    }
+  }
+  return `Next practice at ${time}`;
+}
+
+const STATUS_ICON: Record<string, string> = { bloom: "🌸", solo: "👤", wither: "🥀" };
+const STATUS_LABEL: Record<string, string> = { bloom: "Bloomed", solo: "Solo", wither: "Withered" };
+const STATUS_COLOR: Record<string, string> = { bloom: "text-[#6B8F71]", solo: "text-amber-600", wither: "text-rose-400/80" };
 
 // ─── Window History Entry ─────────────────────────────────────────────────────
 
@@ -101,24 +158,18 @@ function WindowEntry({ win }: { win: MomentWindow }) {
   const date = parseISO(win.windowDate);
   const today = new Date().toISOString().slice(0, 10);
   const isToday = win.windowDate === today;
-
   return (
     <div className="flex gap-4 py-3 border-b border-border/30 last:border-0">
-      {/* Date column */}
       <div className="w-20 shrink-0 pt-0.5">
         <p className="text-xs font-medium text-foreground/80">{isToday ? "Today" : format(date, "MMM d")}</p>
         <p className="text-[11px] text-muted-foreground/60">{format(date, "EEEE")}</p>
       </div>
-
-      {/* Status */}
       <div className="w-20 shrink-0 flex items-start gap-1.5 pt-0.5">
         <span className="text-base leading-none">{STATUS_ICON[win.status] ?? "·"}</span>
         <span className={`text-xs font-medium ${STATUS_COLOR[win.status] ?? "text-muted-foreground"}`}>
           {STATUS_LABEL[win.status] ?? win.status}
         </span>
       </div>
-
-      {/* Posts */}
       <div className="flex-1">
         {win.posts.length === 0 ? (
           <p className="text-xs text-muted-foreground/50 italic">No one showed up</p>
@@ -160,6 +211,7 @@ export default function MomentDetail() {
     queryKey: [`/api/moments/${id}`],
     queryFn: () => apiRequest<MomentDetail>("GET", `/api/moments/${id}`),
     enabled: !!user && !!id,
+    refetchInterval: 30_000,
   });
 
   const seedMutation = useMutation({
@@ -207,17 +259,27 @@ export default function MomentDetail() {
 
   if (!data) return null;
 
-  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount, windowOpen, minutesLeft } = data;
+  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount } = data;
   const progress = goalProgress(moment.createdAt, moment.goalDays);
-  const postUrl = windowOpen && myUserToken
+
+  const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
+  const isIntercession = moment.templateType === "intercession";
+  const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
+  const practiceDay = isTodayPracticeDay(moment.frequency, moment.dayOfWeek, parsedPracticeDays);
+  const pastTime = isPastScheduledTime(moment.scheduledTime);
+  const isOpenNow = isSpiritual ? (practiceDay && pastTime) : data.windowOpen;
+
+  const postUrl = isOpenNow && myUserToken
     ? `/moment/${moment.momentToken}/${myUserToken}`
     : null;
 
-  const memberNames = members
-    .slice(0, 4)
-    .map(m => (m.name ?? m.email).split(" ")[0])
-    .join(", ");
-  const extraMembers = members.length > 4 ? ` +${members.length - 4}` : "";
+  // Label for action button — context-sensitive
+  const actionLabel = isIntercession ? "Pray 🙏" : "Log 🌿";
+
+  // Intention display
+  const intentionDisplay = isIntercession
+    ? (moment.intercessionTopic ?? moment.intention)
+    : moment.intention;
 
   return (
     <Layout>
@@ -231,39 +293,53 @@ export default function MomentDetail() {
           ← Your practices
         </button>
 
-        {/* Open Now Banner */}
-        {windowOpen && (
+        {/* Header */}
+        <div className="mb-5">
+          <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
+
+          {/* Intercession: "Praying for" — others: italic intention */}
+          {isIntercession ? (
+            <p className="text-sm text-[#6B8F71] mb-1.5">
+              Praying for: {intentionDisplay}
+            </p>
+          ) : moment.intention ? (
+            <p className="text-sm text-muted-foreground italic mb-1.5">"{moment.intention}"</p>
+          ) : null}
+
+          <p className="text-xs text-muted-foreground">
+            {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays)}
+          </p>
+        </div>
+
+        {/* Open Now Banner — only when actually open */}
+        {isOpenNow ? (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-5 flex items-center justify-between bg-[#FFF8EC] border border-[#C17F24]/30 rounded-2xl px-4 py-3"
           >
             <div>
-              <p className="text-sm font-semibold text-[#C17F24]">Practice open now · {minutesLeft} min left</p>
-              <p className="text-xs text-[#C17F24]/70 mt-0.5">{todayPostCount} of {memberCount} logged</p>
+              <p className="text-sm font-semibold text-[#C17F24]">
+                {isIntercession ? "🙏 Open today · Pray together" : "🌿 Open today"}
+              </p>
+              <p className="text-xs text-[#C17F24]/70 mt-0.5">
+                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : "logged"}
+              </p>
             </div>
             {postUrl && (
               <Link href={postUrl}>
                 <span className="text-sm font-medium text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors whitespace-nowrap">
-                  Log 🌿
+                  {actionLabel}
                 </span>
               </Link>
             )}
           </motion.div>
+        ) : (
+          /* Not open: show quiet next-practice line */
+          <p className="text-xs text-muted-foreground mb-5">
+            Next {isIntercession ? "prayer" : "practice"}: {nextPracticeLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays)}
+          </p>
         )}
-
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
-              <p className="text-sm text-muted-foreground italic mb-2">"{moment.intention}"</p>
-              <p className="text-xs text-muted-foreground">
-                {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek)}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
@@ -329,22 +405,15 @@ export default function MomentDetail() {
         </div>
 
         {/* Practice History */}
-        <div>
+        <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">History</span>
             <div className="flex-1 h-px bg-border/40" />
             <span className="text-xs text-muted-foreground">{windows.length} practices</span>
           </div>
 
-          {windows.length === 0 ? (
+          {windows.length > 0 && (
             <div>
-              <div className="text-center py-8 text-muted-foreground/40">
-                <p className="text-sm">No practices yet</p>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {/* Seed posts shown at top of history */}
               {seedPosts.length > 0 && (
                 <div className="mb-4 bg-[#F4F9F5] border border-[#6B8F71]/20 rounded-2xl px-4 py-3">
                   <p className="text-xs font-medium text-[#4a6b50] mb-2">🌱 Before the first window</p>
@@ -362,7 +431,6 @@ export default function MomentDetail() {
                   </div>
                 </div>
               )}
-
               <div className="bg-card border border-border/60 rounded-2xl px-4 divide-y divide-border/20">
                 {windows.map(win => (
                   <WindowEntry key={win.id} win={win} />
@@ -371,13 +439,16 @@ export default function MomentDetail() {
             </div>
           )}
         </div>
-        {/* ── Manage section ─────────────────────────────────────────── */}
-        <div className="mt-10 pt-6 border-t border-border/30">
+
+        {/* ── Settings section — always visible on mobile ──────────────────── */}
+        <div className="border-t border-border/30 pt-5">
           <button
             onClick={() => setShowManage(m => !m)}
-            className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2 px-1 -mx-1 rounded-lg"
           >
-            ⚙️ Settings
+            <span>⚙️</span>
+            <span className="font-medium">Settings</span>
+            <span className="text-xs opacity-50">{showManage ? "▲" : "▼"}</span>
           </button>
 
           {showManage && (
@@ -387,18 +458,18 @@ export default function MomentDetail() {
               transition={{ duration: 0.18 }}
               className="mt-4 space-y-3"
             >
-              {/* Archive */}
+              {/* Leave / Archive */}
               <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Archive this practice</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Hides it from your garden. History is preserved.</p>
+                  <p className="text-sm font-medium text-foreground">Leave this practice</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Removes it from your garden. History is preserved.</p>
                 </div>
                 <button
                   onClick={() => archiveMutation.mutate()}
                   disabled={archiveMutation.isPending}
-                  className="shrink-0 ml-4 text-xs font-medium text-amber-700 border border-amber-300/60 rounded-full px-4 py-1.5 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                  className="shrink-0 ml-4 text-xs font-medium text-amber-700 border border-amber-300/60 rounded-full px-4 py-2 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[36px]"
                 >
-                  {archiveMutation.isPending ? "Archiving…" : "Archive"}
+                  {archiveMutation.isPending ? "Leaving…" : "Leave"}
                 </button>
               </div>
 
@@ -411,7 +482,7 @@ export default function MomentDetail() {
                   </div>
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="shrink-0 ml-4 text-xs font-medium text-rose-600 border border-rose-300/60 rounded-full px-4 py-1.5 hover:bg-rose-50 transition-colors"
+                    className="shrink-0 ml-4 text-xs font-medium text-rose-600 border border-rose-300/60 rounded-full px-4 py-2 hover:bg-rose-50 transition-colors min-h-[36px]"
                   >
                     Delete
                   </button>
@@ -430,13 +501,13 @@ export default function MomentDetail() {
                     <button
                       onClick={() => deleteMutation.mutate()}
                       disabled={deleteMutation.isPending}
-                      className="text-xs font-semibold text-white bg-rose-600 rounded-full px-5 py-2 hover:bg-rose-700 transition-colors disabled:opacity-50"
+                      className="text-sm font-semibold text-white bg-rose-600 rounded-full px-5 py-2.5 hover:bg-rose-700 transition-colors disabled:opacity-50"
                     >
                       {deleteMutation.isPending ? "Deleting…" : "Yes, delete it"}
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      className="text-xs text-rose-700 px-3 py-2 hover:text-rose-900 transition-colors"
+                      className="text-sm text-rose-700 px-3 py-2.5 hover:text-rose-900 transition-colors"
                     >
                       Cancel
                     </button>

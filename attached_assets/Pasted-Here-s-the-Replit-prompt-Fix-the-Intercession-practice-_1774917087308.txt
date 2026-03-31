@@ -1,0 +1,197 @@
+Here’s the Replit prompt:
+
+Fix the Intercession practice — open state, logging flow, prayer screen, and frequency options
+Do not change anything that is not described below. Apply these fixes only to the Intercession template and its detail screen, posting page, and creation flow.
+
+FIX 1 — The practice should not show as open immediately after planting
+The detail screen currently shows “Practice open now · 697 min left” immediately after the practice is created. This is wrong. A practice that was just planted should not be open. It should show as waiting for the first scheduled time.
+The practice opens at the scheduled time the user set — in this case 8:00 AM. If it is currently before 8:00 AM the practice is not open. If it is after 8:00 AM on a scheduled day the practice is open.
+Fix the open/closed logic so the practice only shows as open during the correct time window on scheduled days. Outside of that it should show:
+
+Next practice: [day] at [time]
+
+
+Remove the minute countdown entirely. “697 min left” is not meaningful or human. Replace any time-remaining display with simply:
+For a practice that is open today:
+
+🙏 Open today · until [end of day]
+
+
+For a practice that is not yet open:
+
+Next practice: [day] at 8:00 AM
+
+
+FIX 2 — Show the intention correctly
+The detail screen currently shows the intention as “The Potomac River” in quotes beneath the practice title. This is correct in placement but the framing is wrong. It should read:
+
+Praying for: The Potomac River
+
+
+Not in quotes. In muted sage text, normal weight. Beneath the practice title, above the frequency line.
+This “Praying for” label should appear on the detail screen for all BCP intercessions and custom intercessions. It replaces the current italic quoted intention display.
+
+FIX 3 — The Log button should say Pray
+The “Log 🌿” button in the open practice banner at the top of the detail screen should say:
+“Pray 🙏”
+Not Log. Not Post. Pray.
+Replace this button label everywhere it appears for Intercession practices. For other practice types keep the appropriate label (Log, I showed up, I walked, etc). Only Intercession uses Pray.
+
+FIX 4 — The Pray button takes the user to a full prayer screen
+When a member taps “Pray 🙏” they should not go to a generic posting page. They should go to a dedicated prayer screen designed for this moment.
+The prayer screen at eleanor.app/moment/[moment_token]/[user_moment_token]:
+Full screen. Cream background. Warm and unhurried. No navigation visible. Nothing distracting.
+
+[Practice name — Space Grotesk bold, soil, 22px, top]
+
+[Muted sage, 13px:]
+Praying for: [intention text]
+
+[Divider — thin sage line]
+
+[Full BCP prayer text — Playfair Display italic, soil, 16px,
+ generous line height, comfortable reading pace]
+
+[If the prayer is long: show it fully, scroll naturally,
+ do not paginate or truncate]
+
+[Attribution beneath prayer in muted 12px:]
+From the Book of Common Prayer
+
+[Divider — thin sage line]
+
+[Who has prayed this session — live, updates as others pray:]
+
+[X of Y] have prayed this 🙏
+
+[Small presence indicators — circular avatars or initials,
+ filled sage for prayed, empty outline for not yet]
+[Names shown if available, initials if not]
+
+[Large full-width button, soil background, cream text,
+ very generous padding, Space Grotesk bold:]
+
+      Amen 🙏
+
+[Beneath the button in muted small italic:]
+"Tapping Amen marks that you have prayed this together."
+
+
+After tapping Amen:
+Screen transitions to a simple confirmation:
+
+🙏
+
+"Amen."
+
+[X of Y] have prayed together today.
+
+[If reflection prompt exists:]
+[Reflection prompt — sage italic]
+[Warm text area]
+[Submit reflection button — optional, can dismiss]
+
+Come back [next practice day]. 🌿
+
+
+No “Post” button. No “Log” button. Only Amen.
+
+FIX 5 — Show who else has prayed during the session
+On the prayer screen, in real time, show which members have already prayed this session and which have not. Update live without requiring a page refresh.
+Display as a row of circular presence indicators beneath the prayer text and above the Amen button:
+
+[X of Y] have prayed this 🙏
+
+[J] [G] [○] [○]
+Jeremy  Greta  (pending) (pending)
+
+
+Filled sage circle with initial = prayed
+Empty outline circle with initial = not yet
+Names in muted 11px beneath each circle.
+When the user taps Amen their circle fills and the count updates for everyone else viewing the screen simultaneously.
+
+FIX 6 — Add Daily and Weekly frequency options to the Intercession creation flow
+The Intercession creation flow currently does not have a clear frequency selection step. Add one.
+After the intention step and before the invite step, show a frequency selection screen:
+Header: “How often will you pray together? 🙏”
+Muted subtitle:
+“This is your commitment to each other.”
+Two large cards only:
+
+📅  Daily
+    Every day at your chosen time
+
+🗓  Weekly
+    Choose which days of the week
+
+
+If Weekly is selected: show day selector pills Mon Tue Wed Thu Fri Sat Sun — multi-select, minimum one day.
+Store in shared_moments:
+
+frequency text (daily | weekly)
+practice_days text[] (populated if weekly)
+
+
+This is the only frequency configuration. Do not show any other options. Daily and weekly are the only valid commitments for intercession.
+
+FIX 7 — Detail screen when practice is not yet open
+When the practice has not yet opened for the day the top banner should not show at all. Instead show a quiet status line beneath the practice name and intention:
+
+For the Harvest of Lands and Waters
+
+Praying for: The Potomac River
+
+Every day at 8:00 AM
+
+Next prayer: Tomorrow at 8:00 AM
+
+
+No amber banner. No countdown. No open indicator. Just the next scheduled time, quietly.
+When the practice is open the amber banner appears:
+
+🙏 Open today · Pray together
+
+0 of 1 have prayed        [Pray 🙏]
+
+
+The Pray button here takes them directly to the prayer screen described in Fix 4.
+
+FIX 8 — Detail screen general cleanup
+The detail screen for Intercession should display in this order:
+
+← Your practices
+
+[Practice name — large bold]
+Praying for: [intention — muted sage]
+[Frequency and time — muted]
+
+[If open: amber banner with Pray button]
+[If not open: Next prayer line]
+
+[Streak cards: Current streak · Best streak · Blooms]
+
+[Goal: ONE WEEK TOGETHER — Just planted]
+[0 practices together so far]
+
+[MEMBERS]
+[Member names]
+
+[HISTORY — 0 practices]
+[No practices yet]
+
+[⚙️ Settings]
+
+
+Remove “No practices yet” empty state text and replace with nothing — the empty history section is self-explanatory.
+
+Build order
+	1.	Fix open/closed logic — practice only open during scheduled window, not immediately after planting
+	2.	Fix the “Praying for:” intention display on detail screen
+	3.	Rename Log button to Pray for Intercession practices everywhere
+	4.	Build the prayer screen — full BCP prayer text, intention, live presence counter, Amen button
+	5.	Real-time presence updates on prayer screen — fills as members pray
+	6.	Post-Amen confirmation screen with optional reflection
+	7.	Add Daily and Weekly frequency selection to Intercession creation flow
+	8.	Fix detail screen banner — only appears when actually open, shows correct count and Pray button
+	9.	Clean up detail screen order and remove unnecessary elements​​​​​​​​​​​​​​​​

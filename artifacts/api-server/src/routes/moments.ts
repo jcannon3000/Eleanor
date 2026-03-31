@@ -794,6 +794,14 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
   const windowOpen = isWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
 
+  // Build member presence: who has prayed today
+  const prayedTokens = new Set(allTodayPosts.map(p => p.userToken));
+  const memberPresence = allMembers.map(m => ({
+    name: m.name ?? m.email.split("@")[0],
+    userToken: m.userToken,
+    prayed: prayedTokens.has(m.userToken),
+  }));
+
   res.json({
     moment: {
       id: moment.id,
@@ -807,6 +815,9 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       currentStreak: moment.currentStreak,
       longestStreak: moment.longestStreak,
       state: moment.state,
+      frequency: moment.frequency,
+      dayOfWeek: moment.dayOfWeek,
+      timeOfDay: moment.timeOfDay,
     },
     ritualName: ritual?.name ?? "",
     windowDate,
@@ -814,6 +825,7 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
     minutesRemaining: minsLeft,
     memberCount: allMembers.length,
     todayPostCount: allTodayPosts.length,
+    members: memberPresence,
     myPost: myPost
       ? {
           photoUrl: myPost.photoUrl,

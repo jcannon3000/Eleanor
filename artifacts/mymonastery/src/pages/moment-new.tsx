@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
-  | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite";
+  | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite" | "intercession-frequency";
 type LoggingType = "photo" | "reflection" | "both" | "checkin";
 type Frequency = "daily" | "weekly";
 type TimeOfDay = "early-morning" | "morning" | "midday" | "afternoon" | "late-afternoon" | "evening" | "night";
@@ -660,8 +660,8 @@ export default function MomentNew() {
     ? BCP_STEP_ORDER
     : templateId === "intercession"
       ? selectedBcpPrayer !== null
-        ? ["template", "intercession", "intention", "schedule", "goal", "invite"]
-        : ["template", "intercession", "name", "intention", "logging", "schedule", "goal", "invite"]
+        ? ["template", "intercession", "intention", "intercession-frequency", "schedule", "goal", "invite"]
+        : ["template", "intercession", "name", "intention", "logging", "intercession-frequency", "schedule", "goal", "invite"]
       : ["template", "name", "intention", "logging", "schedule", "goal", "invite"];
 
   function goNext() {
@@ -710,6 +710,10 @@ export default function MomentNew() {
     if (step === "intention") return intention.trim().length >= 4;
     if (step === "logging") {
       if (loggingType === "reflection") return reflectionPrompt.trim().length >= 1;
+      return true;
+    }
+    if (step === "intercession-frequency") {
+      if (frequency === "weekly") return scheduledDays.length > 0;
       return true;
     }
     if (step === "schedule") {
@@ -1568,6 +1572,80 @@ export default function MomentNew() {
                         className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] focus:outline-none"
                       />
                     </motion.div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Intercession Frequency ─────────────────────────── */}
+              {step === "intercession-frequency" && (
+                <div className="flex-1 space-y-5">
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-1">How often will you pray together? 🙏</h2>
+                    <p className="text-sm text-muted-foreground italic">This is your commitment to each other.</p>
+                  </div>
+                  <div className="space-y-3">
+                    {/* Daily */}
+                    <button
+                      onClick={() => { setFrequency("daily"); setScheduledDays([]); }}
+                      className={`w-full text-left rounded-2xl border-2 px-5 py-5 transition-all ${
+                        frequency === "daily"
+                          ? "border-[#6B8F71] bg-[#6B8F71]/8"
+                          : "border-border hover:border-[#6B8F71]/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl">📅</span>
+                        <div>
+                          <p className="font-semibold text-foreground">Daily</p>
+                          <p className="text-sm text-muted-foreground">Every day at your chosen time</p>
+                        </div>
+                        {frequency === "daily" && <span className="ml-auto text-[#6B8F71] text-lg">✓</span>}
+                      </div>
+                    </button>
+                    {/* Weekly */}
+                    <button
+                      onClick={() => setFrequency("weekly")}
+                      className={`w-full text-left rounded-2xl border-2 px-5 py-5 transition-all ${
+                        frequency === "weekly"
+                          ? "border-[#6B8F71] bg-[#6B8F71]/8"
+                          : "border-border hover:border-[#6B8F71]/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl">🗓</span>
+                        <div>
+                          <p className="font-semibold text-foreground">Weekly</p>
+                          <p className="text-sm text-muted-foreground">Choose which days of the week</p>
+                        </div>
+                        {frequency === "weekly" && <span className="ml-auto text-[#6B8F71] text-lg">✓</span>}
+                      </div>
+                    </button>
+                  </div>
+                  {/* Day picker for weekly */}
+                  {frequency === "weekly" && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days?</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[{ id: "MO", label: "Mon" }, { id: "TU", label: "Tue" }, { id: "WE", label: "Wed" },
+                          { id: "TH", label: "Thu" }, { id: "FR", label: "Fri" }, { id: "SA", label: "Sat" }, { id: "SU", label: "Sun" }].map(d => {
+                          const sel = scheduledDays.includes(d.id);
+                          return (
+                            <button key={d.id}
+                              onClick={() => setScheduledDays(prev =>
+                                sel ? prev.filter(x => x !== d.id) : [...prev, d.id]
+                              )}
+                              className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                                sel
+                                  ? "bg-[#6B8F71] text-white border-[#6B8F71]"
+                                  : "border-border text-muted-foreground hover:border-[#6B8F71]/50"
+                              }`}
+                            >
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

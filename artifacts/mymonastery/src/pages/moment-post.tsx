@@ -12,6 +12,8 @@ const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "int
 const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 const RRULE_DAY_MAP: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
+type MomentMember = { name: string; userToken: string; prayed: boolean };
+
 type MomentData = {
   moment: {
     id: number;
@@ -35,6 +37,7 @@ type MomentData = {
   minutesRemaining: number;
   memberCount: number;
   todayPostCount: number;
+  members: MomentMember[];
   myPost: { photoUrl: string | null; reflectionText: string | null; isCheckin: boolean } | null;
   userName: string;
 };
@@ -53,10 +56,48 @@ function PresenceDots({ count, total }: { count: number; total: number }) {
   );
 }
 
+// ─── Named presence circles ───────────────────────────────────────────────────
+function NamedPresence({ members, myToken }: { members: MomentMember[]; myToken?: string }) {
+  const shown = Math.min(members.length, 8);
+  return (
+    <div className="flex flex-wrap justify-center gap-4">
+      {members.slice(0, shown).map((m, i) => {
+        const initial = (m.name ?? "?")[0].toUpperCase();
+        const isMe = m.userToken === myToken;
+        return (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <motion.div
+              animate={m.prayed ? { scale: [1.1, 1] } : {}}
+              className={clsx(
+                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors",
+                m.prayed
+                  ? "bg-[#6B8F71] border-[#6B8F71] text-white"
+                  : "bg-transparent border-[#6B8F71]/40 text-[#6B8F71]/60"
+              )}
+            >
+              {initial}
+            </motion.div>
+            <span className="text-[10px] text-[#6b5c4a]/60 max-w-[3rem] text-center leading-tight">
+              {isMe ? "you" : (m.name ?? "?").split(" ")[0]}
+            </span>
+          </div>
+        );
+      })}
+      {members.length > shown && (
+        <div className="flex flex-col items-center gap-1">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 border-[#6B8F71]/30 text-[#6B8F71]/50">
+            +{members.length - shown}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
   topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
-  alreadyPosted, myReflection, isPraying, onComplete,
+  members, myToken, alreadyPosted, myReflection, isPraying, onComplete,
 }: {
   topic: string;
   fullText: string;
@@ -64,12 +105,81 @@ function IntercessionPrayerPage({
   reflectionPrompt: string;
   memberCount: number;
   todayPostCount: number;
+  members: MomentMember[];
+  myToken?: string;
   alreadyPosted: boolean;
   myReflection: string | null;
   isPraying: boolean;
   onComplete: (reflection: string) => void;
 }) {
   const [reflection, setReflection] = useState(myReflection ?? "");
+  const [showReflection, setShowReflection] = useState(false);
+
+  // Post-Amen confirmation screen
+  if (alreadyPosted) {
+    return (
+      <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          className="max-w-xs w-full text-center">
+          <div className="text-7xl mb-5">🙏</div>
+          <h1 className="text-3xl font-bold text-[#2C1A0E] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+            Amen.
+          </h1>
+          <p className="text-sm text-[#6b5c4a] mb-6">
+            {todayPostCount} of {memberCount} have prayed together today.
+          </p>
+
+          {/* Named presence */}
+          <div className="mb-8">
+            <NamedPresence members={members} myToken={myToken} />
+          </div>
+
+          {/* Optional reflection */}
+          {!myReflection && (
+            <div className="mb-6">
+              {!showReflection ? (
+                <button
+                  onClick={() => setShowReflection(true)}
+                  className="text-sm text-[#6B8F71] underline-offset-2 hover:underline"
+                >
+                  Add a reflection?
+                </button>
+              ) : (
+                <div className="text-left">
+                  <p className="font-serif italic text-[#6B8F71] text-sm mb-2">"{reflectionPrompt}"</p>
+                  <textarea
+                    value={reflection}
+                    onChange={e => setReflection(e.target.value.slice(0, 280))}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-sm"
+                    placeholder="What are you holding today?"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => onComplete(reflection)}
+                    className="mt-2 w-full py-3 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold"
+                  >
+                    Save reflection
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {myReflection && (
+            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-4 mb-6 text-left">
+              <p className="text-xs text-[#6b5c4a]/60 italic mb-1">{reflectionPrompt}</p>
+              <p className="text-sm font-serif text-[#2C1A0E] italic">"{myReflection}"</p>
+            </div>
+          )}
+
+          <p className="text-xs text-[#6b5c4a]/50 italic">
+            Come back at your next prayer time. 🌿
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5EDD8]">
@@ -79,81 +189,74 @@ function IntercessionPrayerPage({
         <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-2">
           Today's intercession
         </p>
-        <h1 className="text-2xl font-bold text-[#2C1A0E] text-center leading-snug mb-4">
+        <h1 className="text-[22px] font-bold text-[#2C1A0E] text-center leading-snug mb-2"
+          style={{ fontFamily: "Space Grotesk, sans-serif" }}>
           {topic}
         </h1>
 
         {/* Intention */}
         {intention && (
-          <p className="text-center text-[#6B8F71] italic font-serif text-sm leading-relaxed mb-6">
-            "{intention}"
+          <p className="text-center text-[#6B8F71] text-[13px] mb-5">
+            Praying for: {intention}
           </p>
         )}
 
-        {/* Full prayer card — always visible, not collapsible */}
+        {/* Thin divider */}
+        <div className="w-full h-px bg-[#6B8F71]/20 mb-6" />
+
+        {/* Full prayer card — Playfair Display italic */}
         {fullText && (
-          <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-6 mb-6">
-            <p className="text-xs font-semibold text-[#6b5c4a]/70 mb-3">📖 The prayer</p>
-            <p className="font-serif text-[#2C1A0E] text-[15px] leading-[1.9] whitespace-pre-wrap">
+          <div className="mb-6">
+            <p className="font-serif text-[#2C1A0E] text-base leading-[1.9] whitespace-pre-wrap italic"
+              style={{ fontFamily: "Playfair Display, Georgia, serif" }}>
               {fullText}
             </p>
-            <p className="text-[11px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
+            <p className="text-[12px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
               From the Book of Common Prayer
             </p>
           </div>
         )}
 
-        {/* Presence count */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <PresenceDots count={todayPostCount} total={memberCount} />
-          <span className="text-xs text-[#6b5c4a]/70">
-            {todayPostCount} of {memberCount} {alreadyPosted ? "logged today" : "praying with you"}
-          </span>
+        {/* Thin divider */}
+        <div className="w-full h-px bg-[#6B8F71]/20 mb-6" />
+
+        {/* Live presence — named circles */}
+        <div className="mb-2 text-center">
+          <p className="text-sm text-[#6b5c4a]/70 mb-4">
+            {todayPostCount} of {memberCount} have prayed this 🙏
+          </p>
+          <NamedPresence members={members} myToken={myToken} />
         </div>
 
-        {/* Reflection prompt */}
-        <p className="text-center font-serif italic text-[#6B8F71] text-base mb-4">
-          "{reflectionPrompt}"
+        <div className="mt-6 mb-3" />
+
+        {/* Reflection (optional, before Amen) */}
+        <div className="mb-5">
+          <p className="font-serif italic text-[#6B8F71] text-sm mb-2 text-center">
+            "{reflectionPrompt}"
+          </p>
+          <textarea
+            value={reflection}
+            onChange={e => setReflection(e.target.value.slice(0, 280))}
+            placeholder="Who or what are you holding today?"
+            rows={3}
+            className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
+          />
+          <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
+        </div>
+
+        {/* Amen button */}
+        <button
+          onClick={() => onComplete(reflection)}
+          disabled={isPraying}
+          className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-40"
+          style={{ fontFamily: "Space Grotesk, sans-serif" }}
+        >
+          {isPraying ? "Marking…" : "Amen 🙏"}
+        </button>
+        <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
+          Tapping Amen marks that you have prayed this together.
         </p>
-
-        {/* Reflection — show text if already posted, textarea otherwise */}
-        {alreadyPosted ? (
-          <div className="mb-6">
-            {myReflection ? (
-              <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-5">
-                <p className="text-sm text-[#2C1A0E] italic leading-relaxed font-serif">"{myReflection}"</p>
-              </div>
-            ) : (
-              <p className="text-center text-sm text-[#6b5c4a]/60 italic">Presence marked — you were here.</p>
-            )}
-          </div>
-        ) : (
-          <div className="mb-6">
-            <textarea
-              value={reflection}
-              onChange={e => setReflection(e.target.value.slice(0, 280))}
-              placeholder="Who or what are you holding today?"
-              rows={3}
-              className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
-            />
-            <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
-          </div>
-        )}
-
-        {/* Primary action */}
-        {alreadyPosted ? (
-          <div className="w-full py-4 rounded-2xl bg-[#6B8F71]/15 border border-[#6B8F71]/30 text-[#6B8F71] text-lg font-semibold text-center">
-            🌸 You prayed today
-          </div>
-        ) : (
-          <button
-            onClick={() => onComplete(reflection)}
-            disabled={isPraying}
-            className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
-          >
-            {isPraying ? "Marking…" : "I prayed 🙏"}
-          </button>
-        )}
       </div>
     </div>
   );
@@ -172,7 +275,7 @@ export default function MomentPostPage() {
     queryKey: [`/api/moment/${momentToken}/${userToken}`],
     queryFn: () => apiRequest("GET", `/api/moment/${momentToken}/${userToken}`),
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
 
   const postMutation = useMutation({
@@ -237,7 +340,7 @@ export default function MomentPostPage() {
     );
   }
 
-  const { moment, windowOpen, minutesRemaining, memberCount: mc, todayPostCount, myPost } = data;
+  const { moment, windowOpen, minutesRemaining, memberCount: mc, todayPostCount, myPost, members = [] } = data;
   const actualMemberCount = memberCount ?? mc;
   const actualTodayCount = todayCount ?? todayPostCount;
   const alreadyPosted = posted || !!myPost;
@@ -271,6 +374,11 @@ export default function MomentPostPage() {
 
   // ── Intercession — full prayer page (open window or already logged) ─────────
   if (moment.templateType === "intercession" && (effectiveWindowOpen || alreadyPosted)) {
+    // Build live member presence using latest data merged with local `posted` state
+    const liveMembers: MomentMember[] = members.map(m => ({
+      ...m,
+      prayed: m.prayed || (posted && m.userToken === userToken),
+    }));
     return (
       <IntercessionPrayerPage
         topic={moment.intercessionTopic ?? moment.name}
@@ -279,6 +387,8 @@ export default function MomentPostPage() {
         reflectionPrompt={moment.reflectionPrompt ?? "What are you holding today?"}
         memberCount={actualMemberCount}
         todayPostCount={actualTodayCount}
+        members={liveMembers}
+        myToken={userToken}
         alreadyPosted={alreadyPosted}
         myReflection={myPost?.reflectionText ?? null}
         isPraying={postMutation.isPending}
