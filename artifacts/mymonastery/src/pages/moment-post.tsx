@@ -844,27 +844,7 @@ export default function MomentPostPage() {
     const bgColor = isMorning ? "#2C1810" : "#1A1C2E";
     const accentColor = isMorning ? "#C8975A" : "#7B9EBE";
 
-    if (alreadyPosted) {
-      return (
-        <div className="min-h-screen flex items-center justify-center px-6" style={{ background: bgColor }}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="text-center max-w-sm text-[#F7F0E6]">
-            <div className="text-6xl mb-5">{isMorning ? "🌅" : "🌙"}</div>
-            <h1 className="text-2xl font-bold mb-2">You prayed today.</h1>
-            <p className="text-[#F7F0E6]/60 text-sm mb-6">
-              {actualTodayCount} of {actualMemberCount} prayed {officeName} today.
-            </p>
-            <p className="font-serif italic text-[#F7F0E6]/50 text-sm leading-relaxed">
-              {isMorning
-                ? '"Let my prayer be set forth in thy sight as incense." — Psalm 141'
-                : '"O gracious Light, pure brightness of the everliving Father." — Phos Hilaron'}
-            </p>
-          </motion.div>
-        </div>
-      );
-    }
-
-    // Main BCP posting view — open and not yet prayed
+    // Single unified BCP view — page number and link always visible, bottom state changes after logging
     return (
       <div className="min-h-screen pb-24" style={{ background: bgColor }}>
         <div className="max-w-md mx-auto px-5 pt-8">
@@ -881,7 +861,7 @@ export default function MomentPostPage() {
             <span className="text-sm text-[#F7F0E6]/60">{actualTodayCount} of {actualMemberCount} prayed today</span>
           </div>
 
-          {/* The BCP link — MOST PROMINENT ELEMENT */}
+          {/* The BCP link — always visible */}
           <div className="rounded-2xl border border-[#F7F0E6]/20 p-6 mb-5 text-center"
             style={{ background: "rgba(247,240,230,0.07)" }}>
             <p className="text-[#F7F0E6]/50 text-xs uppercase tracking-widest mb-3">Open your Book of Common Prayer</p>
@@ -898,26 +878,23 @@ export default function MomentPostPage() {
             </div>
           </div>
 
-          {/* Already posted by others */}
-          {actualTodayCount > 0 && (
-            <p className="text-center text-sm text-[#F7F0E6]/50 mb-5 font-serif italic">
-              {actualTodayCount === 1 ? "1 person prayed with you already." : `${actualTodayCount} people have prayed today.`}
-            </p>
-          )}
-
-          {/* Submit */}
-          <AnimatePresence>
-            {posted ? (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-8">
-                <div className="text-5xl mb-4">🌿</div>
-                <p className="text-xl font-bold text-[#F7F0E6]">You prayed.</p>
-                <p className="text-[#F7F0E6]/60 text-sm mt-2">
-                  {actualTodayCount} of {actualMemberCount} prayed today.
+          {/* Bottom: logged state or log button */}
+          <AnimatePresence mode="wait">
+            {alreadyPosted ? (
+              <motion.div key="prayed" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="text-center py-6">
+                <p className="text-lg font-bold text-[#F7F0E6] mb-1">🌿 You prayed today.</p>
+                <p className="text-[#F7F0E6]/50 text-sm">
+                  {actualTodayCount} of {actualMemberCount} prayed {officeName} today.
+                </p>
+                <p className="font-serif italic text-[#F7F0E6]/40 text-xs leading-relaxed mt-4">
+                  {isMorning
+                    ? '"Let my prayer be set forth in thy sight as incense." — Psalm 141'
+                    : '"O gracious Light, pure brightness of the everliving Father." — Phos Hilaron'}
                 </p>
               </motion.div>
             ) : (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <motion.div key="log" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <button
                   onClick={() => postMutation.mutate({ isCheckin: true })}
                   disabled={postMutation.isPending}
