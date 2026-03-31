@@ -697,17 +697,24 @@ export default function MomentPostPage() {
     }
     return true;
   })();
-  const effectiveWindowOpen = isSpiritual ? isPracticeDay : windowOpen;
+  // BCP offices (Morning/Evening Prayer) are gated by practice day — liturgy is tied to the office cycle.
+  // All other spiritual practices (contemplative, intercession, fasting, custom) are always open:
+  // the calendar reminder is a nudge, not a gate — users log when they actually practice.
+  const effectiveWindowOpen = isBcp ? isPracticeDay : (isSpiritual ? true : windowOpen);
 
-  // ── Spiritual practice — rests today (not a practice day) ──────────────────
-  // Intercession is always accessible (prayer can be read any time), so skip this guard for it
-  if (isSpiritual && !isPracticeDay && !alreadyPosted && moment.templateType !== "intercession" && moment.templateType !== "fasting") {
+  // BCP only — show "rests today" when it's not a scheduled practice day
+  if (isBcp && !isPracticeDay && !alreadyPosted) {
+    const isMorning = moment.templateType === "morning-prayer";
+    const bgColor = isMorning ? "#2C1810" : "#1A1C2E";
     return (
-      <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
-        <div className="text-center max-w-xs">
-          <p className="text-5xl mb-5">🌿</p>
-          <p className="text-xl font-semibold text-[#2C1A0E] mb-3">This practice rests today.</p>
-          <p className="text-sm text-[#6b5c4a] italic">{moment.name}</p>
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ background: bgColor }}>
+        <div className="text-center max-w-xs text-[#F7F0E6]">
+          <div className="text-5xl mb-5">{isMorning ? "🌅" : "🌙"}</div>
+          <h1 className="text-2xl font-bold mb-2">{isMorning ? "Morning Prayer" : "Evening Prayer"}</h1>
+          <p className="text-[#F7F0E6]/60 text-sm mb-6">This practice rests today.</p>
+          <p className="font-serif italic text-[#F7F0E6]/70 text-sm leading-relaxed">
+            {isMorning ? "Come back on your next practice morning." : "Come back on your next practice evening."}
+          </p>
         </div>
       </div>
     );
@@ -823,21 +830,6 @@ export default function MomentPostPage() {
     const bcpUrl = isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html";
     const bgColor = isMorning ? "#2C1810" : "#1A1C2E";
     const accentColor = isMorning ? "#C8975A" : "#7B9EBE";
-
-    if (!effectiveWindowOpen && !alreadyPosted) {
-      return (
-        <div className="min-h-screen flex items-center justify-center px-6" style={{ background: bgColor }}>
-          <div className="text-center max-w-xs text-[#F7F0E6]">
-            <div className="text-5xl mb-5">{isMorning ? "🌅" : "🌙"}</div>
-            <h1 className="text-2xl font-bold mb-2">{officeName}</h1>
-            <p className="text-[#F7F0E6]/60 text-sm mb-6">This practice rests today.</p>
-            <p className="font-serif italic text-[#F7F0E6]/70 text-sm leading-relaxed">
-              {isMorning ? "Come back on your next practice morning." : "Come back on your next practice evening."}
-            </p>
-          </div>
-        </div>
-      );
-    }
 
     if (alreadyPosted) {
       return (
