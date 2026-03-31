@@ -323,27 +323,56 @@ const TEMPLATES = [
 ];
 
 // ─── Milestone goal options ───────────────────────────────────────────────────
-const GOAL_OPTIONS = [
+const TO_RRULE: Record<string, string> = {
+  sunday: "SU", monday: "MO", tuesday: "TU", wednesday: "WE",
+  thursday: "TH", friday: "FR", saturday: "SA",
+};
+
+const GOAL_OPTIONS_DAILY = [
   {
-    days: 3, emoji: "🌱", label: "Three days", sub: "A first tender",
+    days: 3, emoji: "🌱", label: "3 days", sub: "A first tender",
     bg: "#EEF3EF", borderColor: "#c8dac9",
     dots: Array(3).fill(0), dotLabel: "3 practices together",
     badge: null,
     message: "A gentle beginning. Three practices to find your rhythm.",
   },
   {
-    days: 7, emoji: "🌿", label: "One week", sub: "Taking root",
+    days: 7, emoji: "🌿", label: "1 week", sub: "Taking root",
     bg: "#E4EEE6", borderColor: "#b0cdb3",
     dots: Array(7).fill(0), dotLabel: "7 practices together",
     badge: "Most chosen 🌿",
-    message: "One week of showing up together. This is where something real begins.",
+    message: "One week of practicing together. This is where something real begins.",
   },
   {
-    days: 14, emoji: "🌸", label: "Two weeks", sub: "In bloom — then renew",
+    days: 14, emoji: "🌸", label: "2 weeks", sub: "In bloom — then renew",
     bg: "#F7F0E6", borderColor: "#b0cdb3",
     dots: Array(14).fill(0), dotLabel: "14 practices — then your circle renews the commitment",
     badge: null, accentBar: true,
     message: "Two weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.",
+  },
+  {
+    days: 0, emoji: "✨", label: "Just begin", sub: "No goal, tend freely",
+    bg: "#FAF6F0", borderColor: "rgba(0,0,0,0.06)",
+    dots: [], dotLabel: "",
+    badge: null,
+    message: "No pressure. The practice is open. Tend it when you can.",
+  },
+];
+
+const GOAL_OPTIONS_WEEKLY = [
+  {
+    days: 7, emoji: "🌿", label: "1 week", sub: "Taking root",
+    bg: "#E4EEE6", borderColor: "#b0cdb3",
+    dots: Array(1).fill(0), dotLabel: "1 practice together",
+    badge: "Most chosen 🌿",
+    message: "One week of practicing together. This is where something real begins.",
+  },
+  {
+    days: 21, emoji: "🌸", label: "3 weeks", sub: "In bloom — then renew",
+    bg: "#F7F0E6", borderColor: "#b0cdb3",
+    dots: Array(3).fill(0), dotLabel: "3 practices — then your circle renews the commitment",
+    badge: null, accentBar: true,
+    message: "Three weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.",
   },
   {
     days: 0, emoji: "✨", label: "Just begin", sub: "No goal, tend freely",
@@ -493,14 +522,6 @@ function BcpPrayerList({ onSelect }: { onSelect: (prayer: BcpPrayer) => void }) 
   );
 }
 
-// ─── Milestone streak helper ──────────────────────────────────────────────────
-export function milestoneLabel(streak: number): string {
-  if (streak < 3) return `🌱 Day ${streak + 1} of 3`;
-  if (streak < 7) return `🌱✓  🌿 Day ${streak + 1} of 7`;
-  if (streak < 14) return `🌱✓  🌿✓  🌸 Day ${streak + 1} of 14`;
-  return `🌸 14 days — ready to renew`;
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MomentNew() {
   const [, setLocation] = useLocation();
@@ -582,12 +603,21 @@ export default function MomentNew() {
     return `${String(h).padStart(2, "0")}:${String(scheduledMinute).padStart(2, "0")}`;
   })();
 
-  const dayOfWeek = frequency === "weekly" && scheduledDays.length === 1 ? scheduledDays[0] : undefined;
+  const dayOfWeek = frequency === "weekly" && scheduledDays.length === 1
+    ? (TO_RRULE[scheduledDays[0]] ?? scheduledDays[0])
+    : undefined;
+  const GOAL_OPTIONS = frequency === "weekly" ? GOAL_OPTIONS_WEEKLY : GOAL_OPTIONS_DAILY;
   const isSpiritual = SPIRITUAL_TEMPLATES.has(templateId ?? "");
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
+
+  // Reset goalDays when frequency changes to a value not in the new option set
+  useEffect(() => {
+    const validDays = GOAL_OPTIONS.map(g => g.days);
+    if (!validDays.includes(goalDays)) setGoalDays(7);
+  }, [frequency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── When personal time prompt opens, constrain hour/ampm to the selected time-of-day ──
   useEffect(() => {
@@ -821,6 +851,9 @@ export default function MomentNew() {
       frequency,
       scheduledTime: isSpiritual ? "08:00" : scheduledTime,
       dayOfWeek,
+      practiceDays: isSpiritual && frequency === "weekly" && scheduledDays.length > 0
+        ? JSON.stringify(scheduledDays)
+        : undefined,
       goalDays,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timeOfDay: isSpiritual ? timeOfDay : undefined,
