@@ -1074,6 +1074,12 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
     prayed: prayedTokens.has(m.userToken),
   }));
 
+  // Determine inviter — member with the lowest token row ID is the organizer/creator
+  const organizerToken = allMembers.length > 0
+    ? allMembers.reduce((min, m) => m.id < min.id ? m : min, allMembers[0])
+    : null;
+  const inviterName = organizerToken?.name ?? organizerToken?.email?.split("@")[0] ?? "Eleanor";
+
   res.json({
     moment: {
       id: moment.id,
@@ -1089,9 +1095,18 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       state: moment.state,
       frequency: moment.frequency,
       dayOfWeek: moment.dayOfWeek,
+      practiceDays: moment.practiceDays ?? null,
       timeOfDay: moment.timeOfDay,
+      contemplativeDurationMinutes: moment.contemplativeDurationMinutes ?? null,
+      fastingFrom: moment.fastingFrom ?? null,
+      fastingIntention: moment.fastingIntention ?? null,
+      fastingFrequency: moment.fastingFrequency ?? null,
+      fastingDate: moment.fastingDate ?? null,
+      fastingDay: moment.fastingDay ?? null,
+      fastingDayOfMonth: moment.fastingDayOfMonth ?? null,
     },
     ritualName: ritual?.name ?? "",
+    inviterName,
     windowDate,
     windowOpen,
     minutesRemaining: minsLeft,

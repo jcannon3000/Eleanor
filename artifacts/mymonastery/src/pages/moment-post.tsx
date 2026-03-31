@@ -85,6 +85,7 @@ type MomentData = {
   members: MomentMember[];
   myPost: { photoUrl: string | null; reflectionText: string | null; isCheckin: boolean } | null;
   userName: string;
+  inviterName: string;
 };
 
 // ─── Presence dots ────────────────────────────────────────────────────────────
@@ -445,6 +446,17 @@ export default function MomentPostPage() {
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const [memberCount, setMemberCount] = useState<number | null>(null);
 
+  // Welcome screen — shown once per member per moment (localStorage-gated)
+  const welcomeKey = `eleanor-seen-${momentToken}-${userToken}`;
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return !localStorage.getItem(welcomeKey); } catch { return false; }
+  });
+
+  function dismissWelcome() {
+    try { localStorage.setItem(welcomeKey, "1"); } catch { /* ignore */ }
+    setShowWelcome(false);
+  }
+
   const { data, isLoading, error } = useQuery<MomentData>({
     queryKey: [`/api/moment/${momentToken}/${userToken}`],
     queryFn: () => apiRequest("GET", `/api/moment/${momentToken}/${userToken}`),
@@ -510,6 +522,150 @@ export default function MomentPostPage() {
             Or ask the practice organizer to resend your invite.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // ── Welcome screen — shown once on first visit ──────────────────────────────
+  if (showWelcome) {
+    const m = data.moment;
+    // Build a human-readable schedule label
+    const TOD: Record<string, string> = {
+      "early-morning": "early morning", morning: "morning", midday: "midday",
+      afternoon: "afternoon", "late-afternoon": "late afternoon", evening: "evening", night: "night",
+    };
+    const DAY_FULL: Record<string, string> = {
+      SU: "Sunday", MO: "Monday", TU: "Tuesday", WE: "Wednesday",
+      TH: "Thursday", FR: "Friday", SA: "Saturday",
+      sunday: "Sunday", monday: "Monday", tuesday: "Tuesday", wednesday: "Wednesday",
+      thursday: "Thursday", friday: "Friday", saturday: "Saturday",
+    };
+    const tod = m.timeOfDay ? (TOD[m.timeOfDay] ?? m.timeOfDay) : "";
+    let schedLine = "";
+    if (m.frequency === "daily") {
+      schedLine = `Every day${tod ? ` · ${tod}` : ""}`;
+    } else {
+      let days: string[] = [];
+      try { if (m.practiceDays) days = JSON.parse(m.practiceDays) as string[]; } catch { /**/ }
+      if (!days.length && m.dayOfWeek) days = [m.dayOfWeek];
+      const dayStr = days.map(d => DAY_FULL[d] ?? d).join(", ");
+      schedLine = dayStr ? `${dayStr}${tod ? ` · ${tod}` : ""}` : `Weekly${tod ? ` · ${tod}` : ""}`;
+    }
+
+    // Template-specific badge
+    const BADGE: Record<string, string> = {
+      "morning-prayer": "🌅 Morning Prayer",
+      "evening-prayer": "🌙 Evening Prayer",
+      "intercession": "🙏 Intercession Prayer",
+      "contemplative": "🕯️ Contemplative Sitting",
+      "fasting": "🌿 Fasting Practice",
+    };
+    const badgeLabel = BADGE[m.templateType ?? ""] ?? "🌿 Practice";
+    const isFastingWelcome = m.templateType === "fasting";
+
+    return (
+      <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+        {/* Organic background blobs — matches onboarding */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/4 blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-accent/5 blur-3xl" />
+        </div>
+
+        {/* Eleanor header */}
+        <header className="p-6 flex items-center gap-3 relative z-10">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-lg">🌱</div>
+          <span className="font-serif text-lg tracking-tight text-foreground">Eleanor</span>
+        </header>
+
+        {/* Main content */}
+        <main className="flex-1 flex flex-col items-center justify-center px-6 pb-16 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-sm w-full"
+          >
+            {/* Badge */}
+            <div className="flex justify-center mb-6">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/8 text-primary text-sm font-medium border border-primary/15">
+                {badgeLabel}
+              </span>
+            </div>
+
+            {/* Practice name */}
+            <h1 className="font-serif text-3xl text-foreground text-center leading-snug mb-2">
+              {m.name}
+            </h1>
+
+            {/* Invited by */}
+            <p className="text-center text-muted-foreground text-sm mb-5">
+              {data.inviterName} invited you
+            </p>
+
+            {/* Intention */}
+            {m.intention && m.intention !== m.name && (
+              <div className="border-l-2 border-primary/30 pl-4 mb-5">
+                <p className="font-serif italic text-foreground/70 text-base leading-relaxed">
+                  "{m.intention}"
+                </p>
+              </div>
+            )}
+
+            {/* Fasting detail */}
+            {isFastingWelcome && m.fastingFrom && (
+              <div className="bg-[#F0F8F0] border border-primary/20 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
+                <span className="text-xl">🌿</span>
+                <div>
+                  <p className="text-xs font-semibold text-primary/70 uppercase tracking-wider mb-0.5">Fasting from</p>
+                  <p className="text-sm text-foreground/80">{m.fastingFrom}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Contemplative duration */}
+            {m.templateType === "contemplative" && m.contemplativeDurationMinutes && (
+              <div className="bg-[#F5F0FF] border border-[#8B7CF6]/20 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
+                <span className="text-xl">🕯️</span>
+                <p className="text-sm text-[#5B4B9A]">{m.contemplativeDurationMinutes} minutes of stillness</p>
+              </div>
+            )}
+
+            {/* Schedule + member count */}
+            {!isFastingWelcome && (
+              <p className="text-center text-sm text-muted-foreground mb-6">
+                {schedLine}{data.memberCount > 1 ? ` · ${data.memberCount} people` : ""}
+              </p>
+            )}
+
+            {/* Member avatars */}
+            {data.members.length > 0 && (
+              <div className="flex justify-center gap-3 mb-8">
+                {data.members.slice(0, 6).map((mem, i) => (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-semibold text-primary">
+                      {(mem.name ?? "?")[0].toUpperCase()}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[3rem] text-center">
+                      {(mem.name ?? "?").split(" ")[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* CTA */}
+            <motion.button
+              onClick={dismissWelcome}
+              whileTap={{ scale: 0.97 }}
+              className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-medium shadow-[var(--shadow-warm-md)] hover:opacity-90 transition-opacity"
+              style={{ fontFamily: "Space Grotesk, sans-serif" }}
+            >
+              Open practice 🌿
+            </motion.button>
+
+            <p className="mt-3 text-center text-xs text-muted-foreground">No account needed.</p>
+          </motion.div>
+        </main>
       </div>
     );
   }
