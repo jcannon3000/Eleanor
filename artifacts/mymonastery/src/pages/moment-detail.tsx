@@ -67,6 +67,8 @@ interface MomentDetail {
   members: { name: string | null; email: string }[];
   memberCount: number;
   myUserToken: string | null;
+  myPersonalTime: string | null;
+  myPersonalTimezone: string | null;
   windows: MomentWindow[];
   seedPosts: WindowPost[];
   todayPostCount: number;
@@ -201,6 +203,8 @@ export default function MomentDetail() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
+  const [editingReminder, setEditingReminder] = useState(false);
+  const [reminderTimeValue, setReminderTimeValue] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
@@ -246,6 +250,15 @@ export default function MomentDetail() {
     },
   });
 
+  const reminderMutation = useMutation({
+    mutationFn: (payload: { personalTime: string; personalTimezone: string }) =>
+      apiRequest("POST", `/api/moments/${id}/personal-time`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      setEditingReminder(false);
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
@@ -264,7 +277,7 @@ export default function MomentDetail() {
 
   if (!data) return null;
 
-  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
+  const { moment, members, memberCount, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
   const progress = goalProgress(moment.createdAt, moment.goalDays);
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
@@ -327,6 +340,59 @@ export default function MomentDetail() {
           <p className="text-xs text-muted-foreground">
             {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
+
+          {/* Personal reminder time editor */}
+          {!isFasting && (
+            <div className="mt-2">
+              {editingReminder ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={reminderTimeValue}
+                    onChange={e => setReminderTimeValue(e.target.value)}
+                    className="text-xs border border-border/60 rounded-lg px-2 py-1 bg-background text-foreground focus:outline-none focus:border-[#6B8F71]"
+                  />
+                  <button
+                    onClick={() => {
+                      if (reminderTimeValue) {
+                        reminderMutation.mutate({
+                          personalTime: reminderTimeValue,
+                          personalTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        });
+                      }
+                    }}
+                    disabled={reminderMutation.isPending}
+                    className="text-xs font-medium text-[#6B8F71] hover:text-[#4a6b50] transition-colors disabled:opacity-40"
+                  >
+                    {reminderMutation.isPending ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditingReminder(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setReminderTimeValue(myPersonalTime ?? moment.scheduledTime);
+                    setEditingReminder(true);
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors group"
+                >
+                  <span>🔔</span>
+                  <span>
+                    {myPersonalTime
+                      ? `Your reminder: ${formatTime(myPersonalTime)}`
+                      : `Set your reminder time`}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/40 group-hover:text-muted-foreground/60 transition-colors">· Edit</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Member names as plain dot-separated text + together count */}
           {members.length > 0 && (() => {
             const firstNames = members.map(m => (m.name ?? m.email).split(" ")[0]);

@@ -6,7 +6,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, updateCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -815,6 +815,9 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     members: allMembers.map(t => ({ name: t.name, email: t.email })),
     memberCount: allMembers.length,
     myUserToken: myTokenRow[0]?.userToken ?? null,
+    myPersonalTime: myTokenRow[0]?.personalTime ?? null,
+    myPersonalTimezone: myTokenRow[0]?.personalTimezone ?? null,
+    myGoogleCalendarEventId: myTokenRow[0]?.googleCalendarEventId ?? null,
     windows: windowsWithPosts,
     seedPosts: seedPosts.map(p => ({
       guestName: p.guestName,
@@ -1223,7 +1226,7 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       .set({ personalTime, personalTimezone })
       .where(eq(momentUserTokensTable.id, myTokenRow.id));
 
-    // Create 2 rolling calendar events
+    // Compute next occurrences for DB tracking and GCal update
     const occurrences = nextOccurrences(personalTime, personalTimezone, moment.frequency, moment.dayOfWeek ?? null, 2);
     for (let i = 0; i < occurrences.length; i++) {
       await db.insert(momentCalendarEventsTable).values({
@@ -1232,6 +1235,28 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
         scheduledFor: occurrences[i],
         isFirstEvent: i === 0,
       });
+    }
+
+    // Update the Google Calendar event to the new personal time
+    // Events live on the organizer's calendar, so use organizer's auth credentials
+    if (myTokenRow.googleCalendarEventId && occurrences.length > 0) {
+      try {
+        const allTokenRows = await db.select().from(momentUserTokensTable)
+          .where(eq(momentUserTokensTable.momentId, momentId));
+        const organizerToken = allTokenRows.reduce((min, t) => t.id < min.id ? t : min, allTokenRows[0]);
+        const [organizer] = await db.select().from(usersTable)
+          .where(eq(usersTable.email, organizerToken.email));
+
+        if (organizer?.googleAccessToken) {
+          await updateCalendarEvent(organizer.id, myTokenRow.googleCalendarEventId, {
+            startDate: occurrences[0],
+            endDate: new Date(occurrences[0].getTime() + 60 * 60 * 1000),
+            attendees: [myTokenRow.email],
+          });
+        }
+      } catch (gcalErr) {
+        console.error("Personal time GCal update failed (non-fatal):", gcalErr);
+      }
     }
 
     res.json({ ok: true, calendarEventsCreated: occurrences.length });
