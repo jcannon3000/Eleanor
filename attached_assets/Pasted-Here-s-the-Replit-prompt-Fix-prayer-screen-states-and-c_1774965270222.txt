@@ -1,0 +1,68 @@
+Here’s the Replit prompt:
+
+Fix prayer screen states and closed screen design
+Do not change anything not described below.
+
+FIX 1 — Already-logged state should go to prayer screen not Amen screen
+Currently when a user has already logged today and taps Pray they see the Amen confirmation screen. This is wrong.
+Fix the Pray button behavior based on whether the user has already logged today:
+Not yet logged today:
+Pray → full prayer screen with Amen button at the bottom
+Already logged today:
+Pray → full prayer screen WITHOUT the Amen button. Replace the Amen button with:
+
+🙏 You prayed this today.
+
+← Back to practice
+
+
+Muted, centered, gentle. The user can read the prayer anytime. They simply cannot log it twice.
+The Amen confirmation screen — showing “Amen.” with the presence circles and reflection field — only appears as a transition immediately after the user taps Amen for the first time in a session. It is never shown as a navigation destination when revisiting.
+
+FIX 2 — Closed prayer screen design must match Eleanor
+The closed prayer screen currently shows plain white background with default black text. It does not match Eleanor’s design system. Apply the following:
+Background: cream #F7F0E6
+Page background: soft white #FAF6F0
+Header:
+
+INTERCESSION PRAYER
+
+
+10px, uppercase, letter-spaced, muted sage, Space Grotesk
+
+For the Care of Creation
+
+
+Space Grotesk bold, soil #2C1810, 24px
+
+Praying for: The pandas
+
+
+Sage #6B8F71, 14px — only shown if the intention text differs from the practice name
+Thin divider: sage #6B8F71 at 20% opacity
+Prayer text:
+Playfair Display italic, soil #2C1810, 16px, line height 1.8
+Full prayer visible, scrollable if long. Keep exactly as is — content is correct.
+BCP attribution:
+
+📖 From the Book of Common Prayer
+
+
+Playfair Display italic, muted sage, 12px
+Thin divider
+Presence section:
+
+0 of 2 have prayed this 🙏
+
+
+Space Grotesk, muted soil, 14px, centered
+Avatar circles: cream background, sage border, initials in sage
+Back link at bottom:
+
+← Back to practice
+
+
+Sage colored text, 13px, centered, generous tap target
+The overall feeling must match the open prayer page — same warmth, same typography, same color palette. The only difference from the open state is that the Amen button is absent and replaced with the back link.
+
+That is the only change. Two fixes, prayer screen states and closed screen design. Nothing else.​​​​​​​​​​​​​​​​

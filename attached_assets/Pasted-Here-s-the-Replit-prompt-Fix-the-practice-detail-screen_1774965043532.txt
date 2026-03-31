@@ -1,0 +1,193 @@
+Here’s the Replit prompt:
+
+Fix the practice detail screen, calendar invite format, and timezone handling
+Do not change anything not described below. Apply these changes across all practice types where relevant.
+
+FIX 1 — Practice detail screen header should show participants and prayer count
+The top of the detail screen currently shows the practice name, frequency, and open banner. Update the header section to include participants and a summary stat.
+New header order:
+
+For Peace
+
+Every morning
+
+[Member names as a simple horizontal list of first names:]
+Jeremy · Marcus
+
+[If more than 4 members — show first 3 names then "+ X more"]
+Jeremy · Marcus · Sarah · +2 more
+
+
+Member names appear as plain muted text, not chips, not avatars. Just first names separated by dots. Clean and minimal. This replaces the current approach of showing names only in the MEMBERS section lower down.
+Beneath the member names, one quiet stat line:
+
+🤝 [X] times prayed together
+
+
+This shows the total joint sessions (windows where 2+ members logged). On a new practice this shows “0 times prayed together” — honest and simple.
+For non-intercession practices use “practiced” instead of “prayed”:
+
+🤝 [X] times practiced together
+
+
+FIX 2 — Log timeline should say “Prayed” not “logged” for Intercession
+The log timeline currently shows “logged 9:04 am” for Jeremy. For Intercession practices this should say:
+
+Jeremy                    Prayed · 9:04 am
+"The people of Iran"      ← reflection text shown beneath name if exists
+
+
+For Contemplative Prayer:
+
+Jeremy                    Sat · 9:04 am
+
+
+For Morning Prayer / Evening Prayer:
+
+Jeremy                    Prayed · 9:04 am
+
+
+For Fasting:
+
+Jeremy                    Fasting · all day
+
+
+For all others:
+
+Jeremy                    Practiced · 9:04 am
+
+
+Also: Marcus’s row currently shows just a dash “—” with muted styling. This is correct for “not yet logged” but make it slightly clearer:
+
+Marcus                    Not yet 🌱
+
+
+Muted, gentle. Not alarming.
+
+FIX 3 — Calendar invite needs to be reworked completely
+Looking at the calendar screenshots the invite has three serious problems:
+Problem A — Wrong time. The event is showing 12 AM – 1 AM. This is wrong. For a morning practice the calendar event should be at the member’s chosen personal time in their timezone. Never midnight. Never a default time. The personal time the member set during onboarding or joining is the time the calendar event must be created at.
+Problem B — Wrong format for practices. The Notes section currently shows:
+
+For the Care of Creation
+Praying for: For the Care of Creation
+Wednesday · morning
+
+
+This is too sparse and repeats itself. It should feel like a meaningful invite not a data dump.
+Problem C — Two duplicate events appear side by side. The calendar is showing two separate events for the same practice at the same time. This means Eleanor is creating duplicate events. Find where duplicate calendar events are being created for the same member and practice, and fix it. Each member should have exactly one calendar event per occurrence. Not two.
+New calendar event format for all practice types:
+For Intercession:
+
+Title: 🙏 [Practice name] — [their personal time]
+
+[Inviter name] invited you to pray together.
+Praying for: [intention — only if different from practice name]
+
+Tap to pray:
+[personal_url]
+
+No login needed. 🌿
+
+
+For Morning Prayer:
+
+Title: 🌅 Morning Prayer — [their personal time]
+
+[Inviter name] invited you to pray Morning Prayer together.
+Morning Prayer Rite II · Book of Common Prayer · Page 75
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. 🌿
+
+
+For Evening Prayer:
+
+Title: 🌙 Evening Prayer — [their personal time]
+
+[Inviter name] invited you to pray Evening Prayer together.
+Evening Prayer Rite II · Book of Common Prayer · Page 115
+
+Tap when you have prayed:
+[personal_url]
+
+No login needed. 🌿
+
+
+For Contemplative Prayer:
+
+Title: 🕯️ [Practice name] — [their personal time]
+
+[Inviter name] invited you to sit together in stillness.
+[X] minutes · [frequency]
+
+Tap when you have sat:
+[personal_url]
+
+No login needed. 🌿
+
+
+For Fasting:
+
+Title: 🌿 Fasting — [fasting_from]
+All day
+
+[Inviter name] invited you to fast together.
+Why we fast: [fasting_intention]
+
+Tap to mark that you are fasting:
+[personal_url]
+
+No login needed. 🌿
+
+
+FIX 4 — Timezone handling for morning practices
+When a practice is set to “morning” time of day every member sets their own personal time within morning hours. Eleanor creates each member’s calendar event at their personal time in their personal timezone.
+Fix the timezone conversion so:
+	∙	The creator’s event is created at their personal_time in their personal_timezone
+	∙	Each invitee’s event is created at their personal_time in their personal_timezone
+	∙	No event should ever default to midnight or 12 AM
+	∙	No event should be created in UTC without converting to the member’s timezone first
+When generating a Google Calendar event:
+
+// Use the member's personal_time and personal_timezone
+// NOT the practice's shared ritual_time
+// NOT UTC
+// NOT the server's timezone
+
+scheduled_for = convert(
+  member.personal_time,
+  member.personal_timezone
+)
+
+
+If a member has not set a personal_time yet (they joined without setting one) default to 8:00 AM in their detected timezone and flag their record as needing time confirmation. Send them one email asking them to set their preferred time via their personal link.
+
+FIX 5 — Fix duplicate calendar events
+Find where Google Calendar events are being created for Shared Moment practices. There is a bug causing two events to be created per member per occurrence instead of one.
+Likely causes:
+	∙	The creation flow is triggering event creation twice (once on save, once on confirmation)
+	∙	The invite process is creating an event and then the join process is creating another
+	∙	A recurring event is being created AND individual events are also being created
+Fix so each member has exactly one calendar event per occurrence. Before creating a new calendar event check whether one already exists for that member and that practice occurrence using moment_calendar_events. If one exists do not create another.
+Add a uniqueness constraint:
+
+moment_calendar_events:
+  unique on (shared_moment_id, moment_member_id, scheduled_for)
+
+
+FIX 6 — Remove “Praying for: For the Care of Creation” redundancy from calendar notes
+In the calendar event notes the line “Praying for: For the Care of Creation” repeats the practice name exactly. Apply the same rule as the detail screen — only show “Praying for:” when the intention text differs from the practice name.
+If the intention is identical to or near-identical to the practice name omit the “Praying for:” line from the calendar notes entirely.
+
+Build order
+	1.	Fix duplicate calendar event creation — add uniqueness check before creating
+	2.	Fix timezone handling — use member’s personal_time and personal_timezone for all event creation
+	3.	Fix midnight default time — if no personal_time set default to 8am in detected timezone
+	4.	Update all calendar event formats — title, description, personal URL prominent
+	5.	Fix “Praying for:” redundancy in calendar notes
+	6.	Update detail screen header — member names as plain text, 🤝 times prayed/practiced together
+	7.	Fix log timeline action words per practice type — Prayed, Sat, Fasting, Practiced
+	8.	Fix “not yet” display — “Not yet 🌱” instead of dash​​​​​​​​​​​​​​​​

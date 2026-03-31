@@ -327,6 +327,27 @@ export default function MomentDetail() {
           <p className="text-xs text-muted-foreground">
             {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
+          {/* Member names as plain dot-separated text + together count */}
+          {members.length > 0 && (() => {
+            const firstNames = members.map(m => (m.name ?? m.email).split(" ")[0]);
+            const togetherCount = windows.filter(w => w.postCount >= 2).length;
+            const isPrayer = ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "");
+            const togetherVerb = isPrayer ? "prayed" : "practiced";
+            const MAX = 4;
+            const shown = firstNames.length <= MAX ? firstNames : firstNames.slice(0, MAX - 1);
+            const extra = firstNames.length > MAX ? firstNames.length - (MAX - 1) : 0;
+            const nameStr = extra > 0
+              ? [...shown, `+${extra} more`].join(" · ")
+              : shown.join(" · ");
+            return (
+              <div className="mt-2 space-y-0.5">
+                <p className="text-sm text-muted-foreground/70">{nameStr}</p>
+                <p className="text-xs text-muted-foreground/50">
+                  🤝 {togetherCount} {togetherCount === 1 ? "time" : "times"} {togetherVerb} together
+                </p>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Contemplative Prayer — duration card */}
@@ -520,9 +541,17 @@ export default function MomentDetail() {
                       </div>
                       <div className="shrink-0 text-right">
                         {loggedTime ? (
-                          <p className="text-xs text-[#6B8F71] font-medium">logged {loggedTime}</p>
+                          <p className="text-xs text-[#6B8F71] font-medium">
+                            {isFasting
+                              ? "Fasting · all day"
+                              : ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "")
+                              ? `Prayed · ${loggedTime}`
+                              : isContemplative
+                              ? `Sat · ${loggedTime}`
+                              : `Practiced · ${loggedTime}`}
+                          </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground/40">—</p>
+                          <p className="text-xs text-muted-foreground/40">Not yet 🌱</p>
                         )}
                       </div>
                     </div>
@@ -572,7 +601,15 @@ export default function MomentDetail() {
                                   {post.reflectionText ? (
                                     <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
                                   ) : post.isCheckin ? (
-                                    <p className="text-xs text-muted-foreground">✓ practiced</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {isFasting
+                                        ? "✓ fasted"
+                                        : ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "")
+                                        ? "✓ prayed"
+                                        : isContemplative
+                                        ? "✓ sat"
+                                        : "✓ practiced"}
+                                    </p>
                                   ) : null}
                                 </div>
                                 {loggedTime && (

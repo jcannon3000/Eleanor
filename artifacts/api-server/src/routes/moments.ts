@@ -475,60 +475,94 @@ router.post("/moments", async (req, res): Promise<void> => {
 
   const tz = timezone || "UTC";
   const [hh, mm] = scheduledTime.split(":").map(Number);
-  const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, tz);
+  // Spiritual practices have scheduledTime="00:00"; use 8 AM as default for calendar
+  const hhEff = (hh === 0 && mm === 0 && isSpiritual) ? 8 : hh;
+  const mmEff = (hh === 0 && mm === 0 && isSpiritual) ? 0 : mm;
+  const { startLocalStr, endLocalStr } = buildLocalEventTimes(hhEff, mmEff, tz);
   const startDate = new Date(); // fallback
 
+  function formatTimeForTitle(h: number, m: number): string {
+    const period = h < 12 ? "AM" : "PM";
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const minStr = String(m).padStart(2, "0");
+    return minStr === "00" ? `${hour12} ${period}` : `${hour12}:${minStr} ${period}`;
+  }
+  const calTimeLabel = formatTimeForTitle(hhEff, mmEff);
+  function buildEventTitle(): string {
+    if (templateType === "morning-prayer") return `🌅 Morning Prayer — ${calTimeLabel}`;
+    if (templateType === "evening-prayer") return `🌙 Evening Prayer — ${calTimeLabel}`;
+    if (templateType === "intercession") return `🙏 ${name} — ${calTimeLabel}`;
+    if (templateType === "contemplative") return `🕯️ ${name} — ${calTimeLabel}`;
+    if (templateType === "fasting") return `🌿 Fasting — ${fastingFrom ?? name}`;
+    return `🌿 ${name} — ${calTimeLabel}`;
+  }
+
   // ─── Build a personalised calendar description for each member ────────────
-  function buildDescription(memberToken: string, _memberName: string): string {
+  function buildDescription(memberToken: string, _memberName: string, inviterName: string): string {
     const personalLink = `${baseUrl}/${momentToken}/${memberToken}`;
 
     if (templateType === "morning-prayer") {
       return [
-        "Morning Prayer Rite II · Page 75",
-        scheduleLabel,
+        `${inviterName} invited you to pray Morning Prayer together.`,
+        "Morning Prayer Rite II · Book of Common Prayer · Page 75",
         "",
         "Tap when you have prayed:",
         personalLink,
         "",
-        "Eleanor — a shared practice companion",
+        "No login needed. 🌿",
       ].join("\n");
     }
 
     if (templateType === "evening-prayer") {
       return [
-        "Evening Prayer Rite II · Page 115",
-        scheduleLabel,
+        `${inviterName} invited you to pray Evening Prayer together.`,
+        "Evening Prayer Rite II · Book of Common Prayer · Page 115",
         "",
         "Tap when you have prayed:",
         personalLink,
         "",
-        "Eleanor — a shared practice companion",
+        "No login needed. 🌿",
       ].join("\n");
     }
 
     if (templateType === "intercession") {
       const topic = intercessionTopic ?? intention;
+      const showIntention = !!(topic && topic.toLowerCase() !== name.toLowerCase());
       return [
-        name,
-        `Praying for: ${topic}`,
-        scheduleLabel,
+        `${inviterName} invited you to pray together.`,
+        ...(showIntention ? [`Praying for: ${topic}`] : []),
         "",
         "Tap to pray:",
         personalLink,
         "",
-        "Eleanor — a shared practice companion",
+        "No login needed. 🌿",
+      ].join("\n");
+    }
+
+    if (templateType === "contemplative") {
+      const durLine = contemplativeDurationMinutes
+        ? `${contemplativeDurationMinutes} minutes · ${frequency}`
+        : frequency;
+      return [
+        `${inviterName} invited you to sit together in stillness.`,
+        durLine,
+        "",
+        "Tap when you have sat:",
+        personalLink,
+        "",
+        "No login needed. 🌿",
       ].join("\n");
     }
 
     // All other practices
     return [
-      name,
+      `${inviterName} invited you to practice together.`,
       scheduleLabel,
       "",
       "Tap to log:",
       personalLink,
       "",
-      "Eleanor — a shared practice companion",
+      "No login needed. 🌿",
     ].join("\n");
   }
 
@@ -566,89 +600,75 @@ router.post("/moments", async (req, res): Promise<void> => {
     return [];
   }
 
-  function buildFastingDescription(memberToken: string): string {
+  function buildFastingDescription(memberToken: string, inviterName: string): string {
     const baseUrl2 = process.env["REPLIT_DEV_DOMAIN"]
       ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
       : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
     const personalLink = `${baseUrl2}/${momentToken}/${memberToken}`;
     return [
-      `🌿 Fasting — ${fastingFrom ?? name}`,
+      `${inviterName} invited you to fast together.`,
+      ...(fastingIntention ? [`Why we fast: ${fastingIntention}`] : []),
       "",
-      fastingIntention ? `Why we fast: ${fastingIntention}` : "",
-      "",
-      "Your personal link:",
+      "Tap to mark that you are fasting:",
       personalLink,
       "",
-      "Eleanor — a shared practice companion",
-    ].filter(l => l !== undefined).join("\n");
+      "No login needed. 🌿",
+    ].join("\n");
   }
 
   // ─── Create one personalised calendar event per member ─────────────────────
-  // (Like Calendly: each invitee gets their own event with only their link)
+  // Each member gets exactly one event with their own personal link (no group event = no duplicates)
+  const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
   let gcalEventId: string | null = null;
+
   if (isFasting) {
     const fastingDateStr = getFastingStartDateStr();
     const fastingRec = getFastingRecurrence();
-    const orgToken = insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "";
-    gcalEventId = await createAllDayCalendarEvent(sessionUserId, {
-      summary: `🌿 Fasting — ${fastingFrom ?? name}`,
-      description: buildFastingDescription(orgToken),
-      dateStr: fastingDateStr,
-      attendees: uniqueMembers.map(m => m.email),
-      recurrence: fastingRec,
-    }).catch(() => null);
-
-    const guestTokensFasting = insertedTokens.filter(t => t.email !== organizer.email);
-    await Promise.allSettled(
-      guestTokensFasting.map(t =>
+    const fastingTitle = buildEventTitle();
+    const fastingResults = await Promise.allSettled(
+      insertedTokens.map(t =>
         createAllDayCalendarEvent(sessionUserId, {
-          summary: `🌿 Fasting — ${fastingFrom ?? name}`,
-          description: buildFastingDescription(t.userToken),
+          summary: fastingTitle,
+          description: buildFastingDescription(t.userToken, organizerName),
           dateStr: fastingDateStr,
           attendees: [t.email],
           recurrence: fastingRec,
-        })
+        }).catch(() => null)
       )
     );
+    for (let i = 0; i < insertedTokens.length; i++) {
+      const result = fastingResults[i];
+      if (result.status === "fulfilled" && result.value) {
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: result.value })
+          .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
+        if (insertedTokens[i].email === organizer.email) gcalEventId = result.value;
+      }
+    }
   } else {
-    gcalEventId = await createCalendarEvent(sessionUserId, {
-      summary: `🌿 ${name}`,
-      description: buildDescription(
-        insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "",
-        organizer.name ?? organizer.email
-      ),
-      startDate,
-      startLocalStr,
-      endLocalStr,
-      timeZone: tz,
-      attendees: uniqueMembers.map(m => m.email),
-      recurrence: recurrenceRule,
-    }).catch(() => null);
-
-    // Create individual personalised events for non-organizer members
-    const guestTokens = insertedTokens.filter(t => t.email !== organizer.email);
-    await Promise.allSettled(
-      guestTokens.map(t =>
+    const eventTitle = buildEventTitle();
+    const eventResults = await Promise.allSettled(
+      insertedTokens.map(t =>
         createCalendarEvent(sessionUserId, {
-          summary: `🌿 ${name}`,
-          description: buildDescription(t.userToken, t.name ?? t.email),
+          summary: eventTitle,
+          description: buildDescription(t.userToken, t.name ?? t.email, organizerName),
           startDate,
           startLocalStr,
           endLocalStr,
           timeZone: tz,
           attendees: [t.email],
           recurrence: recurrenceRule,
-        })
+        }).catch(() => null)
       )
     );
-  }
-
-  if (gcalEventId) {
-    const organizerTokenRow = insertedTokens.find(t => t.email === organizer.email);
-    if (organizerTokenRow) {
-      await db.update(momentUserTokensTable)
-        .set({ googleCalendarEventId: gcalEventId })
-        .where(eq(momentUserTokensTable.id, organizerTokenRow.id));
+    for (let i = 0; i < insertedTokens.length; i++) {
+      const result = eventResults[i];
+      if (result.status === "fulfilled" && result.value) {
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: result.value })
+          .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
+        if (insertedTokens[i].email === organizer.email) gcalEventId = result.value;
+      }
     }
   }
 
