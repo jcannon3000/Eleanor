@@ -1,0 +1,86 @@
+Here’s the Replit prompt:
+
+Add member management to Traditions — invite after creation, sync from Google Calendar
+Find the Tradition detail screen (currently showing as the gathering circle dashboard with Timeline, Moments, and Settings tabs). Apply the changes below. Do not change anything not described here.
+
+CHANGE 1 — Add member management to the Tradition detail screen
+The current detail screen shows a member avatar (J) and a settings gear icon but no way to add new members after the tradition has been created.
+Add a visible invite button beside the existing member avatars:
+
+[J avatar]  [+ Add people]
+
+
+“+ Add people” is a small sage outlined button, not a filled button. Tapping it opens the invite sheet described below.
+
+INVITE SHEET
+When the user taps “+ Add people” show a bottom sheet that slides up.
+Header: “Invite to [Tradition name] 🌱”
+Section 1 — From your practices and traditions
+Label: “Already in Eleanor with you”
+Query moment_members and circle_members for everyone the current user shares any existing practice or tradition with. Deduplicate by email. Display as selectable rows:
+
+[Avatar]  [Name]           [Invite →]
+          [email muted]
+
+
+Tapping Invite → immediately sends them a calendar invite and adds them to the tradition. Their row updates to “Invited ✓” in sage. If they are already a member of this tradition show “Already here ✓” in muted text instead.
+If the user has no existing connections this section is hidden.
+Section 2 — Invite by email
+Label: “Invite someone new”
+Email input field. Tap Add. Multiple addresses allowed. Each added address queues a calendar invite.
+Section 3 — Share a link
+Label: “Or share a link”
+Auto-generated join link: eleanor.app/join/[tradition_token]
+Copy button. Share via Messages, WhatsApp, email.
+Bottom of sheet: sage full-width button:
+“Send invites 🌱”
+On tapping Send invites:
+	∙	Creates Google Calendar event for each new invitee and adds them as attendees on the existing event if one exists
+	∙	Adds them to circle_members with role “member”
+	∙	Sends welcome email to each new member
+	∙	Closes the sheet
+	∙	Member avatars on the detail screen update to show the new members
+
+CHANGE 2 — Sync members from Google Calendar
+When a tradition has a Google Calendar event associated with it, Eleanor should check that event’s attendee list and sync it with the tradition’s member list.
+On loading the tradition detail screen:
+	∙	Fetch the attendee list from the associated Google Calendar event using the stored google_calendar_event_id
+	∙	Compare attendees to current circle_members
+	∙	If an attendee appears in the calendar event but not in circle_members: add them automatically and show a notification card on the detail screen:
+
+[Small sage card:]
+🌱 [Name] was added from your calendar
+   They've been added to [Tradition name].
+
+
+This card appears at the top of the timeline, above AWAITING RESPONSES. It auto-dismisses after 5 seconds or on tap.
+	∙	If a circle_member no longer appears in the calendar event attendee list: do not automatically remove them. Only flag with a small indicator on their avatar showing they may have declined. Do not remove without explicit user action.
+This sync happens once on page load, not continuously. It does not run in the background.
+
+CHANGE 3 — Member avatars on the detail screen
+Update the member display on the Tradition detail screen.
+Currently shows: one avatar (J) and a settings gear.
+Update to show:
+
+[Avatar 1]  [Avatar 2]  [Avatar 3]  [+N more if >3]  [+ Add people]
+
+
+Each avatar shows the member’s initials or photo.
+Tap any avatar to see their name in a small tooltip.
+If they were synced from Google Calendar show a small calendar icon on their avatar.
+If they have not yet accepted their invite show their avatar as an empty outline circle with their initial in muted text and a small pending indicator.
+The settings gear moves into the Settings tab. Remove it from the header area.
+
+CHANGE 4 — “Ready to plant” label
+The card currently shows “Ready to plant” as a status label. This implies the tradition hasn’t started. Remove this label. It was never asked for and is confusing. The tradition exists. It is planted. Replace it with nothing — the growth state badge (“Just planted”) already communicates where the tradition is in its lifecycle.
+
+Build order
+	1.	Add “+ Add people” button beside member avatars on tradition detail screen
+	2.	Build invite sheet — existing connections section, email invite section, share link section
+	3.	Autofill existing connections — query moment_members and circle_members, deduplicate by email
+	4.	Send calendar invites to new members and add them as attendees on existing event
+	5.	Add new members to circle_members on invite
+	6.	Google Calendar sync on page load — fetch attendee list, add missing members, show notification card
+	7.	Update member avatar display — multiple avatars, pending state, calendar sync indicator
+	8.	Move settings gear to Settings tab, remove from header
+	9.	Remove “Ready to plant” label from tradition cards​​​​​​​​​​​​​​​​

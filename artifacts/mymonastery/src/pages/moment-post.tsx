@@ -94,7 +94,7 @@ function PresenceDots({ count, total }: { count: number; total: number }) {
   );
 }
 
-// ─── Named presence circles ───────────────────────────────────────────────────
+// ─── Named presence circles (standard) ────────────────────────────────────────
 function NamedPresence({ members, myToken }: { members: MomentMember[]; myToken?: string }) {
   const shown = Math.min(members.length, 8);
   return (
@@ -132,195 +132,296 @@ function NamedPresence({ members, myToken }: { members: MomentMember[]; myToken?
   );
 }
 
+// ─── Named presence circles with bloom animation (intercession) ───────────────
+function NamedPresenceWithBloom({ members, myToken, justBloomed }: { members: MomentMember[]; myToken?: string; justBloomed: Set<string> }) {
+  const shown = Math.min(members.length, 8);
+  return (
+    <div className="flex flex-wrap justify-center gap-4">
+      {members.slice(0, shown).map((m, i) => {
+        const initial = (m.name ?? "?")[0].toUpperCase();
+        const isMe = m.userToken === myToken;
+        const isBloomin = justBloomed.has(m.userToken);
+        return (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <motion.div
+              animate={{
+                scale: isBloomin ? [0, 1.3, 1] : 1,
+                backgroundColor: m.prayed ? "#6B8F71" : "transparent",
+                borderColor: m.prayed ? "#6B8F71" : "rgba(107,143,113,0.4)",
+              }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className={clsx(
+                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold border-2",
+                m.prayed ? "text-white" : "text-[#6B8F71]/60"
+              )}
+            >
+              {initial}
+            </motion.div>
+            <span className="text-[10px] text-[#6b5c4a]/60 max-w-[3rem] text-center leading-tight">
+              {isMe ? "you" : (m.name ?? "?").split(" ")[0]}
+            </span>
+          </div>
+        );
+      })}
+      {members.length > shown && (
+        <div className="flex flex-col items-center gap-1">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 border-[#6B8F71]/30 text-[#6B8F71]/50">
+            +{members.length - shown}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
   topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
-  members, myToken, canPray, alreadyPosted, myReflection, isPraying, nextWindowLabel, onComplete, onBack,
+  members, myToken, canPray, alreadyPosted, myReflection, isPraying, nextWindowLabel: _nwl, onComplete, onBack,
 }: {
-  topic: string;
-  fullText: string;
-  intention: string;
-  reflectionPrompt: string;
-  memberCount: number;
-  todayPostCount: number;
-  members: MomentMember[];
-  myToken?: string;
-  canPray: boolean;
-  alreadyPosted: boolean;
-  myReflection: string | null;
-  isPraying: boolean;
-  nextWindowLabel: string;
-  onComplete: (reflection: string) => void;
-  onBack: () => void;
+  topic: string; fullText: string; intention: string; reflectionPrompt: string;
+  memberCount: number; todayPostCount: number; members: MomentMember[]; myToken?: string;
+  canPray: boolean; alreadyPosted: boolean; myReflection: string | null;
+  isPraying: boolean; nextWindowLabel: string;
+  onComplete: (reflection: string) => void; onBack: () => void;
 }) {
   const [reflection, setReflection] = useState(myReflection ?? "");
   const [showReflection, setShowReflection] = useState(false);
 
-  // Post-Amen confirmation screen
-  if (alreadyPosted) {
-    return (
-      <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="max-w-xs w-full text-center">
-          <div className="text-7xl mb-5">🙏</div>
-          <h1 className="text-3xl font-bold text-[#2C1A0E] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-            Amen.
-          </h1>
-          <p className="text-sm text-[#6b5c4a] mb-6">
-            {todayPostCount} of {memberCount} have prayed together today.
-          </p>
+  // Confirmation step: "prayer" → "amen-text" → "confirmed"
+  const [confirmStep, setConfirmStep] = useState<"prayer" | "amen-text" | "confirmed">(
+    alreadyPosted ? "confirmed" : "prayer"
+  );
+  const [amenPulse, setAmenPulse] = useState(false);
+  const [showGlow, setShowGlow] = useState(false);
+  const [justBloomed, setJustBloomed] = useState<Set<string>>(new Set());
 
-          {/* Named presence */}
-          <div className="mb-8">
-            <NamedPresence members={members} myToken={myToken} />
-          </div>
+  // When alreadyPosted transitions false → true, animate through amen-text → confirmed
+  const prevPostedRef = useRef(alreadyPosted);
+  useEffect(() => {
+    if (!prevPostedRef.current && alreadyPosted && confirmStep === "prayer") {
+      setConfirmStep("amen-text");
+      const t = setTimeout(() => setConfirmStep("confirmed"), 1500);
+      return () => clearTimeout(t);
+    }
+    prevPostedRef.current = alreadyPosted;
+  }, [alreadyPosted, confirmStep]);
 
-          {/* Optional reflection */}
-          {!myReflection && (
-            <div className="mb-6">
-              {!showReflection ? (
-                <button
-                  onClick={() => setShowReflection(true)}
-                  className="text-sm text-[#6B8F71] underline-offset-2 hover:underline"
-                >
-                  Add a reflection?
-                </button>
-              ) : (
-                <div className="text-left">
-                  <p className="font-serif italic text-[#6B8F71] text-sm mb-2">"{reflectionPrompt}"</p>
-                  <textarea
-                    value={reflection}
-                    onChange={e => setReflection(e.target.value.slice(0, 280))}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-sm"
-                    placeholder="What are you holding today?"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => onComplete(reflection)}
-                    className="mt-2 w-full py-3 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold"
-                  >
-                    Save reflection
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+  // Warm glow when a second person prays
+  const prevCountRef = useRef(todayPostCount);
+  useEffect(() => {
+    if (todayPostCount >= 2 && prevCountRef.current < 2) {
+      setShowGlow(true);
+      const t = setTimeout(() => setShowGlow(false), 2000);
+      return () => clearTimeout(t);
+    }
+    prevCountRef.current = todayPostCount;
+  }, [todayPostCount]);
 
-          {myReflection && (
-            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-4 mb-6 text-left">
-              <p className="text-xs text-[#6b5c4a]/60 italic mb-1">{reflectionPrompt}</p>
-              <p className="text-sm font-serif text-[#2C1A0E] italic">"{myReflection}"</p>
-            </div>
-          )}
+  // Bloom animation: track newly-prayed members
+  const prevPrayedRef = useRef<Set<string>>(
+    new Set(members.filter(m => m.prayed).map(m => m.userToken))
+  );
+  useEffect(() => {
+    const newBlooms = members
+      .filter(m => m.prayed && !prevPrayedRef.current.has(m.userToken))
+      .map(m => m.userToken);
+    if (newBlooms.length > 0) {
+      setJustBloomed(prev => new Set([...prev, ...newBlooms]));
+      newBlooms.forEach(token => {
+        setTimeout(() => setJustBloomed(prev => { const s = new Set(prev); s.delete(token); return s; }), 600);
+      });
+    }
+    prevPrayedRef.current = new Set(members.filter(m => m.prayed).map(m => m.userToken));
+  }, [members]);
 
-          {/* Continue button — goes back to detail */}
-          <button
-            onClick={onBack}
-            className="w-full py-4 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-base font-semibold hover:opacity-90 transition-opacity"
-            style={{ fontFamily: "Space Grotesk, sans-serif" }}
-          >
-            Continue →
-          </button>
-        </motion.div>
-      </div>
-    );
+  function handleAmen() {
+    setAmenPulse(true);
+    onComplete(reflection);
   }
 
-  return (
-    <div className="min-h-screen bg-[#F5EDD8]">
+  const headerContainer = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.2, delayChildren: 0.1 } },
+  };
+  const headerItem = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.4, ease: "easeOut" } },
+  };
+
+  // ── Confirmation screen (slides up from below) ──────────────────────────────
+  const confirmScreen = (
+    <motion.div
+      key="confirmation"
+      initial={{ y: "100%" }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6"
+    >
+      <div className="max-w-xs w-full text-center">
+        <div className="text-7xl mb-5">🙏</div>
+        <h1 className="text-3xl font-bold text-[#2C1A0E] mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>Amen.</h1>
+        <p className="text-sm text-[#6b5c4a] mb-6">{todayPostCount} of {memberCount} have prayed together today.</p>
+        <div className="mb-8">
+          <NamedPresenceWithBloom members={members} myToken={myToken} justBloomed={justBloomed} />
+        </div>
+        {!myReflection && (
+          <div className="mb-6">
+            {!showReflection ? (
+              <button onClick={() => setShowReflection(true)} className="text-sm text-[#6B8F71] underline-offset-2 hover:underline">
+                Add a reflection?
+              </button>
+            ) : (
+              <div className="text-left">
+                <p className="font-serif italic text-[#6B8F71] text-sm mb-2">"{reflectionPrompt}"</p>
+                <textarea value={reflection} onChange={e => setReflection(e.target.value.slice(0, 280))} rows={3}
+                  className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-sm"
+                  placeholder="What are you holding today?" autoFocus />
+                <button onClick={() => onComplete(reflection)} className="mt-2 w-full py-3 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold">
+                  Save reflection
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {myReflection && (
+          <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-4 mb-6 text-left">
+            <p className="text-xs text-[#6b5c4a]/60 italic mb-1">{reflectionPrompt}</p>
+            <p className="text-sm font-serif text-[#2C1A0E] italic">"{myReflection}"</p>
+          </div>
+        )}
+        <button onClick={onBack} className="w-full py-4 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-base font-semibold hover:opacity-90 transition-opacity" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+          Continue →
+        </button>
+      </div>
+    </motion.div>
+  );
+
+  // ── Prayer screen (slides up and out on exit) ───────────────────────────────
+  const prayerScreen = (
+    <motion.div
+      key="prayer"
+      exit={{ y: "-100%", transition: { duration: 0.35, ease: [0.4, 0, 1, 1] } }}
+      className="min-h-screen bg-[#F5EDD8]"
+    >
       <div className="max-w-md mx-auto px-5 py-10 pb-24">
 
-        {/* Back link — shown when window is closed (read-only) */}
-        {!canPray && (
+        {/* Closed state: quiet back button at top */}
+        {!canPray && confirmStep === "prayer" && (
           <button onClick={onBack} className="text-xs text-[#6b5c4a]/60 hover:text-[#6b5c4a] flex items-center gap-1 mb-6 transition-colors">
-            ← Back
+            ← Back to practice
           </button>
         )}
 
-        {/* Header */}
-        <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-2">
-          {canPray ? "Today's intercession" : "Intercession prayer"}
-        </p>
-        <h1 className="text-[22px] font-bold text-[#2C1A0E] text-center leading-snug mb-2"
-          style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-          {topic}
-        </h1>
+        {/* Header — staggered fade-in */}
+        <motion.div variants={headerContainer} initial="hidden" animate="visible" className="text-center mb-5">
+          <motion.p variants={headerItem} className="text-[11px] uppercase tracking-widest text-[#6B8F71]/60 mb-2">
+            Intercession Prayer
+          </motion.p>
+          <motion.h1 variants={headerItem} className="text-[22px] font-bold text-[#2C1A0E] leading-snug mb-2"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+            {topic}
+          </motion.h1>
+          {intention && (
+            <motion.p variants={headerItem} className="text-[#6B8F71] text-[13px]">
+              Praying for: {intention}
+            </motion.p>
+          )}
+        </motion.div>
 
-        {/* Intention */}
-        {intention && (
-          <p className="text-center text-[#6B8F71] text-[13px] mb-5">
-            Praying for: {intention}
-          </p>
-        )}
-
-        {/* Thin divider */}
         <div className="w-full h-px bg-[#6B8F71]/20 mb-6" />
 
-        {/* Full prayer card — Playfair Display italic */}
+        {/* Prayer text — subtle upward settle, 400ms after header */}
         {fullText && (
-          <div className="mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5, ease: "easeOut" }}
+            className="mb-6"
+          >
             <p className="font-serif text-[#2C1A0E] text-base leading-[1.9] whitespace-pre-wrap italic"
               style={{ fontFamily: "Playfair Display, Georgia, serif" }}>
               {fullText}
             </p>
             <p className="text-[12px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
-              From the Book of Common Prayer
+              📖 From the Book of Common Prayer
             </p>
-          </div>
+          </motion.div>
         )}
 
-        {/* Thin divider */}
         <div className="w-full h-px bg-[#6B8F71]/20 mb-6" />
 
-        {/* Live presence — named circles */}
-        <div className="mb-2 text-center">
-          <p className="text-sm text-[#6b5c4a]/70 mb-4">
-            {todayPostCount} of {memberCount} have prayed this 🙏
-          </p>
-          <NamedPresence members={members} myToken={myToken} />
-        </div>
+        {/* Presence — with ambient glow when two have prayed */}
+        <motion.div
+          animate={{
+            boxShadow: showGlow
+              ? "0 0 36px 8px rgba(217,119,6,0.09), 0 0 0 1px rgba(217,119,6,0.05)"
+              : "0 0 0 0 rgba(0,0,0,0)",
+          }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mb-4 text-center rounded-2xl p-3"
+        >
+          <p className="text-sm text-[#6b5c4a]/70 mb-4">{todayPostCount} of {memberCount} have prayed this 🙏</p>
+          <NamedPresenceWithBloom members={members} myToken={myToken} justBloomed={justBloomed} />
+        </motion.div>
 
         <div className="mt-6 mb-3" />
 
+        {/* Amen / closed-state section */}
         {canPray ? (
-          <>
-            {/* Reflection (optional, before Amen) */}
-            <div className="mb-5">
-              <p className="font-serif italic text-[#6B8F71] text-sm mb-2 text-center">
-                "{reflectionPrompt}"
-              </p>
-              <textarea
-                value={reflection}
-                onChange={e => setReflection(e.target.value.slice(0, 280))}
-                placeholder="Who or what are you holding today?"
-                rows={3}
-                className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
-              />
-              <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
-            </div>
-
-            {/* Amen button */}
-            <button
-              onClick={() => onComplete(reflection)}
-              disabled={isPraying}
-              className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-40"
-              style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          confirmStep === "amen-text" ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-4"
             >
-              {isPraying ? "Marking…" : "Amen 🙏"}
-            </button>
-            <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
-              Tapping Amen marks that you have prayed this together.
-            </p>
-          </>
+              <p className="text-4xl font-bold text-[#6B8F71]">🙏 Amen</p>
+            </motion.div>
+          ) : (
+            <>
+              <div className="mb-5">
+                <p className="font-serif italic text-[#6B8F71] text-sm mb-2 text-center">"{reflectionPrompt}"</p>
+                <textarea
+                  value={reflection}
+                  onChange={e => setReflection(e.target.value.slice(0, 280))}
+                  placeholder="Who or what are you holding today?"
+                  rows={3}
+                  className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
+                />
+                <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
+              </div>
+              {/* Amen button — amber pulse on tap, then "🙏 Amen" text */}
+              <motion.button
+                onClick={handleAmen}
+                disabled={isPraying}
+                animate={amenPulse ? { backgroundColor: ["#2C1A0E", "#B45309", "#2C1A0E"] } : { backgroundColor: "#2C1A0E" }}
+                transition={{ duration: 0.3 }}
+                className="w-full py-5 rounded-2xl text-[#F5EDD8] text-lg font-bold hover:opacity-90 disabled:opacity-40"
+                style={{ fontFamily: "Space Grotesk, sans-serif" }}
+              >
+                {isPraying ? "Marking…" : "Amen 🙏"}
+              </motion.button>
+              <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
+                Tapping Amen marks that you have prayed this together.
+              </p>
+            </>
+          )
         ) : (
-          /* Window not open — preview only, show next window time */
+          /* Closed state — full prayer visible, quiet back button */
           <div className="text-center py-4">
-            <p className="text-sm text-[#6b5c4a]/60 font-serif italic">{nextWindowLabel}</p>
+            <button onClick={onBack} className="text-sm text-[#6b5c4a]/50 hover:text-[#6b5c4a] transition-colors">
+              ← Back to practice
+            </button>
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
+  );
+
+  return (
+    <AnimatePresence mode="wait">
+      {confirmStep === "confirmed" ? confirmScreen : prayerScreen}
+    </AnimatePresence>
   );
 }
 
@@ -635,7 +736,7 @@ export default function MomentPostPage() {
         {/* Already posted — success */}
         {alreadyPosted && !posted && myPost && (
           <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-5 mb-6 shadow-sm">
-            <p className="text-sm font-semibold text-[#2C1A0E] mb-3">🌸 You showed up today.</p>
+            <p className="text-sm font-semibold text-[#2C1A0E] mb-3">🌸 You practiced today.</p>
             {myPost.reflectionText && (
               <div className="bg-[#F5EDD8] rounded-xl p-3">
                 {moment.reflectionPrompt && <p className="text-xs text-[#6b5c4a] italic mb-1">{moment.reflectionPrompt}</p>}
@@ -656,7 +757,7 @@ export default function MomentPostPage() {
           {posted && (
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
               <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 0.6 }} className="text-6xl mb-4">🌿</motion.div>
-              <p className="text-xl font-semibold text-[#2C1A0E] mb-2">You showed up.</p>
+              <p className="text-xl font-semibold text-[#2C1A0E] mb-2">You practiced.</p>
               {(actualTodayCount ?? 0) >= 2 ? (
                 <p className="text-sm text-[#6B8F71] font-medium">
                   🌸 {actualTodayCount} of {actualMemberCount} tended this together.
@@ -703,7 +804,7 @@ export default function MomentPostPage() {
             <button onClick={() => handleSubmit()}
               disabled={!canSubmit() || postMutation.isPending}
               className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-40">
-              {postMutation.isPending ? "Showing up..." : "I showed up 🌿"}
+              {postMutation.isPending ? "Practicing..." : "I practiced 🌿"}
             </button>
           </div>
         )}

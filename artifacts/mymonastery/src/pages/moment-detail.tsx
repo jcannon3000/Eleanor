@@ -188,7 +188,7 @@ function WindowEntry({ win }: { win: MomentWindow }) {
       </div>
       <div className="flex-1">
         {win.posts.length === 0 ? (
-          <p className="text-xs text-muted-foreground/50 italic">No one showed up</p>
+          <p className="text-xs text-muted-foreground/50 italic">No one practiced</p>
         ) : (
           <div className="space-y-2">
             {win.posts.map((post, i) => (
@@ -200,7 +200,7 @@ function WindowEntry({ win }: { win: MomentWindow }) {
                   <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
                 )}
                 {post.isCheckin && !post.reflectionText && (
-                  <span className="text-xs text-muted-foreground">✓ showed up</span>
+                  <span className="text-xs text-muted-foreground">✓ practiced</span>
                 )}
               </div>
             ))}
@@ -281,9 +281,8 @@ export default function MomentDetail() {
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
   const isIntercession = moment.templateType === "intercession";
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
-  const practiceDay = isTodayPracticeDay(moment.frequency, moment.dayOfWeek, parsedPracticeDays);
-  const pastTime = isPastScheduledTime(moment.scheduledTime);
-  const isOpenNow = isSpiritual ? (practiceDay && pastTime) : data.windowOpen;
+  // Use the backend's computed windowOpen for all practices — it checks day-of-week + time window
+  const isOpenNow = data.windowOpen;
 
   // Intercession: Pray button always accessible (prayer can be read any time; Amen only logs when window open)
   const postUrl = myUserToken

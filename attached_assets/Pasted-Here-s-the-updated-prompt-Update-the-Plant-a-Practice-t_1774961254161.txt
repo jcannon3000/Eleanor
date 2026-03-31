@@ -1,0 +1,210 @@
+Here’s the updated prompt:
+
+Update the Plant a Practice template list — order, descriptions, and template behavior
+Find the “What will you tend together?” template selection screen in the Plant a Practice flow. Apply all changes below.
+
+NEW ORDER AND DESCRIPTIONS
+Display templates in this exact order with these exact descriptions:
+
+🙏  Intercession
+    Start a practice of prayer together
+
+🕯️  Contemplative Prayer
+    Sit in silence together, wherever you are
+
+🌿  Fasting
+    Keep a shared fast as a discipline
+
+🌅  Morning Prayer
+    Pray the Daily Office together each morning
+
+🌙  Evening Prayer
+    Pray the Daily Office together each evening
+
+🌱  Create your own
+    Build your own practice from scratch
+
+
+The last template is now called “Create your own” everywhere — on the template list, in the creation flow, in any back navigation, and in any references to it elsewhere in the app. Remove all instances of “Begin from stillness” and replace with “Create your own.”
+
+EVENING PRAYER — update description in creation flow
+Evening Prayer is a Daily Office, identical in status to Morning Prayer. Anywhere in the app that describes Evening Prayer as something other than a Daily Office update it to match Morning Prayer’s framing.
+On the commitment screen for Evening Prayer update the attribution line to read:
+
+Evening Prayer Rite II · Book of Common Prayer · Page 115 · A Daily Office
+
+
+Mirror however Morning Prayer is described as a Daily Office and apply the same language to Evening Prayer throughout the app.
+
+CONTEMPLATIVE PRAYER — add length selection step
+After the template is selected and before the intention step add a single new step to the Contemplative Prayer creation flow:
+Header: “How long will you sit together? 🕯️”
+Muted subtitle:
+“Everyone sits for the same length of time, wherever they are.”
+Five large selectable cards:
+
+🌱  5 minutes
+    A brief stillness
+
+🌿  10 minutes
+    A gentle practice
+
+🌸  20 minutes
+    A deeper sit
+
+🌳  30 minutes
+    A sustained silence
+
+✨  Choose your own
+    Set your own length
+
+
+On selecting “Choose your own” show a simple number input — minutes only, minimum 1, maximum 60.
+Store in shared_moments:
+
+contemplative_duration_minutes integer
+
+
+This duration displays on the detail screen:
+
+Contemplative Prayer · [X] minutes
+Every [frequency] in the [time of day]
+
+
+And on the posting page as context for the member before they begin:
+
+🕯️ [X] minutes of silence together
+
+
+The duration is informational only. Members sit for the chosen time on their own and then log “I practiced 🌿” when complete.
+
+FASTING — complete setup redesign
+The Fasting template needs a dedicated creation flow different from all other practices. Replace whatever currently exists with the following.
+Step 1 — What are you fasting from?
+Header: “What are you fasting from? 🌿”
+Muted subtitle:
+“Name the fast your group will keep together.”
+Large warm text area, starts empty.
+Rotating examples beneath in muted italic:
+“Food — eating only one meal today”
+“Social media and screens”
+“Alcohol”
+“Meat”
+“News and consumption”
+“Spending and buying”
+Character limit: 140 characters.
+Store in shared_moments:
+
+fasting_from text
+
+
+Step 2 — Why are you fasting?
+Header: “Why are you fasting together? 🙏”
+Muted subtitle:
+“The intention your group will hold. This is what gives the fast its meaning.”
+Large warm text area, starts empty.
+Rotating examples:
+“In solidarity with those who go without”
+“For clarity and discernment”
+“As a discipline of Lent”
+“In prayer for [specific person or cause]”
+“To create space for God”
+Character limit: 200 characters.
+Store in shared_moments:
+
+fasting_intention text
+
+
+Step 3 — When will you fast?
+Header: “When will you fast together? 📅”
+Muted subtitle:
+“Fasting is a full day practice. Choose the day or days.”
+Frequency options:
+
+📅  A specific date
+    Choose one day on the calendar
+
+🗓  Weekly
+    The same day every week
+
+📆  Monthly
+    The same day every month
+
+
+For a specific date: show a date picker.
+For weekly: show single-select day pills Mon–Sun.
+For monthly: show a day-of-month selector (1st through last).
+Fasting events are created as full-day Google Calendar events — not time-specific. The event spans the entire calendar day.
+Calendar event format:
+
+Title: 🌿 Fasting — [fasting_from]
+All day event
+
+Why we fast: [fasting_intention]
+
+Your personal link:
+[personal_url]
+
+
+Store:
+
+fasting_frequency text (specific | weekly | monthly)
+fasting_date date (if specific)
+fasting_day text (if weekly, e.g. "friday")
+fasting_day_of_month integer (if monthly)
+
+
+Fasting detail screen:
+
+[Practice name: the fasting_from text, e.g. "Fasting from social media"]
+
+Fasting from: [fasting_from]
+Why: [fasting_intention]
+[Frequency]
+
+[Streak and goal sections as normal]
+
+[MEMBERS]
+
+[HISTORY]
+
+
+Fasting posting page:
+
+🌿 [Practice name]
+
+Fasting from: [fasting_from]
+
+"[fasting_intention]"
+
+[X of Y] are fasting today.
+[Presence indicators]
+
+      I am fasting 🌿
+
+
+After logging:
+
+🌿
+
+"Fasting together."
+
+[X of Y] are keeping this fast today.
+
+Come back [next fast date]. 🌿
+
+
+No reflection prompt for fasting. No photo. Just the commitment marked.
+
+Build order
+	1.	Update template order and descriptions on the Plant a Practice list
+	2.	Rename “Begin from stillness” to “Create your own” everywhere in the app
+	3.	Update Evening Prayer attribution and descriptions to match Morning Prayer as a Daily Office
+	4.	Add contemplative duration selection step to Contemplative Prayer flow
+	5.	Display duration on Contemplative Prayer detail screen and posting page
+	6.	Build Fasting step 1 — what are you fasting from
+	7.	Build Fasting step 2 — why are you fasting
+	8.	Build Fasting step 3 — when, with date/weekly/monthly options
+	9.	Create full-day calendar events for Fasting
+	10.	Build Fasting detail screen with fasting_from and fasting_intention display
+	11.	Build Fasting posting page with “I am fasting 🌿” log button​​​​​​​​​​​​​​​​

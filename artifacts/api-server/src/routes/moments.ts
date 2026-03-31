@@ -55,6 +55,48 @@ function isWindowOpen(moment: { scheduledTime: string; windowMinutes: number; ti
   return currentMins >= startMins && currentMins < endMins;
 }
 
+// ─── Day-of-week check (timezone-aware) ──────────────────────────────────────
+const RRULE_DOW: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+const DOW_LC: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+
+function getCurrentDayOfWeekInTz(tz: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).formatToParts(new Date());
+    const name = (parts.find(p => p.type === "weekday")?.value ?? "").toLowerCase();
+    return DOW_LC[name] ?? new Date().getDay();
+  } catch { return new Date().getDay(); }
+}
+
+function isPracticeDayInTz(moment: { frequency: string; dayOfWeek?: string | null; practiceDays?: string | null; timezone?: string | null }): boolean {
+  if (moment.frequency !== "weekly") return true;
+  const todayDow = getCurrentDayOfWeekInTz(moment.timezone || "UTC");
+  // Check practiceDays JSON array (RRULE codes like ["MO","WE"])
+  if (moment.practiceDays) {
+    try {
+      const days: string[] = JSON.parse(moment.practiceDays);
+      if (days.length > 0) {
+        return days.some(d => {
+          const up = d.toUpperCase(); if (RRULE_DOW[up] !== undefined) return RRULE_DOW[up] === todayDow;
+          return DOW_LC[d.toLowerCase()] === todayDow;
+        });
+      }
+    } catch { /* ignore */ }
+  }
+  // Fallback: single dayOfWeek
+  if (moment.dayOfWeek) {
+    const up = moment.dayOfWeek.toUpperCase();
+    if (RRULE_DOW[up] !== undefined) return RRULE_DOW[up] === todayDow;
+    return DOW_LC[moment.dayOfWeek.toLowerCase()] === todayDow;
+  }
+  return true;
+}
+
+// ─── Combined open check: must be both a practice day AND within window ───────
+function computeWindowOpen(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null; frequency: string; dayOfWeek?: string | null; practiceDays?: string | null }): boolean {
+  if (!isPracticeDayInTz(moment)) return false;
+  return isWindowOpen(moment);
+}
+
 // ─── Minutes remaining in window (timezone-aware) ────────────────────────────
 function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): number {
   const tz = moment.timezone || "UTC";
@@ -561,7 +603,7 @@ router.get("/moments", async (req, res): Promise<void> => {
       memberCount: allMembers.length,
       members: allMembers.map(t => ({ name: t.name, email: t.email })),
       todayPostCount: todayPosts.length,
-      windowOpen: isWindowOpen(m),
+      windowOpen: computeWindowOpen(m),
       minutesLeft: minutesRemaining(m),
       latestWindow,
       myUserToken: myToken?.userToken ?? null,
@@ -628,7 +670,7 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
   const tz = moment.timezone || "UTC";
   const windowDate = todayDateInTz(tz);
   const todayPosts = postsByDate[windowDate] ?? [];
-  const windowOpen = isWindowOpen(moment);
+  const windowOpen = computeWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
 
   res.json({
@@ -730,7 +772,7 @@ router.get("/rituals/:id/moments", async (req, res): Promise<void> => {
       ...m,
       latestWindow,
       todayPostCount: todayPosts.length,
-      windowOpen: isWindowOpen(m),
+      windowOpen: computeWindowOpen(m),
     };
   }));
 
@@ -765,7 +807,7 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
   const allMembers = await db.select().from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.momentId, moment.id));
 
-  const windowOpen = isWindowOpen(moment);
+  const windowOpen = computeWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
 
   // Build member presence: who has prayed today
