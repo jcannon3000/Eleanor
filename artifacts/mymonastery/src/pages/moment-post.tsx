@@ -153,7 +153,7 @@ function NamedPresenceWithBloom({ members, myToken, justBloomed }: { members: Mo
             <motion.div
               animate={{
                 scale: isBloomin ? [0, 1.3, 1] : 1,
-                backgroundColor: m.prayed ? "#6B8F71" : "transparent",
+                backgroundColor: m.prayed ? "#6B8F71" : "#F7F0E6",
                 borderColor: m.prayed ? "#6B8F71" : "rgba(107,143,113,0.4)",
               }}
               transition={{ duration: 0.5, ease: "easeOut" }}
@@ -196,9 +196,8 @@ function IntercessionPrayerPage({
   const [showReflection, setShowReflection] = useState(false);
 
   // Confirmation step: "prayer" → "amen-text" → "confirmed"
-  const [confirmStep, setConfirmStep] = useState<"prayer" | "amen-text" | "confirmed">(
-    alreadyPosted ? "confirmed" : "prayer"
-  );
+  // Always start on "prayer" — "confirmed" only appears immediately after tapping Amen
+  const [confirmStep, setConfirmStep] = useState<"prayer" | "amen-text" | "confirmed">("prayer");
   const [amenPulse, setAmenPulse] = useState(false);
   const [showGlow, setShowGlow] = useState(false);
   const [justBloomed, setJustBloomed] = useState<Set<string>>(new Set());
@@ -313,12 +312,6 @@ function IntercessionPrayerPage({
     >
       <div className="max-w-md mx-auto px-5 py-10 pb-24">
 
-        {/* Closed state: quiet back button at top */}
-        {!canPray && confirmStep === "prayer" && (
-          <button onClick={onBack} className="text-xs text-[#6b5c4a]/60 hover:text-[#6b5c4a] flex items-center gap-1 mb-6 transition-colors">
-            ← Back to practice
-          </button>
-        )}
 
         {/* Header — staggered fade-in */}
         <motion.div variants={headerContainer} initial="hidden" animate="visible" className="text-center mb-5">
@@ -374,8 +367,18 @@ function IntercessionPrayerPage({
 
         <div className="mt-6 mb-3" />
 
-        {/* Amen / closed-state section */}
-        {canPray ? (
+        {/* Amen / state section */}
+        {alreadyPosted && confirmStep === "prayer" ? (
+          /* Already prayed today — full prayer always readable, no Amen button */
+          <div className="text-center py-6">
+            <p className="text-[#6B8F71] font-medium text-base mb-3" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+              🙏 You prayed this today.
+            </p>
+            <button onClick={onBack} className="text-sm text-[#6B8F71]/60 hover:text-[#6B8F71] transition-colors">
+              ← Back to practice
+            </button>
+          </div>
+        ) : canPray ? (
           confirmStep === "amen-text" ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -414,9 +417,9 @@ function IntercessionPrayerPage({
             </>
           )
         ) : (
-          /* Closed state — full prayer visible, quiet back button */
-          <div className="text-center py-4">
-            <button onClick={onBack} className="text-sm text-[#6b5c4a]/50 hover:text-[#6b5c4a] transition-colors">
+          /* Window closed — prayer always readable, back link */
+          <div className="text-center py-6">
+            <button onClick={onBack} className="text-sm text-[#6B8F71]/70 hover:text-[#6B8F71] transition-colors">
               ← Back to practice
             </button>
           </div>
