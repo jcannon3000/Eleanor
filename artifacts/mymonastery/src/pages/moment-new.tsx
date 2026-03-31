@@ -527,6 +527,13 @@ export default function MomentNew() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
 
+  // Read optional ritualId from query string (e.g. /moment/new?ritualId=5)
+  const ritualIdFromUrl = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("ritualId");
+    return v ? parseInt(v, 10) : null;
+  })();
+
   // Intro splash (1.5s, first use only)
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem("eleanor_practice_intro_seen"));
 
@@ -762,6 +769,10 @@ export default function MomentNew() {
     mutationFn: (data: object) => apiRequest<{ moment: { id: number; momentToken: string } }>("POST", "/api/moments", data),
     onSuccess: (data) => {
       setCreatedMomentId(data.moment.id);
+      if (ritualIdFromUrl && !isSpiritual) {
+        setLocation(`/ritual/${ritualIdFromUrl}`);
+        return;
+      }
       setDone(true);
       if (isSpiritual) setShowPersonalTimePrompt(true);
     },
@@ -858,6 +869,7 @@ export default function MomentNew() {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timeOfDay: isSpiritual ? timeOfDay : undefined,
       participants: validParticipants,
+      ritualId: ritualIdFromUrl ?? undefined,
     });
   }
 

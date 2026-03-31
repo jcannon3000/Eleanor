@@ -463,7 +463,7 @@ export default function RitualDetail() {
             >
               {/* Plant CTA */}
               <Link
-                href={`/ritual/${ritualId}/moment/plant`}
+                href={`/moment/new?ritualId=${ritualId}`}
                 className="flex items-center justify-between p-5 bg-card rounded-2xl border border-card-border hover:border-primary/30 transition-colors group"
               >
                 <div>

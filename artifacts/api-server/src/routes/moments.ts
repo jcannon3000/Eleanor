@@ -315,6 +315,8 @@ const StandalonePlantSchema = z.object({
   frequencyType: z.string().optional(),
   frequencyDaysPerWeek: z.number().int().min(1).max(7).optional(),
   practiceDays: z.string().optional(),
+  // Optional link to a tradition/circle
+  ritualId: z.number().int().positive().optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -328,14 +330,14 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId } = parsed.data;
 
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
   const isBcp = BCP_TEMPLATE_IDS.has(templateType ?? "");
   const momentToken = generateToken();
 
   const [moment] = await db.insert(sharedMomentsTable).values({
-    ritualId: null,
+    ritualId: providedRitualId ?? null,
     name,
     intention,
     loggingType,
@@ -1204,7 +1206,7 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-// ─── GET /api/connections — return all unique people in user's moments ────────
+// ─── GET /api/connections — return all unique people in user's moments + traditions ────
 router.get("/connections", async (req, res): Promise<void> => {
   const sessionUserId = req.user ? (req.user as { id: number }).id : null;
   if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -1213,28 +1215,40 @@ router.get("/connections", async (req, res): Promise<void> => {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    // Find all moments this user is a member of
+    const seen = new Set<string>([user.email]);
+    const connections: { name: string; email: string }[] = [];
+
+    // Members from traditions (rituals owned by this user)
+    const rituals = await db.select({ participants: ritualsTable.participants })
+      .from(ritualsTable)
+      .where(eq(ritualsTable.ownerId, sessionUserId));
+
+    for (const r of rituals) {
+      const parts = (r.participants as Array<{ name: string; email: string }>) ?? [];
+      for (const p of parts) {
+        if (p.email && !seen.has(p.email)) {
+          seen.add(p.email);
+          connections.push({ name: p.name ?? p.email, email: p.email });
+        }
+      }
+    }
+
+    // Members from practices (moments this user is part of)
     const userTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
       .from(momentUserTokensTable)
       .where(eq(momentUserTokensTable.email, user.email));
 
     const momentIds = [...new Set(userTokenRows.map(r => r.momentId))];
-    if (momentIds.length === 0) {
-      res.json({ connections: [] }); return;
-    }
+    if (momentIds.length > 0) {
+      const allMembers = await db.select({ name: momentUserTokensTable.name, email: momentUserTokensTable.email })
+        .from(momentUserTokensTable)
+        .where(inArray(momentUserTokensTable.momentId, momentIds));
 
-    // Get all other members of those moments
-    const allMembers = await db.select({ name: momentUserTokensTable.name, email: momentUserTokensTable.email })
-      .from(momentUserTokensTable)
-      .where(inArray(momentUserTokensTable.momentId, momentIds));
-
-    // Deduplicate by email, exclude current user
-    const seen = new Set<string>([user.email]);
-    const connections: { name: string; email: string }[] = [];
-    for (const m of allMembers) {
-      if (!seen.has(m.email)) {
-        seen.add(m.email);
-        connections.push({ name: m.name ?? m.email, email: m.email });
+      for (const m of allMembers) {
+        if (m.email && !seen.has(m.email)) {
+          seen.add(m.email);
+          connections.push({ name: m.name ?? m.email, email: m.email });
+        }
       }
     }
 
