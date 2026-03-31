@@ -292,7 +292,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 });
 
 // ─── POST /api/moments — plant a standalone shared moment ───────────────────
-const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "custom"]);
 const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 
 const StandalonePlantSchema = z.object({

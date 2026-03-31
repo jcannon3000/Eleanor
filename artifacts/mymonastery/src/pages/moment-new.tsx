@@ -32,7 +32,7 @@ const WEEK_DAYS = [
   { id: "TH", label: "Thu" }, { id: "FR", label: "Fri" }, { id: "SA", label: "Sat" }, { id: "SU", label: "Sun" },
 ];
 
-const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
+const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "custom"]);
 
 const TIME_OF_DAY_OPTIONS: { id: TimeOfDay; emoji: string; label: string; sub: string; range: string }[] = [
   { id: "early-morning",  emoji: "🌄", label: "Early morning",  sub: "Before the day begins",             range: "5am – 8am" },
@@ -292,22 +292,10 @@ const TEMPLATES = [
     },
   },
   {
-    id: "breath", emoji: "🌬️", name: "Breath Together",
-    desc: "Two minutes of shared breath across the distance",
+    id: "contemplative", emoji: "🕯️", name: "Contemplative Prayer",
+    desc: "Sit together in stillness and silence",
     prefill: {
-      name: "Breath Together 🌬️",
-      intention: "Two minutes. Wherever we are. We breathe at the same time and remember we are not alone.",
-      loggingType: "checkin" as LoggingType,
-      reflectionPrompt: "",
-      scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
-      frequency: "daily" as Frequency,
-    },
-  },
-  {
-    id: "contemplative", emoji: "🕯️", name: "Contemplative Sit",
-    desc: "Sit together in stillness",
-    prefill: {
-      name: "Contemplative Sit 🕯️",
+      name: "Contemplative Prayer 🕯️",
       intention: "We sit together in the silence. No agenda. Just presence.",
       loggingType: "checkin" as LoggingType,
       reflectionPrompt: "",
@@ -316,15 +304,15 @@ const TEMPLATES = [
     },
   },
   {
-    id: "walk", emoji: "🚶", name: "Walk Together",
-    desc: "Ten minutes outside, wherever you are",
+    id: "fasting", emoji: "🍃", name: "Fasting",
+    desc: "Fast together as a shared discipline",
     prefill: {
-      name: "Walk Together 🚶",
-      intention: "Step outside. We are walking at the same time, in different places, under the same sky.",
-      loggingType: "reflection" as LoggingType,
-      reflectionPrompt: "What did you notice?",
-      scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
-      frequency: "daily" as Frequency,
+      name: "Fasting 🍃",
+      intention: "We fast together — not alone. A shared discipline, a shared surrender.",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
+      scheduledHour: 8, scheduledAmPm: "AM" as "AM" | "PM",
+      frequency: "weekly" as Frequency,
     },
   },
   {
@@ -1032,17 +1020,17 @@ export default function MomentNew() {
           className="max-w-sm w-full text-center text-[#F7F0E6]">
           <div className="text-6xl mb-6">{isMorning ? "🌅" : "🌙"}</div>
           <h1 className="text-3xl font-bold leading-tight mb-2">
-            Commit to {isMorning ? "Morning Prayer" : "Evening Prayer"}
+            Plant {isMorning ? "Morning Prayer" : "Evening Prayer"}
           </h1>
-          <p className="text-[#6B8F71] text-lg font-semibold mb-8">together</p>
+          <p className="text-[#6B8F71] text-lg font-semibold mb-8">with your people</p>
           <p className="font-serif italic text-[#F7F0E6]/80 text-base leading-loose mb-8">
             {isMorning ? (
               <>
                 "Morning Prayer is the first office of the day.<br />
-                Prayed in the morning, from the same book,<br />
-                in your own home — but not alone.<br /><br />
-                You and your people will pray the same words<br />
-                at the same time of day, wherever you are.<br />
+                Prayed from the same book, in your own home<br />
+                — but not alone.<br /><br />
+                Your circle will pray the same words<br />
+                at the same time, wherever they are.<br />
                 That is what makes it fellowship."
               </>
             ) : (
@@ -1050,8 +1038,8 @@ export default function MomentNew() {
                 "Evening Prayer is the closing office of the day.<br />
                 Prayed as the light changes, from the same book,<br />
                 in your own home — but not alone.<br /><br />
-                You and your people will pray the same words<br />
-                at the same time of day, wherever you are.<br />
+                Your circle will pray the same words<br />
+                at the same time, wherever they are.<br />
                 That is what makes it fellowship."
               </>
             )}
@@ -1062,7 +1050,7 @@ export default function MomentNew() {
           </p>
           <button onClick={goNext}
             className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors">
-            I want to commit to this 🌿
+            Plant this with my people 🌿
           </button>
           <button onClick={() => { setTemplateId(null); setStep("template"); }}
             className="mt-4 text-sm text-[#F7F0E6]/40 hover:text-[#F7F0E6]/70 transition-colors">
