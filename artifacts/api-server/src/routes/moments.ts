@@ -758,6 +758,7 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
       photoUrl: p.photoUrl,
       reflectionText: p.reflectionText,
       isCheckin: p.isCheckin === 1,
+      loggedAt: p.createdAt?.toISOString() ?? null,
     })),
   }));
 
@@ -767,6 +768,25 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
   const todayPosts = postsByDate[windowDate] ?? [];
   const windowOpen = computeWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
+
+  // Per-member today log status — match by guestName
+  const todayLogs = allMembers.map(member => {
+    const memberName = (member.name ?? member.email).toLowerCase();
+    const post = todayPosts.find(p => (p.guestName ?? "").toLowerCase() === memberName);
+    return {
+      name: member.name ?? member.email,
+      email: member.email,
+      loggedAt: post?.createdAt?.toISOString() ?? null,
+      reflectionText: post?.reflectionText ?? null,
+      isCheckin: post ? post.isCheckin === 1 : false,
+    };
+  });
+
+  // Determine creator — member with the smallest token id
+  const creatorToken = allMembers.length > 0
+    ? allMembers.reduce((min, m) => m.id < min.id ? m : min, allMembers[0])
+    : null;
+  const isCreator = myTokenRow[0]?.email.toLowerCase() === creatorToken?.email.toLowerCase();
 
   res.json({
     moment,
@@ -783,7 +803,55 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     todayPostCount: todayPosts.length,
     windowOpen,
     minutesLeft: minsLeft,
+    todayLogs,
+    isCreator,
   });
+});
+
+// ─── POST /api/moments/:id/invite — add new participants ─────────────────────
+const InviteMembersSchema = z.object({
+  people: z.array(z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+  })).min(1),
+});
+
+router.post("/moments/:id/invite", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = InviteMembersSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: String(parsed.error) }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [myTokenRow] = await db.select().from(momentUserTokensTable)
+    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+  if (!myTokenRow) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const existingMembers = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+  const existingEmails = new Set(existingMembers.map(m => m.email.toLowerCase()));
+
+  const newPeople = parsed.data.people.filter(p => !existingEmails.has(p.email.toLowerCase()));
+  if (newPeople.length === 0) {
+    res.json({ added: 0, message: "All people are already members" });
+    return;
+  }
+
+  const newTokenRows = newPeople.map(p => ({
+    momentId,
+    email: p.email,
+    name: p.name,
+    userToken: generateToken(),
+  }));
+
+  await db.insert(momentUserTokensTable).values(newTokenRows);
+  res.json({ added: newPeople.length, people: newPeople });
 });
 
 // ─── POST /api/moments/:id/seed-post — creator plants an example post ────────

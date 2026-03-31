@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { apiRequest } from "@/lib/queryClient";
+import { InviteStep } from "@/components/InviteStep";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface WindowPost {
   guestName: string | null;
+  reflectionText: string | null;
+  isCheckin: boolean;
+  loggedAt: string | null;
+}
+
+interface TodayLog {
+  name: string;
+  email: string;
+  loggedAt: string | null;
   reflectionText: string | null;
   isCheckin: boolean;
 }
@@ -62,6 +72,8 @@ interface MomentDetail {
   todayPostCount: number;
   windowOpen: boolean;
   minutesLeft: number;
+  todayLogs: TodayLog[];
+  isCreator: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -87,7 +99,7 @@ function parsePracticeDays(raw: string | string[] | null | undefined): string[] 
 }
 
 const TIME_OF_DAY_LABELS: Record<string, string> = {
-  "early-morning": "early morning", "morning": "morning", "midday": "midday",
+  "early-morning": "morning", "morning": "morning", "midday": "midday",
   "afternoon": "afternoon", "late-afternoon": "late afternoon", "evening": "evening", "night": "night",
 };
 
@@ -175,49 +187,6 @@ const STATUS_ICON: Record<string, string> = { bloom: "🌸", solo: "👤", withe
 const STATUS_LABEL: Record<string, string> = { bloom: "Bloomed", solo: "Solo", wither: "Withered" };
 const STATUS_COLOR: Record<string, string> = { bloom: "text-[#6B8F71]", solo: "text-amber-600", wither: "text-rose-400/80" };
 
-// ─── Window History Entry ─────────────────────────────────────────────────────
-
-function WindowEntry({ win }: { win: MomentWindow }) {
-  const date = parseISO(win.windowDate);
-  const today = new Date().toISOString().slice(0, 10);
-  const isToday = win.windowDate === today;
-  return (
-    <div className="flex gap-4 py-3 border-b border-border/30 last:border-0">
-      <div className="w-20 shrink-0 pt-0.5">
-        <p className="text-xs font-medium text-foreground/80">{isToday ? "Today" : format(date, "MMM d")}</p>
-        <p className="text-[11px] text-muted-foreground/60">{format(date, "EEEE")}</p>
-      </div>
-      <div className="w-20 shrink-0 flex items-start gap-1.5 pt-0.5">
-        <span className="text-base leading-none">{STATUS_ICON[win.status] ?? "·"}</span>
-        <span className={`text-xs font-medium ${STATUS_COLOR[win.status] ?? "text-muted-foreground"}`}>
-          {STATUS_LABEL[win.status] ?? win.status}
-        </span>
-      </div>
-      <div className="flex-1">
-        {win.posts.length === 0 ? (
-          <p className="text-xs text-muted-foreground/50 italic">No one practiced</p>
-        ) : (
-          <div className="space-y-2">
-            {win.posts.map((post, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="text-xs font-medium text-foreground/80 shrink-0 mt-0.5">
-                  {(post.guestName ?? "Someone").split(" ")[0]}
-                </span>
-                {post.reflectionText && (
-                  <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
-                )}
-                {post.isCheckin && !post.reflectionText && (
-                  <span className="text-xs text-muted-foreground">✓ practiced</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MomentDetail() {
@@ -229,6 +198,9 @@ export default function MomentDetail() {
   const [showSeedForm, setShowSeedForm] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
@@ -264,6 +236,16 @@ export default function MomentDetail() {
     },
   });
 
+  const inviteMutation = useMutation({
+    mutationFn: (people: { name: string; email: string }[]) =>
+      apiRequest("POST", `/api/moments/${id}/invite`, { people }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      setShowInvite(false);
+      setInvitePeople([]);
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
@@ -282,7 +264,7 @@ export default function MomentDetail() {
 
   if (!data) return null;
 
-  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount } = data;
+  const { moment, members, memberCount, myUserToken, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
   const progress = goalProgress(moment.createdAt, moment.goalDays);
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
@@ -301,9 +283,12 @@ export default function MomentDetail() {
   // Label for action button — context-sensitive
   const actionLabel = isIntercession ? "Pray 🙏" : "Log 🌿";
 
-  // Intention display
+  // Intention display — for intercession, show intercessionTopic if it differs from the practice name
+  const intercessionLabel = moment.intercessionTopic ?? moment.intention;
+  const showIntercessionLabel = isIntercession && !!intercessionLabel &&
+    intercessionLabel.toLowerCase() !== moment.name.toLowerCase();
   const intentionDisplay = isIntercession
-    ? (moment.intercessionTopic ?? moment.intention)
+    ? intercessionLabel
     : moment.intention;
 
   return (
@@ -320,14 +305,22 @@ export default function MomentDetail() {
 
         {/* Header */}
         <div className="mb-5">
-          <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
+            <button
+              onClick={() => setShowInvite(true)}
+              className="shrink-0 mt-0.5 text-xs font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-3 py-1.5 hover:bg-[#6B8F71]/8 transition-colors whitespace-nowrap"
+            >
+              + Invite 🌿
+            </button>
+          </div>
 
-          {/* Intercession: "Praying for" — others: italic intention */}
-          {isIntercession ? (
+          {/* Intercession: "Praying for" — only when label differs from name; others: italic intention */}
+          {showIntercessionLabel ? (
             <p className="text-sm text-[#6B8F71] mb-1.5">
               Praying for: {intentionDisplay}
             </p>
-          ) : moment.intention ? (
+          ) : !isIntercession && moment.intention ? (
             <p className="text-sm text-muted-foreground italic mb-1.5">"{moment.intention}"</p>
           ) : null}
 
@@ -491,52 +484,111 @@ export default function MomentDetail() {
           );
         })()}
 
-        {/* Members */}
-        <div className="mb-6">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Members</p>
-          <div className="flex flex-wrap gap-2">
-            {members.map((m, i) => (
-              <span key={i} className="text-xs bg-secondary/50 border border-border/40 rounded-full px-3 py-1.5 text-foreground/80">
-                {m.name ?? m.email}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Practice History */}
+        {/* ── LOG TIMELINE ─────────────────────────────────────────────────── */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">History</span>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Log Timeline</span>
             <div className="flex-1 h-px bg-border/40" />
-            <span className="text-xs text-muted-foreground">{windows.length} practices</span>
           </div>
 
-          {windows.length > 0 && (
-            <div>
-              {seedPosts.length > 0 && (
-                <div className="mb-4 bg-[#F4F9F5] border border-[#6B8F71]/20 rounded-2xl px-4 py-3">
-                  <p className="text-xs font-medium text-[#4a6b50] mb-2">🌱 Before the first window</p>
-                  <div className="space-y-2">
-                    {seedPosts.map((post, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-xs font-medium text-[#4a6b50] shrink-0">
-                          {(post.guestName ?? "Someone").split(" ")[0]}
-                        </span>
-                        {post.reflectionText && (
-                          <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
+          {/* TODAY — per-member status (only on practice days) */}
+          {isTodayPracticeDay(moment.frequency, moment.dayOfWeek, parsedPracticeDays) && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 mb-2">Today</p>
+              <div className="bg-card border border-border/60 rounded-2xl divide-y divide-border/20 overflow-hidden">
+                {todayLogs.map((log, i) => {
+                  const firstName = log.name.split(" ")[0];
+                  const initials = log.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                  const loggedTime = log.loggedAt
+                    ? new Date(log.loggedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()
+                    : null;
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      {/* Avatar */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
+                        log.loggedAt
+                          ? "bg-[#6B8F71]/15 text-[#4a6b50]"
+                          : "bg-secondary/60 text-muted-foreground/50"
+                      }`}>
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground/90">{firstName}</p>
+                        {log.reflectionText && (
+                          <p className="text-xs text-muted-foreground italic truncate">"{log.reflectionText}"</p>
                         )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="bg-card border border-border/60 rounded-2xl px-4 divide-y divide-border/20">
-                {windows.map(win => (
-                  <WindowEntry key={win.id} win={win} />
-                ))}
+                      <div className="shrink-0 text-right">
+                        {loggedTime ? (
+                          <p className="text-xs text-[#6B8F71] font-medium">logged {loggedTime}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/40">—</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+
+          {/* RECENT — last 5 windows with at least one post */}
+          {(() => {
+            const recentWindows = [...windows]
+              .filter(w => w.posts.length > 0)
+              .sort((a, b) => b.windowDate.localeCompare(a.windowDate))
+              .slice(0, 5);
+            if (recentWindows.length === 0) return (
+              <p className="text-xs text-muted-foreground/50 italic text-center py-4">
+                No practice sessions yet — be the first to log 🌿
+              </p>
+            );
+            return (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 mb-2">Recent</p>
+                <div className="space-y-3">
+                  {recentWindows.map(win => {
+                    const date = parseISO(win.windowDate);
+                    const today = new Date().toISOString().slice(0, 10);
+                    const dateLabel = win.windowDate === today ? "Today" : format(date, "EEE, MMM d");
+                    return (
+                      <div key={win.id} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-border/20">
+                          <p className="text-xs font-semibold text-foreground/70">{dateLabel}</p>
+                          <span className="text-xs text-muted-foreground/50">
+                            {STATUS_ICON[win.status] ?? ""} {STATUS_LABEL[win.status] ?? win.status}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-border/20">
+                          {win.posts.map((post, i) => {
+                            const firstName = (post.guestName ?? "Someone").split(" ")[0];
+                            const loggedTime = post.loggedAt
+                              ? new Date(post.loggedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()
+                              : null;
+                            return (
+                              <div key={i} className="flex items-start gap-3 px-4 py-2.5">
+                                <p className="text-xs font-semibold text-foreground/70 shrink-0 mt-0.5 w-16 truncate">{firstName}</p>
+                                <div className="flex-1 min-w-0">
+                                  {post.reflectionText ? (
+                                    <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
+                                  ) : post.isCheckin ? (
+                                    <p className="text-xs text-muted-foreground">✓ practiced</p>
+                                  ) : null}
+                                </div>
+                                {loggedTime && (
+                                  <p className="text-[11px] text-muted-foreground/40 shrink-0">{loggedTime}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Settings section — always visible on mobile ──────────────────── */}
@@ -557,67 +609,172 @@ export default function MomentDetail() {
               transition={{ duration: 0.18 }}
               className="mt-4 space-y-3"
             >
-              {/* Leave / Archive */}
-              <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Leave this practice</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Removes it from your garden. History is preserved.</p>
-                </div>
-                <button
-                  onClick={() => archiveMutation.mutate()}
-                  disabled={archiveMutation.isPending}
-                  className="shrink-0 ml-4 text-xs font-medium text-amber-700 border border-amber-300/60 rounded-full px-4 py-2 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[36px]"
-                >
-                  {archiveMutation.isPending ? "Leaving…" : "Leave"}
-                </button>
-              </div>
+              {/* Non-creator: Leave only */}
+              {!isCreator && (
+                <>
+                  {!showLeaveConfirm ? (
+                    <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Leave this practice</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Removes it from your garden. History is preserved.</p>
+                      </div>
+                      <button
+                        onClick={() => setShowLeaveConfirm(true)}
+                        className="shrink-0 ml-4 text-xs font-medium text-amber-700 border border-amber-300/60 rounded-full px-4 py-2 hover:bg-amber-50 transition-colors min-h-[36px]"
+                      >
+                        Leave
+                      </button>
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4"
+                    >
+                      <p className="text-sm font-semibold text-amber-800 mb-1">Leave "{moment.name}"?</p>
+                      <p className="text-xs text-amber-700/80 mb-4">
+                        You'll no longer receive reminders or appear in this practice. You can always be re-invited.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => archiveMutation.mutate()}
+                          disabled={archiveMutation.isPending}
+                          className="text-sm font-semibold text-white bg-amber-600 rounded-full px-5 py-2.5 hover:bg-amber-700 transition-colors disabled:opacity-50"
+                        >
+                          {archiveMutation.isPending ? "Leaving…" : "Yes, leave it"}
+                        </button>
+                        <button
+                          onClick={() => setShowLeaveConfirm(false)}
+                          className="text-sm text-amber-700 px-3 py-2.5 hover:text-amber-900 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </>
+              )}
 
-              {/* Delete */}
-              {!showDeleteConfirm ? (
-                <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Delete this practice</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Permanently removes it and all history. Cannot be undone.</p>
-                  </div>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="shrink-0 ml-4 text-xs font-medium text-rose-600 border border-rose-300/60 rounded-full px-4 py-2 hover:bg-rose-50 transition-colors min-h-[36px]"
-                  >
-                    Delete
-                  </button>
-                </div>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-rose-50 border border-rose-200 rounded-2xl px-5 py-4"
-                >
-                  <p className="text-sm font-semibold text-rose-800 mb-1">Delete "{moment.name}"?</p>
-                  <p className="text-xs text-rose-700/80 mb-4">
-                    This cannot be undone. All history, streaks, and reflections will be permanently removed.
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => deleteMutation.mutate()}
-                      disabled={deleteMutation.isPending}
-                      className="text-sm font-semibold text-white bg-rose-600 rounded-full px-5 py-2.5 hover:bg-rose-700 transition-colors disabled:opacity-50"
+              {/* Creator: Delete */}
+              {isCreator && (
+                <>
+                  {!showDeleteConfirm ? (
+                    <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Delete this practice</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Permanently removes it for everyone. Cannot be undone.</p>
+                      </div>
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="shrink-0 ml-4 text-xs font-medium text-rose-600 border border-rose-300/60 rounded-full px-4 py-2 hover:bg-rose-50 transition-colors min-h-[36px]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-rose-50 border border-rose-200 rounded-2xl px-5 py-4"
                     >
-                      {deleteMutation.isPending ? "Deleting…" : "Yes, delete it"}
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="text-sm text-rose-700 px-3 py-2.5 hover:text-rose-900 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </motion.div>
+                      <p className="text-sm font-semibold text-rose-800 mb-1">Delete "{moment.name}"?</p>
+                      <p className="text-xs text-rose-700/80 mb-4">
+                        This cannot be undone. All history, streaks, and reflections will be permanently removed for everyone.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => deleteMutation.mutate()}
+                          disabled={deleteMutation.isPending}
+                          className="text-sm font-semibold text-white bg-rose-600 rounded-full px-5 py-2.5 hover:bg-rose-700 transition-colors disabled:opacity-50"
+                        >
+                          {deleteMutation.isPending ? "Deleting…" : "Yes, delete it"}
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="text-sm text-rose-700 px-3 py-2.5 hover:text-rose-900 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </>
               )}
             </motion.div>
           )}
         </div>
 
       </div>
+
+      {/* ── Invite Sheet ─────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showInvite && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="invite-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-40"
+              onClick={() => setShowInvite(false)}
+            />
+            {/* Sheet */}
+            <motion.div
+              key="invite-sheet"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto"
+            >
+              <div className="px-5 pt-4 pb-safe-bottom">
+                {/* Handle */}
+                <div className="w-10 h-1 bg-border/60 rounded-full mx-auto mb-4" />
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-semibold text-foreground">Invite to practice</h2>
+                  <button
+                    onClick={() => setShowInvite(false)}
+                    className="text-muted-foreground hover:text-foreground text-xl leading-none p-1"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mb-5">
+                  Add people to <span className="font-medium text-foreground">{moment.name}</span>
+                </p>
+
+                <InviteStep
+                  type="practice"
+                  onPeopleChange={setInvitePeople}
+                />
+
+                <div className="mt-5 pb-6">
+                  <button
+                    onClick={() => {
+                      if (invitePeople.length > 0) inviteMutation.mutate(invitePeople);
+                    }}
+                    disabled={invitePeople.length === 0 || inviteMutation.isPending}
+                    className={`w-full py-3.5 rounded-2xl text-sm font-semibold transition-colors ${
+                      invitePeople.length > 0
+                        ? "bg-[#6B8F71] text-white hover:bg-[#5a7a60]"
+                        : "bg-secondary text-muted-foreground cursor-not-allowed"
+                    }`}
+                  >
+                    {inviteMutation.isPending
+                      ? "Inviting…"
+                      : invitePeople.length === 0
+                        ? "Choose someone to invite"
+                        : invitePeople.length === 1
+                          ? `Invite ${invitePeople[0].name} 🌿`
+                          : `Invite ${invitePeople.length} people 🌿`}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
