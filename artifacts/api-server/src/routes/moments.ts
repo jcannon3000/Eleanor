@@ -107,8 +107,20 @@ function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number
   return Math.max(0, endMins - currentMins);
 }
 
+// ─── Event duration by practice template ─────────────────────────────────────
+function practiceEventDurationMins(templateType: string | null | undefined): number {
+  if (templateType === "intercession") return 5;
+  if (templateType === "morning-prayer" || templateType === "evening-prayer" || templateType === "contemplative") return 20;
+  return 60;
+}
+
 // ─── Build local datetime strings for calendar events ────────────────────────
-function buildLocalEventTimes(hh: number, mm: number, timezone: string): { startLocalStr: string; endLocalStr: string } {
+function buildLocalEventTimes(
+  hh: number,
+  mm: number,
+  timezone: string,
+  durationMins = 60,
+): { startLocalStr: string; endLocalStr: string } {
   const { hour: curH, minute: curM } = getCurrentTimeInTz(timezone);
   const hasPassed = (curH * 60 + curM) >= (hh * 60 + mm);
 
@@ -122,7 +134,7 @@ function buildLocalEventTimes(hh: number, mm: number, timezone: string): { start
   }
 
   const pad = (n: number) => String(n).padStart(2, "0");
-  const endTotalMins = hh * 60 + mm + 60;
+  const endTotalMins = hh * 60 + mm + durationMins;
   const endH = Math.floor(endTotalMins / 60) % 24;
   const endM = endTotalMins % 60;
 
@@ -482,7 +494,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   // Spiritual practices have scheduledTime="00:00"; use 8 AM as default for calendar
   const hhEff = (hh === 0 && mm === 0 && isSpiritual) ? 8 : hh;
   const mmEff = (hh === 0 && mm === 0 && isSpiritual) ? 0 : mm;
-  const { startLocalStr, endLocalStr } = buildLocalEventTimes(hhEff, mmEff, tz);
+  const { startLocalStr, endLocalStr } = buildLocalEventTimes(hhEff, mmEff, tz, practiceEventDurationMins(templateType));
   const startDate = new Date(); // fallback
 
   function formatTimeForTitle(h: number, m: number): string {
@@ -901,7 +913,7 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
         const startDate = new Date();
         startDate.setHours(hh, mm, 0, 0);
         if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
-        const endDate = new Date(startDate.getTime() + 60 * 60_000);
+        const endDate = new Date(startDate.getTime() + practiceEventDurationMins(moment.templateType) * 60_000);
 
         const recurrenceRule = moment.frequency === "daily"
           ? ["RRULE:FREQ=DAILY"]
@@ -1333,7 +1345,7 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
 
         if (organizer?.googleAccessToken) {
           const [hh2, mm2] = personalTime.split(":").map(Number);
-          const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone);
+          const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone, practiceEventDurationMins(moment.templateType));
           const updated = await updateCalendarEvent(organizer.id, myTokenRow.googleCalendarEventId, {
             startLocalStr,
             endLocalStr,
