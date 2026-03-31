@@ -284,6 +284,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
     ? ["RRULE:FREQ=WEEKLY"]
     : ["RRULE:FREQ=MONTHLY"];
 
+  const [hh, mm] = scheduledTime.split(":").map(Number);
   const startDate = new Date();
   startDate.setHours(hh, mm, 0, 0);
   // If that time has already passed today, start from tomorrow
@@ -473,6 +474,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     : ["RRULE:FREQ=MONTHLY"];
 
   const tz = timezone || "UTC";
+  const [hh, mm] = scheduledTime.split(":").map(Number);
   const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, tz);
   const startDate = new Date(); // fallback
 
