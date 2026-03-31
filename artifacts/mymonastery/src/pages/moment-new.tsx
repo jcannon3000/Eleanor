@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
+import { InviteStep } from "@/components/InviteStep";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
@@ -580,7 +581,8 @@ export default function MomentNew() {
   const [scheduledAmPm, setScheduledAmPm] = useState<"AM" | "PM">("AM");
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
   const [goalDays, setGoalDays] = useState(7);
-  const [participants, setParticipants] = useState([{ name: "", email: "" }]);
+  const [invitedPeople, setInvitedPeople] = useState<{ name: string; email: string }[]>([]);
+  const [showInviteDisabledMsg, setShowInviteDisabledMsg] = useState(false);
 
   // ─── BCP-specific state (Morning Prayer / Evening Prayer) ────────────────────
   const [bcpFreqType, setBcpFreqType] = useState<BcpFreqType | null>(null);
@@ -837,7 +839,7 @@ export default function MomentNew() {
       return true;
     }
     if (step === "goal") return true;
-    if (step === "invite") return true;
+    if (step === "invite") return invitedPeople.length > 0;
     return false;
   };
 
@@ -923,7 +925,7 @@ export default function MomentNew() {
   });
 
   function handleSubmit() {
-    const validParticipants = participants.filter(p => p.name.trim() && p.email.trim());
+    const validParticipants = invitedPeople;
     const isFasting = templateId === "fasting";
 
     // Fasting: derive name/intention/scheduling from fasting-specific fields
@@ -2023,24 +2025,9 @@ export default function MomentNew() {
                 <div className="space-y-5 flex-1">
                   <div>
                     <h2 className="text-2xl font-semibold mb-1">Who will tend this practice with you? 🌿</h2>
-                    <p className="text-sm text-muted-foreground">Each person gets their own link. No account needed to participate.</p>
+                    <p className="text-sm text-muted-foreground">Practices are meant to be done together across distance. Add at least one person to begin.</p>
                   </div>
-                  <div className="space-y-3">
-                    {participants.map((p, i) => (
-                      <PersonRow key={i} person={p} index={i} showRemove={participants.length > 1}
-                        onUpdate={(idx, f, v) => setParticipants(prev => { const n = [...prev]; n[idx][f] = v; return n; })}
-                        onRemove={idx => setParticipants(prev => prev.filter((_, j) => j !== idx))}
-                        onSelect={(idx, c) => setParticipants(prev => { const n = [...prev]; n[idx] = { name: c.name, email: c.email }; return n; })}
-                      />
-                    ))}
-                  </div>
-                  {participants.length < 19 && (
-                    <button onClick={() => setParticipants(p => [...p, { name: "", email: "" }])}
-                      className="text-sm text-[#6B8F71] hover:text-[#4a6b50] transition-colors flex items-center gap-1">
-                      + Add another person
-                    </button>
-                  )}
-                  <p className="text-xs text-muted-foreground/60 italic mt-2">You can also add people later by sharing your practice link.</p>
+                  <InviteStep type="practice" onPeopleChange={setInvitedPeople} />
                 </div>
               )}
 
@@ -2207,16 +2194,43 @@ export default function MomentNew() {
           {/* ── Next button (not shown for template, intercession main, bcp-commitment, or contemplative-duration) ── */}
           {step !== "template" && step !== "intercession" && step !== "bcp-commitment" && step !== "contemplative-duration" && (
             <div className="mt-6 pt-4 border-t border-border/30">
+              {/* Disabled inline message for invite step */}
+              {step === "invite" && showInviteDisabledMsg && invitedPeople.length === 0 && (
+                <div className="mb-3 px-4 py-3 rounded-2xl bg-[#6B8F71]/8 border border-[#6B8F71]/20 text-center">
+                  <p className="text-sm text-[#4a6b50] font-medium mb-1">🌿 This practice needs at least one other person.</p>
+                  <p className="text-xs text-[#4a6b50]/70 leading-relaxed">
+                    Eleanor is built for doing things together across distance —<br />
+                    praying the same words, sitting in the same silence,<br />
+                    keeping the same fast. Add someone to share it with.
+                  </p>
+                </div>
+              )}
               <button
-                onClick={goNext}
-                disabled={!canNext() || plantMutation.isPending || bcpPlantMutation.isPending}
-                className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors disabled:opacity-40"
+                onClick={() => {
+                  if (step === "invite" && invitedPeople.length === 0) {
+                    setShowInviteDisabledMsg(true);
+                    return;
+                  }
+                  goNext();
+                }}
+                disabled={(step !== "invite" && !canNext()) || plantMutation.isPending || bcpPlantMutation.isPending}
+                className={`w-full py-4 rounded-2xl text-white text-base font-semibold transition-colors ${
+                  (step === "invite" && invitedPeople.length === 0) || (!canNext() && step !== "invite")
+                    ? "bg-[#6B8F71]/40 cursor-not-allowed"
+                    : "bg-[#6B8F71] hover:bg-[#5a7a60]"
+                }`}
               >
                 {(plantMutation.isPending || bcpPlantMutation.isPending)
                   ? "Planting..."
-                  : step === "invite" || step === "bcp-invite"
+                  : step === "bcp-invite"
                     ? "Plant this practice 🌿"
-                    : "Continue →"}
+                    : step === "invite"
+                      ? invitedPeople.length === 0
+                        ? "Plant this practice 🌿"
+                        : invitedPeople.length === 1
+                          ? `Plant this practice with ${invitedPeople[0].name || invitedPeople[0].email.split("@")[0]} 🌿`
+                          : `Plant this practice with ${invitedPeople.length} people 🌿`
+                      : "Continue →"}
               </button>
               {plantMutation.isError && (
                 <p className="text-xs text-destructive text-center mt-2">Something went wrong. Please try again.</p>

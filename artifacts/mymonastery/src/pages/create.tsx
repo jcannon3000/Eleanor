@@ -5,6 +5,7 @@ import { useCreateRitual, CreateRitualBodyFrequency, DayOfWeekCode, MonthlyType,
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
+import { InviteStep } from "@/components/InviteStep";
 
 const STEPS = [
   { id: 1, title: "Name" },
@@ -201,7 +202,8 @@ export default function CreateRitual() {
     } catch {}
     return "";
   });
-  const [participants, setParticipants] = useState([{ name: "", email: "" }]);
+  const [invitedPeople, setInvitedPeople] = useState<{ name: string; email: string }[]>([]);
+  const [showTraditionDisabledMsg, setShowTraditionDisabledMsg] = useState(false);
   const [frequency, setFrequency] = useState<CreateRitualBodyFrequency>("weekly");
   const [dayPreference, setDayPreference] = useState("");
   const [locationVal, setLocationVal] = useState("");
@@ -225,31 +227,10 @@ export default function CreateRitual() {
   const handleNext = () => setStep(s => Math.min(STEPS.length, s + 1));
   const handlePrev = () => setStep(s => Math.max(1, s - 1));
 
-  const addParticipant = () => {
-    if (participants.length >= 8) return;
-    setParticipants([...participants, { name: "", email: "" }]);
-  };
-
-  const removeParticipant = (index: number) => {
-    setParticipants(participants.filter((_, i) => i !== index));
-  };
-
-  const updateParticipant = (index: number, field: "name" | "email", value: string) => {
-    const newP = [...participants];
-    newP[index][field] = value;
-    setParticipants(newP);
-  };
-
-  const selectContact = (index: number, contact: ContactSuggestion) => {
-    const newP = [...participants];
-    newP[index] = { name: contact.name, email: contact.email };
-    setParticipants(newP);
-  };
-
   const handleSubmit = async () => {
     if (!user) return;
 
-    const validParticipants = participants.filter(p => p.name.trim() && p.email.trim());
+    const validParticipants = [...invitedPeople];
 
     if (!validParticipants.some(p => p.email === user.email)) {
       validParticipants.push({ name: user.name, email: user.email });
@@ -300,7 +281,7 @@ export default function CreateRitual() {
 
   const isStepValid = () => {
     if (step === 1) return name.trim().length > 0;
-    if (step === 2) return participants.some(p => p.name.trim() && p.email.trim());
+    if (step === 2) return invitedPeople.length > 0;
     if (step === 3) return isScheduleValid();
     return true;
   };
@@ -421,34 +402,12 @@ export default function CreateRitual() {
               )}
 
               {step === 2 && (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <div>
-                    <h2 className="text-3xl font-semibold mb-2">Who is in your circle?</h2>
-                    <p className="text-muted-foreground">Add up to 8 people. Eleanor will include them.</p>
+                    <h2 className="text-2xl font-semibold mb-1">Who will tend this tradition with you? 🌱</h2>
+                    <p className="text-sm text-muted-foreground">Traditions bring people together. Add at least one person so Eleanor can coordinate everyone's calendars.</p>
                   </div>
-
-                  <div className="space-y-4">
-                    {participants.map((p, i) => (
-                      <ParticipantRow
-                        key={i}
-                        participant={p}
-                        index={i}
-                        showRemove={participants.length > 1}
-                        onUpdate={updateParticipant}
-                        onRemove={removeParticipant}
-                        onSelect={selectContact}
-                      />
-                    ))}
-                  </div>
-
-                  {participants.length < 8 && (
-                    <button
-                      onClick={addParticipant}
-                      className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium px-2 py-2"
-                    >
-                      + Add another person
-                    </button>
-                  )}
+                  <InviteStep type="tradition" onPeopleChange={setInvitedPeople} />
                 </div>
               )}
 
@@ -647,7 +606,18 @@ export default function CreateRitual() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-12 flex justify-between items-center pt-6 border-t border-border/50">
+          {/* Disabled message for tradition invite step */}
+          {step === 2 && showTraditionDisabledMsg && invitedPeople.length === 0 && (
+            <div className="mt-4 px-4 py-3 rounded-2xl bg-[#6B8F71]/8 border border-[#6B8F71]/20 text-center">
+              <p className="text-sm text-[#4a6b50] font-medium mb-1">🌱 This tradition needs at least one other person.</p>
+              <p className="text-xs text-[#4a6b50]/70 leading-relaxed">
+                Eleanor coordinates shifting calendars so the things<br />
+                worth repeating actually happen. Add someone to gather with.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-between items-center pt-6 border-t border-border/50">
             {step > 1 ? (
               <button
                 onClick={handlePrev}
@@ -659,9 +629,19 @@ export default function CreateRitual() {
 
             {step < STEPS.length ? (
               <button
-                onClick={handleNext}
-                disabled={!isStepValid()}
-                className="inline-flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                onClick={() => {
+                  if (step === 2 && invitedPeople.length === 0) {
+                    setShowTraditionDisabledMsg(true);
+                    return;
+                  }
+                  handleNext();
+                }}
+                disabled={step !== 2 && !isStepValid()}
+                className={`inline-flex items-center gap-2 px-8 py-3 rounded-full font-medium transition-all ${
+                  step === 2 && invitedPeople.length === 0
+                    ? "bg-primary/40 text-primary-foreground cursor-not-allowed"
+                    : "bg-primary text-primary-foreground hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                }`}
               >
                 Continue →
               </button>
@@ -673,8 +653,12 @@ export default function CreateRitual() {
               >
                 {createMutation.isPending ? (
                   <><span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Planting...</>
+                ) : invitedPeople.length === 0 ? (
+                  <>Plant this tradition 🌱</>
+                ) : invitedPeople.length === 1 ? (
+                  <>Plant this tradition with {invitedPeople[0].name || invitedPeople[0].email.split("@")[0]} 🌱</>
                 ) : (
-                  <>Plant It 🌱</>
+                  <>Plant this tradition with {invitedPeople.length} people 🌱</>
                 )}
               </button>
             )}

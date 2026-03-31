@@ -1,0 +1,162 @@
+Here’s the Replit prompt:
+
+Add invite button, individual log timeline, and creator-only delete to all practice detail screens
+Do not change anything not described below. Apply these changes to every practice type — Intercession, Morning Prayer, Evening Prayer, Contemplative Prayer, Fasting, and Create your own.
+
+CHANGE 1 — Add invite button to every practice detail screen
+Beneath the practice title and intention line, beside the member names or presence area, add a visible invite button on every practice detail screen.
+Style: small sage outlined button — not filled.
+Label: ”+ Invite 🌿”
+Place it here:
+
+For Peace
+
+Every morning
+
+[Open banner if applicable]
+
+[+ Invite 🌿]   Jeremy Cannon · Marcus Lusby
+
+
+The + Invite button sits to the left of the member names. On mobile it appears on its own line above the member names if space is tight.
+Tapping + Invite opens the same invite sheet used in the creation flow:
+Section 1 — Recommended from your connections
+Everyone the user shares any other practice or tradition with. Displayed as selectable rows with autofill. If more than three, horizontal scrolling ticker as described in the invite flow.
+Section 2 — Invite by email
+Name and Email fields. Multiple entries allowed.
+Section 3 — Share a link
+eleanor.app/join/[moment_token]
+Copy button. Share via Messages, WhatsApp, email.
+Bottom CTA: “Send invites 🌿”
+On sending: generates tokens, creates calendar invites, sends welcome emails, adds to moment_members. The detail screen updates to show the new member.
+
+CHANGE 2 — Individual log timeline on every practice detail screen
+Replace the current MEMBERS section and HISTORY section with a unified LOG TIMELINE that shows individual logs even if not everyone has logged yet.
+This appears on every practice detail screen below the streak cards and goal section.
+Section header: TODAY (if any logs exist today) and RECENT (for past sessions)
+
+TODAY section:
+Shows every member and whether they have logged today. Always visible on practice days regardless of whether anyone has logged yet.
+
+TODAY
+
+[Avatar]  Jeremy Cannon        🌸 Prayed · 8:14am
+[Avatar]  Marcus Lusby         🌱 Not yet
+
+
+For each member:
+	∙	If they have logged today: show their emoji state, action word, and time of log
+	∙	If they have not yet logged: show 🌱 and “Not yet” in muted text
+Action words by practice type:
+	∙	Intercession → “Prayed”
+	∙	Morning Prayer / Evening Prayer → “Prayed”
+	∙	Contemplative Prayer → “Sat”
+	∙	Fasting → “Fasting”
+	∙	All others → “Practiced”
+On non-practice days the TODAY section is hidden entirely.
+
+RECENT section:
+Shows the last 5 sessions where at least one member logged. Most recent first.
+Each session entry:
+
+[Date — Tuesday, 25 March]
+
+  [Avatar]  Jeremy Cannon     🙏 Prayed · 7:52am
+  [Avatar]  Marcus Lusby      🙏 Prayed · 8:03am
+  
+  🤝 Both prayed together
+
+
+If only one person logged in a session:
+
+[Date — Monday, 24 March]
+
+  [Avatar]  Jeremy Cannon     🙏 Prayed · 7:44am
+  [Avatar]  Marcus Lusby      — Did not log
+  
+  🌱 Solo — streak did not count
+
+
+The “Solo — streak did not count” note is important. It explains why a session that happened did not advance the streak. This prevents confusion when members see logs but streak stays at zero.
+If nobody logged in a session (a missed day): do not show that day in RECENT at all. Only show days where at least one person logged.
+
+If no logs exist yet:
+Hide the TODAY section on non-practice days. Show:
+
+RECENT
+
+"No sessions together yet.
+ Show up together and this is where it grows. 🌱"
+
+
+CHANGE 3 — Creator-only delete
+Add a delete option inside the Settings section at the bottom of every practice detail screen. Only the creator of the practice can see and use this option. Other members do not see it.
+Inside the Settings dropdown or Settings page for the practice:
+For the creator:
+
+⚙️ Settings
+
+  Edit practice details
+  Manage members
+  ───────────────
+  🗑️ Delete this practice
+
+
+“Delete this practice” is displayed in blush #D4896A — not red, not alarming, but visually distinct from the other settings options.
+Tapping it shows a confirmation:
+
+Delete "For Peace"?
+
+This will remove the practice for everyone
+and cancel all calendar invites.
+This cannot be undone.
+
+[Cancel]    [Delete practice]
+
+
+Cancel: dismisses, no action.
+Delete practice: removes the shared_moment record, removes all moment_members, cancels all Google Calendar events for all members, deletes all user_moment_tokens. Redirects to the Your practices screen.
+For non-creator members the Settings section shows:
+
+⚙️ Settings
+
+  Edit my notification time
+  ───────────────
+  Leave this practice
+
+
+“Leave this practice” shows in the same blush color. Tapping it confirms:
+
+Leave "For Peace"?
+
+You will stop receiving calendar invites
+and will no longer appear in this practice.
+
+[Cancel]    [Leave practice]
+
+
+On confirming: removes only that member’s moment_member record and cancels only their calendar events. The practice continues for other members.
+
+CHANGE 4 — Fix “Every early morning” — still appearing
+The frequency line still reads “Every early morning.” This was previously flagged. Fix it now across all practice types. Apply the correct mapping:
+
+5am–10:59am  → morning
+11am–1:59pm  → midday
+2pm–5:59pm   → afternoon
+6pm–11:59pm  → evening
+
+
+“Early morning” is not a valid label. Remove it everywhere.
+Also fix “Praying for: For Peace” — when the intention is identical to the practice name do not show the Praying for line. This has been flagged before. Fix it for all practices so it never shows a redundant repetition of the practice name.
+
+Build order
+	1.	Add + Invite button to every practice detail screen — opens invite sheet
+	2.	Build invite sheet for detail screen — connections, email, share link, send invites
+	3.	Replace MEMBERS and HISTORY sections with LOG TIMELINE on every practice detail screen
+	4.	Build TODAY section — all members shown, logged vs not yet, time of log
+	5.	Build RECENT section — last 5 sessions, individual logs, 🤝 together vs 🌱 solo note
+	6.	Empty state for RECENT when no logs exist
+	7.	Add delete option to Settings — creator only, confirmation dialog, full cleanup
+	8.	Add leave option to Settings — non-creator members only, confirmation dialog, member-only cleanup
+	9.	Fix “early morning” → “morning” everywhere
+	10.	Fix redundant “Praying for:” when same as practice name everywhere​​​​​​​​​​​​​​​​
