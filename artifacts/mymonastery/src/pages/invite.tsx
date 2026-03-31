@@ -187,7 +187,7 @@ export default function InvitePage() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Sprout size={14} className="text-primary" strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">Eleanor</span>
+            <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
           </div>
 
           <motion.div
@@ -438,7 +438,7 @@ export default function InvitePage() {
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Sprout size={14} className="text-primary" strokeWidth={1.5} />
           </div>
-          <span className="text-sm font-medium text-muted-foreground">Eleanor</span>
+          <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
         </div>
 
         {/* Ritual header */}

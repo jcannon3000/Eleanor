@@ -47,7 +47,7 @@ export default function Onboarding() {
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
             <Sprout size={20} strokeWidth={1.5} />
           </div>
-          <span className="font-serif text-xl tracking-tight text-foreground">Eleanor</span>
+          <span className="font-serif text-xl font-bold text-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
         </div>
       </header>
 

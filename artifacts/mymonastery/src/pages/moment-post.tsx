@@ -574,7 +574,7 @@ export default function MomentPostPage() {
         {/* Eleanor header */}
         <header className="p-6 flex items-center gap-3 relative z-10">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-lg">🌱</div>
-          <span className="font-serif text-lg tracking-tight text-foreground">Eleanor</span>
+          <span className="font-serif text-lg font-bold text-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
         </header>
 
         {/* Main content */}

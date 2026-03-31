@@ -18,7 +18,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
               <Sprout size={20} strokeWidth={1.5} />
             </div>
-            <span className="font-serif text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
+            <span className="font-serif text-xl font-bold text-foreground group-hover:text-primary transition-colors" style={{ letterSpacing: "-0.025em" }}>
               Eleanor
             </span>
           </Link>
