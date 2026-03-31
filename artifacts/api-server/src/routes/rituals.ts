@@ -671,7 +671,7 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     inviteLinks.push({ email: p.email, name: p.name, token, url: `${appBase}/invite/${token}` });
   }
 
-  // Build calendar description with per-person invite links
+  // Build calendar description — short, link-first
   function buildCalendarDescription(opts: {
     ritual: typeof ritualsTable.$inferSelect;
     proposedTimes: string[];
@@ -679,30 +679,31 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
     inviteLinks: typeof inviteLinks;
     participantEmail?: string;
   }): string {
-    const { ritual: r, proposedTimes, confirmedTime, inviteLinks: links, participantEmail } = opts;
+    const { ritual: r, confirmedTime, proposedTimes, inviteLinks: links, participantEmail } = opts;
     const link = links.find((l) => l.email === participantEmail);
-    const lines: string[] = [];
-    if (r.intention) lines.push(r.intention, "");
+    const personalUrl = link?.url ?? (links[0] ? links[0].url : null);
+
+    const lines: string[] = [r.name];
+    if (r.intention) lines.push(`"${r.intention}"`);
+    lines.push("");
+
     if (confirmedTime) {
       const d = new Date(confirmedTime);
-      lines.push(`✅ Confirmed: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      lines.push(`📅 ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      lines.push("");
     } else if (proposedTimes.length > 0) {
-      lines.push("📅 Proposed times:");
-      proposedTimes.forEach((t, i) => {
-        const d = new Date(t);
-        const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup";
-        lines.push(`  ${label}: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
-      });
+      const d = new Date(proposedTimes[0]);
+      lines.push(`📅 Proposed: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`);
+      lines.push("");
     }
-    lines.push("");
-    if (link) {
-      lines.push("👉 Your personal link — tap to indicate availability (no account needed):");
-      lines.push(link.url);
-    } else if (links.length > 0) {
-      lines.push("👉 Indicate your availability (no account needed):");
-      lines.push(`${appBase}/invite/${links[0].token}`);
+
+    if (personalUrl) {
+      lines.push("Your personal link:");
+      lines.push(personalUrl);
+      lines.push("");
     }
-    lines.push("", "Coordinated by Eleanor · eleanor.app");
+
+    lines.push("Eleanor — a shared practice companion");
     return lines.join("\n");
   }
 

@@ -1,0 +1,96 @@
+Here’s the Replit prompt:
+
+Fix open state logic, update language, and improve the prayer page
+Three fixes. Do not change anything not described below.
+
+FIX 1 — Open state logic is wrong
+The practices list screen shows “OPEN NOW” with cards marked “PRACTICE DAY 🌿” and “0 of 1 practiced today.” But when the user taps through to the detail screen it shows “Next Prayer: Tomorrow Morning” — meaning the practice is not actually open.
+These two states are contradicting each other. Fix the root cause.
+The practice should only appear in the OPEN NOW section on the list screen if it is genuinely open right now — meaning the current time falls within the scheduled practice window for today. If it is not open it should not appear in OPEN NOW regardless of whether today is a scheduled day.
+The rule:
+	∙	Today is a scheduled day AND current time is within the practice window → OPEN NOW
+	∙	Today is a scheduled day but current time is before or after the window → not open, show under YOUR PRACTICES with next scheduled time
+	∙	Today is not a scheduled day → not open, show under YOUR PRACTICES
+Fix the open/closed check so both the list screen and the detail screen agree on the same state at all times. They should never contradict each other.
+
+FIX 2 — Replace “show up” with “practice” throughout
+Find every instance of “showed up,” “show up,” “0 of 1 showed up,” and similar phrases across the entire Shared Moments feature. Replace with practice language:
+	∙	“0 of 1 showed up” → “0 of 1 have practiced today”
+	∙	“showed up today” → “practiced today”
+	∙	“You showed up” → “You practiced”
+	∙	“X of Y showed up” → “X of Y have practiced”
+	∙	“I showed up 🌿” button → “I practiced 🌿”
+Exception: Intercession uses prayer language not practice language:
+	∙	“0 of 1 have prayed today” — keep this as is
+	∙	“I prayed 🙏” — keep this as is
+	∙	“You prayed today” — keep this as is
+Do not change the prayer-specific language. Only replace “show up” variants for non-intercession practices.
+
+FIX 3 — Improve the prayer page for Intercession
+The current prayer page (screenshot 1) is functional but flat. It shows the prayer text well but needs more presence and animation to make the act of praying feel meaningful.
+Find the prayer page at eleanor.app/moment/[moment_token]/[user_moment_token] for Intercession practices. Apply these improvements:
+Header animation on load:
+When the page loads the header fades in gently over 600ms:
+
+INTERCESSION PRAYER   ← small label, uppercase, muted sage, fades in first
+
+For Our Country       ← bold title, fades in 200ms after label
+
+Praying for: Democracy  ← sage, fades in 200ms after title
+
+
+Staggered fade-ins. Not a slide. Not a bounce. Just a gentle sequential appearance that creates a sense of arriving at something.
+Prayer text:
+The prayer text is currently showing well. Keep it exactly as is — Playfair Display italic, generous line height, full text visible. Do not change the typography.
+Add one subtle detail: as the page loads the prayer text fades in 400ms after the header, from very slightly below its final position (8px upward movement). Barely perceptible. Just enough to feel like the text is settling into place.
+Presence section:
+Currently shows “0 of 1 have prayed this 🙏” with a circle avatar. Improve this section:
+When nobody has prayed yet:
+
+0 of 1 have prayed this 🙏
+
+[J] ← empty outline circle, muted
+you
+
+
+When the user has prayed (after tapping Amen):
+The circle fills with a gentle bloom animation — it does not snap to filled, it blooms from the center outward over 500ms in sage green. The count updates simultaneously.
+When someone else has prayed:
+Their circle is filled sage. The user’s is still empty outline.
+When both have prayed:
+Both circles filled. A very subtle warm glow appears around the presence section for 2 seconds then fades — amber tint, barely visible, acknowledging that two people have now prayed this together.
+The Amen button:
+Currently a standard button. Improve it:
+Before tapping: soil background, cream text, full width, Space Grotesk bold. Exactly as it is.
+On tap: the button does not immediately disappear. It pulses once — a brief amber flash over 300ms — then transitions to a confirmed state:
+
+🙏 Amen
+
+
+Centered, large, sage colored text. The button disappears and this confirmation takes its place for 1.5 seconds before the screen transitions to the post-Amen confirmation screen.
+The transition to the confirmation screen should be a gentle upward slide — the prayer page slides up and out, the confirmation screen slides up and in from below. Not a flash. A movement.
+If the practice is not open (closed state):
+The prayer text still shows in full. The attribution still shows. The presence indicators still show. But the Amen button is replaced with a quiet back button:
+
+← Back to practice
+
+
+Muted, small, centered. No Amen. No logging. Just the prayer available to read.
+No animation on the Amen button in closed state since it does not exist. All other animations still apply.
+The “From the Book of Common Prayer” attribution:
+Currently shows well beneath the prayer. Keep it. Add a small 📖 before it:
+
+📖 From the Book of Common Prayer
+
+
+Build order
+	1.	Fix open/closed state logic — both list screen and detail screen must agree
+	2.	Replace “show up” language throughout non-intercession practices
+	3.	Add staggered fade-in animation to prayer page header
+	4.	Add subtle upward-settle animation to prayer text on load
+	5.	Add bloom animation to presence circles when someone prays
+	6.	Add two-person glow to presence section when both have prayed
+	7.	Add Amen button pulse and transition animation
+	8.	Add slide transition between prayer page and confirmation screen
+	9.	Add 📖 to BCP attribution line
+	10.	Ensure closed state shows prayer text but no Amen button​​​​​​​​​​​​​​​​

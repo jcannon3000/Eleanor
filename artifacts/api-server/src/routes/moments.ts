@@ -224,28 +224,15 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
   const insertedTokens = await db.insert(momentUserTokensTable).values(memberTokenRows).returning();
 
-  // Build calendar description with all personal links
-  const freqLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
-  const [hh, mm] = scheduledTime.split(":").map(Number);
-  const timeLabel = new Date(0, 0, 0, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const loggingLabel = { photo: "Share a photo", reflection: "Reflect on a prompt", both: "Photo and reflection", checkin: "Just show up" }[loggingType];
-
+  // Build calendar description — short, link-first
   const linkLines = insertedTokens.map(t => `  ${t.name ?? t.email}: ${baseUrl}/${momentToken}/${t.userToken}`);
 
   const calDescription = [
-    intention,
+    name,
+    ...(intention ? [`"${intention}"`] : []),
     "",
-    `${freqLabel} at ${timeLabel} · ${goalDays}-day goal`,
-    loggingType === "reflection" || loggingType === "both"
-      ? `Prompt: ${reflectionPrompt ?? "Show up and reflect."}`
-      : `How: ${loggingLabel}`,
-    "",
-    "You have one hour. Tap your personal link:",
+    "Tap your personal link to log:",
     ...linkLines,
-    "",
-    "No login needed. Just show up. 🌿",
-    "",
-    "Coordinated by Eleanor · eleanor.app",
   ].join("\n");
 
   // Create recurring calendar event on the organizer's calendar
@@ -386,20 +373,39 @@ router.post("/moments", async (req, res): Promise<void> => {
 
   const insertedTokens = await db.insert(momentUserTokensTable).values(memberTokenRows).returning();
 
-  const freqLabel = frequency === "daily" ? "every day" : frequency === "weekly" ? "every week" : "every month";
-  const freqCapLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
-  const [hh, mm] = scheduledTime.split(":").map(Number);
-  const timeLabel = new Date(0, 0, 0, hh, mm).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
-  const loggingDesc: Record<string, string> = {
-    photo: "Take a photo to mark the moment",
-    reflection: "Write a short reflection",
-    both: "Share a photo and a reflection",
-    checkin: "Just tap to say you showed up",
-    timer: "Sit together for a few minutes",
-    timer_reflection: "Sit together, then share a brief reflection",
+  // ─── Friendly schedule label (time-of-day language, never clock times) ──────
+  const TOD_LABELS: Record<string, string> = {
+    "early-morning": "early morning", "morning": "morning", "midday": "midday",
+    "afternoon": "afternoon", "late-afternoon": "late afternoon", "evening": "evening", "night": "night",
   };
-  const howLine = loggingDesc[loggingType] ?? "Show up";
+  const DAY_NAMES_SHORT: Record<string, string> = {
+    MO: "Monday", TU: "Tuesday", WE: "Wednesday", TH: "Thursday", FR: "Friday", SA: "Saturday", SU: "Sunday",
+  };
+  function clockToTod(time: string): string {
+    const [h] = time.split(":").map(Number);
+    if (h < 6) return "early morning";
+    if (h < 12) return "morning";
+    if (h < 14) return "midday";
+    if (h < 17) return "afternoon";
+    if (h < 20) return "evening";
+    return "night";
+  }
+  function buildFrequencyLabel(): string {
+    const tod = timeOfDay ? (TOD_LABELS[timeOfDay] ?? timeOfDay) : clockToTod(scheduledTime);
+    if (frequency === "daily") return `Every ${tod}`;
+    if (frequency === "weekly") {
+      let days: string[] = [];
+      if (practiceDays) {
+        try { days = JSON.parse(practiceDays); } catch { days = []; }
+      } else if (dayOfWeek) {
+        days = [dayOfWeek];
+      }
+      const dayStr = days.map((d: string) => DAY_NAMES_SHORT[d.toUpperCase()] ?? d).join(", ");
+      return dayStr ? `${dayStr} · ${tod}` : `Every week · ${tod}`;
+    }
+    return `Monthly · ${tod}`;
+  }
+  const scheduleLabel = buildFrequencyLabel();
 
   const recurrenceRule = frequency === "daily"
     ? ["RRULE:FREQ=DAILY"]
@@ -411,92 +417,58 @@ router.post("/moments", async (req, res): Promise<void> => {
   const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, tz);
   const startDate = new Date(); // fallback
 
-  // ─── Build a personalised description for each member ──────────────────────
-  function buildDescription(memberToken: string, memberName: string): string {
+  // ─── Build a personalised calendar description for each member ────────────
+  function buildDescription(memberToken: string, _memberName: string): string {
     const personalLink = `${baseUrl}/${momentToken}/${memberToken}`;
-    const goalLine = goalDays > 0 ? `${goalDays}-day shared goal` : "Open-ended practice";
 
-    // BCP-specific calendar description
-    if (isBcp) {
-      const isMorning = templateType === "morning-prayer";
-      const bcpPage = isMorning ? "75" : "115";
-      const bcpUrl = isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html";
-      const officeName = isMorning ? "Morning Prayer" : "Evening Prayer";
-      const rite = "Rite II";
-      const freqDisplay = frequencyType === "daily" ? "Daily" : freqCapLabel;
-      const lines = [
-        `${organizer.name ?? organizer.email} invited you to ${officeName} together.`,
+    if (templateType === "morning-prayer") {
+      return [
+        "Morning Prayer Rite II · Page 75",
+        scheduleLabel,
         "",
-        `"${intention}"`,
+        "Tap when you have prayed:",
+        personalLink,
         "",
-        "── THE DAILY OFFICE ───────────────────────────────",
-        `This is ${officeName} ${rite} from the Book of Common Prayer.`,
-        `Page ${bcpPage}.`,
-        "",
-        `Everyone prays on their own schedule, but from the same book.`,
-        `That is what makes it fellowship.`,
-        "",
-        "── HOW TO PRAY ────────────────────────────────────",
-        `  📖 BCP Page ${bcpPage} — ${officeName} ${rite}`,
-        `  🌐 Online: ${bcpUrl}`,
-        "",
-        `  Takes about 15–20 minutes.`,
-        `  Open all day on your practice days.`,
-        `  When done, tap your link to mark it prayed. 🌿`,
-        "",
-        "── HOW OFTEN ──────────────────────────────────────",
-        `  ${freqDisplay}${practiceDays && practiceDays !== "[]" ? ` · ${practiceDays}` : ""}`,
-        "",
-        "── YOUR PERSONAL LINK ─────────────────────────────",
-        `This link is yours, ${memberName}. Open it on your practice days:`,
-        "",
-        `  ${personalLink}`,
-        "",
-        "No login required. Just open it and say you prayed. 🌿",
-        "",
-        "──────────────────────────────────────────────────",
         "Eleanor — a shared practice companion",
-      ];
-      return lines.join("\n");
+      ].join("\n");
     }
 
-    const lines = [
-      `${organizer.name ?? organizer.email} invited you to ${name}.`,
+    if (templateType === "evening-prayer") {
+      return [
+        "Evening Prayer Rite II · Page 115",
+        scheduleLabel,
+        "",
+        "Tap when you have prayed:",
+        personalLink,
+        "",
+        "Eleanor — a shared practice companion",
+      ].join("\n");
+    }
+
+    if (templateType === "intercession") {
+      const topic = intercessionTopic ?? intention;
+      return [
+        name,
+        `Praying for: ${topic}`,
+        scheduleLabel,
+        "",
+        "Tap to pray:",
+        personalLink,
+        "",
+        "Eleanor — a shared practice companion",
+      ].join("\n");
+    }
+
+    // All other practices
+    return [
+      name,
+      scheduleLabel,
       "",
-      "── WHAT IS ELEANOR? ──────────────────────────────",
-      "Eleanor is a simple app that helps close friends and family",
-      "show up for small, recurring practices together — no matter",
-      "the distance. Think of it like a shared habit, tended quietly",
-      "across time. You don't need to download anything or create",
-      "an account.",
+      "Tap to log:",
+      personalLink,
       "",
-      "── THIS PRACTICE ─────────────────────────────────",
-      `"${intention}"`,
-      "",
-      `  When:    ${freqCapLabel} at ${timeLabel}`,
-      `  Window:  1 hour to log each time`,
-      `  Goal:    ${goalLine}`,
-      `  How:     ${howLine}`,
-      ...(reflectionPrompt ? [`  Prompt:  "${reflectionPrompt}"`] : []),
-      "",
-      "── HOW IT WORKS ──────────────────────────────────",
-      `This practice opens ${freqLabel} at ${timeLabel}. When it does,`,
-      "you'll have one hour to open your personal link, do the",
-      "practice, and log it. Eleanor quietly tracks when everyone",
-      "shows up — so you can feel each other's presence over time,",
-      "even from a distance.",
-      "",
-      "── YOUR PERSONAL LINK ───────────────────────────",
-      `This link is yours, ${memberName}. Tap it when the window opens:`,
-      "",
-      `  ${personalLink}`,
-      "",
-      "No login required. Just open it and show up. 🌿",
-      "",
-      "──────────────────────────────────────────────────",
       "Eleanor — a shared practice companion",
-    ];
-    return lines.join("\n");
+    ].join("\n");
   }
 
   // ─── Create one personalised calendar event per member ─────────────────────

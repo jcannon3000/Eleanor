@@ -1,0 +1,169 @@
+Two separate prompts. Here they are:
+
+PROMPT 1 — Fix the calendar invite / email content
+Find the welcome email and calendar invite that Eleanor sends when someone is invited to a Shared Moment practice. Redesign the content completely. It is currently far too long and too technical.
+
+The principle:
+The invite should feel like a warm personal message, not a product onboarding document. Short. Human. The link prominent. Details available when they tap through.
+
+New format — varies by practice type:
+For Intercession:
+
+Subject: [Inviter name] invited you to pray for [intention]
+
+[Inviter name] is praying for [intention] through Eleanor
+and wants you to join them.
+
+[Practice name]
+[Frequency — e.g. Every Wednesday morning]
+
+Your personal link:
+[personal_url]
+
+No login needed. Tap when it's time to pray.
+
+Eleanor — a shared practice companion
+
+
+For Morning Prayer:
+
+Subject: [Inviter name] invited you to pray Morning Prayer together
+
+[Inviter name] is praying Morning Prayer each morning
+and wants you to join them.
+
+Morning Prayer Rite II · Book of Common Prayer · Page 75
+[Frequency]
+
+Your personal link:
+[personal_url]
+
+No login needed. Tap when it's time to pray.
+
+Eleanor — a shared practice companion
+
+
+For Evening Prayer:
+
+Subject: [Inviter name] invited you to pray Evening Prayer together
+
+[Inviter name] is praying Evening Prayer each evening
+and wants you to join them.
+
+Evening Prayer Rite II · Book of Common Prayer · Page 115
+[Frequency]
+
+Your personal link:
+[personal_url]
+
+No login needed. Tap when it's time to pray.
+
+Eleanor — a shared practice companion
+
+
+For Contemplative Prayer, Breath Together, Walk Together:
+
+Subject: [Inviter name] invited you to [practice name] together
+
+[Inviter name] wants to [practice description — e.g. sit together in stillness] with you through Eleanor.
+
+[Practice name]
+[Frequency]
+
+Your personal link:
+[personal_url]
+
+No login needed. Tap when it's time.
+
+Eleanor — a shared practice companion
+
+
+For Traditions (gathering circles):
+
+Subject: [Inviter name] invited you to [tradition name]
+
+[Inviter name] wants to make this a tradition.
+
+[Tradition name]
+[Frequency]
+
+Your personal link:
+[personal_url]
+
+Eleanor — a shared practice companion
+
+
+Rules for all invite emails:
+Remove entirely:
+	∙	“WHAT IS ELEANOR?” section
+	∙	“THIS PRACTICE” section with the tabular When/Window/Goal/How/Prompt breakdown
+	∙	“HOW IT WORKS” section
+	∙	Any explanation of how Eleanor works
+	∙	Clock times (replace with time of day language — morning, afternoon, evening)
+	∙	The word “window”
+	∙	“1 hour to log each time”
+The personal link must appear high in the email — within the first four lines. Never buried at the bottom.
+All of this information — what Eleanor is, how the practice works, the full prayer text — is available when they tap their personal link. The email’s only job is to get them to tap the link.
+
+Calendar event description — also update these:
+For Intercession:
+
+[Practice name]
+Praying for: [intention]
+
+Tap to pray:
+[personal_url]
+
+
+For Morning Prayer:
+
+Morning Prayer Rite II · Page 75
+
+Tap when you have prayed:
+[personal_url]
+
+
+For Evening Prayer:
+
+Evening Prayer Rite II · Page 115
+
+Tap when you have prayed:
+[personal_url]
+
+
+For all others:
+
+[Practice name]
+
+Tap to log:
+[personal_url]
+
+
+Short. The link is always the most prominent thing after the practice name.
+
+PROMPT 2 — Update the practice template list descriptions
+Find the “What will you tend together?” template selection screen in the Plant a Practice flow. Update the description line beneath each template name to feel warmer and more social — about doing something together, not just describing the practice in isolation.
+
+New descriptions:
+
+🌅  Morning Prayer
+    Pray the Daily Office together each morning
+
+🌙  Evening Prayer
+    Close each day together in prayer
+
+🙏  Intercession
+    Hold something in prayer together
+
+🕯️  Contemplative Prayer
+    Sit in silence together, wherever you are
+
+🌿  Fasting
+    Keep a shared fast as a discipline
+
+🌱  Begin from stillness
+    Create your own practice together
+
+
+Remove “Breath Together” and “Walk Together” from the Practice template list — these belong in Traditions not Practices. If they do not already appear in the Traditions list add them there.
+The word “together” should appear in every Practice template description. These are not solo practices. They are shared ones. The description communicates that from the first glance.​​​​​​​​​​​​​​​​

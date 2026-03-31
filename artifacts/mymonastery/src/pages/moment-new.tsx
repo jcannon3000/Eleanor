@@ -257,7 +257,7 @@ const BCP_PRAYERS: BcpPrayer[] = [
 const TEMPLATES = [
   {
     id: "morning-prayer", emoji: "🌅", name: "Morning Prayer",
-    desc: "Open the day together in prayer",
+    desc: "Pray the Daily Office together each morning",
     prefill: {
       name: "Morning Prayer 🌅",
       intention: "We open the day together. Before the world begins, we pray.",
@@ -269,7 +269,7 @@ const TEMPLATES = [
   },
   {
     id: "evening-prayer", emoji: "🌙", name: "Evening Prayer",
-    desc: "Close the day together before rest",
+    desc: "Close each day together in prayer",
     prefill: {
       name: "Evening Prayer 🌙",
       intention: "Before we rest, we release the day together. We pray.",
@@ -281,7 +281,7 @@ const TEMPLATES = [
   },
   {
     id: "intercession", emoji: "🙏", name: "Intercession",
-    desc: "Hold a shared prayer for something that matters",
+    desc: "Hold something in prayer together",
     prefill: {
       name: "Intercession 🙏",
       intention: "",
@@ -293,7 +293,7 @@ const TEMPLATES = [
   },
   {
     id: "contemplative", emoji: "🕯️", name: "Contemplative Prayer",
-    desc: "Sit together in stillness and silence",
+    desc: "Sit in silence together, wherever you are",
     prefill: {
       name: "Contemplative Prayer 🕯️",
       intention: "We sit together in the silence. No agenda. Just presence.",
@@ -305,7 +305,7 @@ const TEMPLATES = [
   },
   {
     id: "fasting", emoji: "🍃", name: "Fasting",
-    desc: "Fast together as a shared discipline",
+    desc: "Keep a shared fast as a discipline",
     prefill: {
       name: "Fasting 🍃",
       intention: "We fast together — not alone. A shared discipline, a shared surrender.",
@@ -317,7 +317,7 @@ const TEMPLATES = [
   },
   {
     id: "custom", emoji: "🌱", name: "Begin from stillness",
-    desc: "Create your own practice from scratch",
+    desc: "Create your own practice together",
     prefill: null,
   },
 ];

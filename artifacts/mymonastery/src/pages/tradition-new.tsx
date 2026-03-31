@@ -68,6 +68,16 @@ const TRADITION_TEMPLATES = [
     },
   },
   {
+    id: "breathe-together",
+    emoji: "🌬️",
+    name: "Breathe Together",
+    desc: "Pause together in stillness, wherever you are",
+    prefill: {
+      name: "Breathe Together 🌬️",
+      intention: "We stop wherever we are and breathe together. Same moment, same rhythm.",
+    },
+  },
+  {
     id: "tradition-custom",
     emoji: "🌱",
     name: "Plant your own",
