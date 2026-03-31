@@ -101,7 +101,7 @@ POST /api/moment/:momentToken/:userToken/post — submit a post (photo URL / ref
 Micro-rituals members can show up to individually each day/week in a 1-hour window:
 
 - **Planting flow** (`/moment/new`): Multi-step wizard; MP/EP templates use BCP-specific flow (commitment → frequency → time → invite); other templates use general flow (template → name → intention → logging → schedule → goal → invite)
-- **Logging types**: `photo` (upload), `reflection` (prompt + text), `both`, `checkin` (just show up), `timer`, `timer_reflection`
+- **Logging types**: `photo` (upload), `reflection` (prompt + text), `both`, `checkin` (just show up)
 - **BCP (Morning/Evening Prayer) templates**: Special Daily Office flow; uses `checkin` logging type; window open all day (1440 min); goal=0 (open-ended); frequency options: once/twice/three/five/daily per week; each person sets their own time
 - **Intention text**: 140 chars, shown at top of posting page + in calendar description
 - **Public posting page** (`/moment/:momentToken/:userToken`): no auth, renders per logging type, presence dots, countdown; BCP pages show dark-themed full-screen with prominent BCP link (📖 Page 75/115) + "I prayed Morning/Evening Prayer 🌿" button

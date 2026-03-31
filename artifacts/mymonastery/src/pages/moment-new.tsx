@@ -9,9 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
   | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite";
-type LoggingType = "reflection" | "timer" | "timer_reflection" | "checkin";
+type LoggingType = "photo" | "reflection" | "both" | "checkin";
 type Frequency = "daily" | "weekly";
-type TimeOfDay = "morning" | "midday" | "afternoon" | "night";
+type TimeOfDay = "early-morning" | "morning" | "midday" | "afternoon" | "late-afternoon" | "evening" | "night";
 type BcpFreqType = "once" | "twice" | "three" | "five" | "daily";
 
 // ─── BCP Frequency options ────────────────────────────────────────────────────
@@ -35,11 +35,25 @@ const WEEK_DAYS = [
 const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
 
 const TIME_OF_DAY_OPTIONS: { id: TimeOfDay; emoji: string; label: string; sub: string; range: string }[] = [
-  { id: "morning",   emoji: "🌅", label: "Morning",   sub: "As the day begins",              range: "Roughly 6am – 10am" },
-  { id: "midday",    emoji: "☀️",  label: "Midday",    sub: "A pause at the center of the day", range: "Roughly 11am – 2pm" },
-  { id: "afternoon", emoji: "🌤", label: "Afternoon", sub: "Before the day winds down",       range: "Roughly 2pm – 6pm" },
-  { id: "night",     emoji: "🌙", label: "Night",     sub: "As the day releases",             range: "Roughly 7pm – 10pm" },
+  { id: "early-morning",  emoji: "🌄", label: "Early morning",  sub: "Before the day begins",             range: "5am – 8am" },
+  { id: "morning",        emoji: "🌅", label: "Morning",        sub: "As the day begins",                 range: "8am – 11am" },
+  { id: "midday",         emoji: "☀️",  label: "Midday",         sub: "A pause at the center of the day",  range: "11am – 2pm" },
+  { id: "afternoon",      emoji: "🌤", label: "Afternoon",      sub: "Before the day winds down",         range: "2pm – 6pm" },
+  { id: "late-afternoon", emoji: "🌇", label: "Late afternoon", sub: "The day winds down",                range: "4pm – 7pm" },
+  { id: "evening",        emoji: "🌆", label: "Evening",        sub: "As the day releases",               range: "7pm – 10pm" },
+  { id: "night",          emoji: "🌙", label: "Night",          sub: "The quiet before rest",             range: "9pm – 11pm" },
 ];
+
+// Constraints per time-of-day (for the personal time picker)
+const TOD_CONSTRAINTS: Record<string, { hours: number[]; amPm: "AM" | "PM" | "mixed"; defaultH: number; defaultAmPm: "AM" | "PM" }> = {
+  "early-morning":  { hours: [5,6,7],        amPm: "AM",    defaultH: 6,  defaultAmPm: "AM" },
+  "morning":        { hours: [8,9,10,11],     amPm: "AM",    defaultH: 8,  defaultAmPm: "AM" },
+  "midday":         { hours: [11,12,1,2],     amPm: "mixed", defaultH: 12, defaultAmPm: "PM" },
+  "afternoon":      { hours: [2,3,4,5,6],     amPm: "PM",    defaultH: 3,  defaultAmPm: "PM" },
+  "late-afternoon": { hours: [4,5,6,7],       amPm: "PM",    defaultH: 5,  defaultAmPm: "PM" },
+  "evening":        { hours: [7,8,9,10],      amPm: "PM",    defaultH: 8,  defaultAmPm: "PM" },
+  "night":          { hours: [9,10,11],       amPm: "PM",    defaultH: 9,  defaultAmPm: "PM" },
+};
 
 interface ContactSuggestion { name: string; email: string; }
 
@@ -238,9 +252,8 @@ const TEMPLATES = [
     prefill: {
       name: "Morning Prayer 🌅",
       intention: "We open the day together. Before the world begins, we pray.",
-      loggingType: "timer_reflection" as LoggingType,
-      timerDuration: 10,
-      reflectionPrompt: "What are you carrying into this day?",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
       scheduledHour: 7, scheduledAmPm: "AM" as "AM" | "PM",
       frequency: "daily" as Frequency,
     },
@@ -251,9 +264,8 @@ const TEMPLATES = [
     prefill: {
       name: "Evening Prayer 🌙",
       intention: "Before we rest, we release the day together. We pray.",
-      loggingType: "timer_reflection" as LoggingType,
-      timerDuration: 10,
-      reflectionPrompt: "What are you releasing tonight?",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
       scheduledHour: 9, scheduledAmPm: "PM" as "AM" | "PM",
       frequency: "daily" as Frequency,
     },
@@ -264,8 +276,7 @@ const TEMPLATES = [
     prefill: {
       name: "Intercession 🙏",
       intention: "",
-      loggingType: "timer_reflection" as LoggingType,
-      timerDuration: 5,
+      loggingType: "reflection" as LoggingType,
       reflectionPrompt: "What are you holding today?",
       scheduledHour: 8, scheduledAmPm: "AM" as "AM" | "PM",
       frequency: "daily" as Frequency,
@@ -277,8 +288,7 @@ const TEMPLATES = [
     prefill: {
       name: "Breath Together 🌬️",
       intention: "Two minutes. Wherever we are. We breathe at the same time and remember we are not alone.",
-      loggingType: "timer" as LoggingType,
-      timerDuration: 2,
+      loggingType: "checkin" as LoggingType,
       reflectionPrompt: "",
       scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
       frequency: "daily" as Frequency,
@@ -290,9 +300,8 @@ const TEMPLATES = [
     prefill: {
       name: "Contemplative Sit 🕯️",
       intention: "We sit together in the silence. No agenda. Just presence.",
-      loggingType: "timer_reflection" as LoggingType,
-      timerDuration: 10,
-      reflectionPrompt: "What arose in the stillness?",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
       scheduledHour: 7, scheduledAmPm: "AM" as "AM" | "PM",
       frequency: "daily" as Frequency,
     },
@@ -304,7 +313,6 @@ const TEMPLATES = [
       name: "Walk Together 🚶",
       intention: "Step outside. We are walking at the same time, in different places, under the same sky.",
       loggingType: "reflection" as LoggingType,
-      timerDuration: 10,
       reflectionPrompt: "What did you notice?",
       scheduledHour: 12, scheduledAmPm: "PM" as "AM" | "PM",
       frequency: "daily" as Frequency,
@@ -351,12 +359,11 @@ const GOAL_OPTIONS = [
 
 // ─── Logging type options ─────────────────────────────────────────────────────
 const LOGGING_OPTIONS: { type: LoggingType; icon: string; label: string; description: string }[] = [
-  { type: "reflection", icon: "✍️", label: "Reflection", description: "A written response to a prompt" },
-  { type: "timer", icon: "⏱️", label: "Meditation timer", description: "A shared countdown — sit, breathe, or pray together" },
-  { type: "checkin", icon: "✅", label: "Just show up", description: "No words needed. Mark that you were present." },
+  { type: "photo",      icon: "📸", label: "Photo",      description: "Capture a moment to share with the group" },
+  { type: "reflection", icon: "✍️", label: "Reflection",  description: "A written response to a prompt" },
+  { type: "both",       icon: "📸✍️", label: "Photo + Reflection", description: "Share a photo and a written reflection" },
+  { type: "checkin",    icon: "✅", label: "Just show up", description: "No words needed. Mark that you were present." },
 ];
-
-const TIMER_DURATIONS = [2, 5, 10, 15, 20];
 
 // ─── Contact search hook ──────────────────────────────────────────────────────
 function useContactSearch(query: string) {
@@ -536,8 +543,6 @@ export default function MomentNew() {
   const [name, setName] = useState("");
   const [intention, setIntention] = useState("");
   const [loggingType, setLoggingType] = useState<LoggingType>("reflection");
-  const [timerDuration, setTimerDuration] = useState(10);
-  const [hasReflectionAfterTimer, setHasReflectionAfterTimer] = useState(false);
   const [reflectionPrompt, setReflectionPrompt] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("daily");
   const [scheduledDays, setScheduledDays] = useState<string[]>([]);
@@ -584,6 +589,25 @@ export default function MomentNew() {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
 
+  // ─── When personal time prompt opens, constrain hour/ampm to the selected time-of-day ──
+  useEffect(() => {
+    if (showPersonalTimePrompt && timeOfDay) {
+      const c = TOD_CONSTRAINTS[timeOfDay];
+      if (c) {
+        setPersonalHour(c.defaultH);
+        setPersonalAmPm(c.defaultAmPm);
+      }
+    }
+  }, [showPersonalTimePrompt, timeOfDay]);
+
+  // ─── For midday (mixed), auto-set AM/PM when hour changes ──────────────────
+  useEffect(() => {
+    if (timeOfDay === "midday") {
+      if (personalHour === 11 || personalHour === 12) setPersonalAmPm("AM");
+      else setPersonalAmPm("PM");
+    }
+  }, [personalHour, timeOfDay]);
+
   // ─── Template selection handler ─────────────────────────────────────────────
   function selectTemplate(t: typeof TEMPLATES[0]) {
     setTemplateId(t.id);
@@ -596,11 +620,9 @@ export default function MomentNew() {
       setName(t.prefill.name);
       setIntention(t.prefill.intention);
       setLoggingType(t.prefill.loggingType);
-      setTimerDuration(t.prefill.timerDuration);
       setReflectionPrompt(t.prefill.reflectionPrompt);
       // No pre-filled time or day — user fills these in
       setFrequency(t.prefill.frequency);
-      if (t.prefill.loggingType === "timer_reflection") setHasReflectionAfterTimer(true);
     }
     if (t.id === "intercession") {
       setStep("intercession");
@@ -773,22 +795,18 @@ export default function MomentNew() {
 
   function handleSubmit() {
     const validParticipants = participants.filter(p => p.name.trim() && p.email.trim());
-    const effectiveLoggingType: LoggingType = loggingType === "timer" && hasReflectionAfterTimer
-      ? "timer_reflection"
-      : loggingType;
 
     plantMutation.mutate({
       name: name.trim(),
       intention: intention.trim(),
-      loggingType: effectiveLoggingType,
-      reflectionPrompt: (effectiveLoggingType === "reflection" || effectiveLoggingType === "timer_reflection")
+      loggingType,
+      reflectionPrompt: (loggingType === "reflection" || loggingType === "both")
         ? reflectionPrompt.trim() || undefined
         : undefined,
       templateType: templateId,
       intercessionTopic: intercessionTopic.trim() || undefined,
       intercessionSource: intercessionTopic.trim() ? intercessionSource : undefined,
       intercessionFullText: intercessionFullText.trim() || undefined,
-      timerDurationMinutes: (loggingType === "timer" || loggingType === "timer_reflection") ? timerDuration : undefined,
       frequency,
       scheduledTime: isSpiritual ? "08:00" : scheduledTime,
       dayOfWeek,
@@ -830,17 +848,22 @@ export default function MomentNew() {
             className="max-w-sm w-full text-[#F5EDD8]"
           >
             <div className="text-5xl mb-4 text-center">{todEmoji}</div>
-            <h2 className="text-2xl font-semibold text-center mb-2">You've planted a {todLabel} practice.</h2>
+            <h2 className="text-2xl font-semibold text-center mb-2">You've planted {["a","e","i","o","u"].includes(todLabel[0]) ? "an" : "a"} {todLabel} practice.</h2>
             <p className="text-[#c9b99a] text-center text-sm mb-8">
               When in the {todLabel} works best for you?
             </p>
 
+            {(() => {
+              const todC = timeOfDay ? TOD_CONSTRAINTS[timeOfDay] : null;
+              const availableHours = todC ? todC.hours : [1,2,3,4,5,6,7,8,9,10,11,12];
+              const amPmMode = todC ? todC.amPm : "mixed";
+              return (
             <div className="bg-[#3a2410] rounded-2xl p-6 space-y-5">
               {/* Hour */}
               <div>
                 <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Hour</label>
-                <div className="grid grid-cols-6 gap-1.5">
-                  {[1,2,3,4,5,6,7,8,9,10,11,12].map(hv => (
+                <div className="grid grid-cols-4 gap-1.5">
+                  {availableHours.map(hv => (
                     <button key={hv} onClick={() => setPersonalHour(hv)}
                       className={`py-2 rounded-lg border text-sm font-medium transition-all ${personalHour === hv ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
                       {hv}
@@ -860,15 +883,23 @@ export default function MomentNew() {
                   ))}
                 </div>
               </div>
-              {/* AM/PM */}
-              <div className="flex gap-3">
-                {(["AM", "PM"] as const).map(p => (
-                  <button key={p} onClick={() => setPersonalAmPm(p)}
-                    className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all ${personalAmPm === p ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
-                    {p}
-                  </button>
-                ))}
-              </div>
+              {/* AM/PM — show toggle only if mixed (midday); otherwise show label only */}
+              {amPmMode === "mixed" ? (
+                <div className="flex gap-3">
+                  {(["AM", "PM"] as const).map(p => (
+                    <button key={p} onClick={() => setPersonalAmPm(p)}
+                      className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all ${personalAmPm === p ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center">
+                  <span className="inline-block px-5 py-2 rounded-xl border border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f] font-medium text-sm">
+                    {amPmMode}
+                  </span>
+                </div>
+              )}
               {/* Timezone */}
               <div>
                 <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Your timezone</label>
@@ -884,6 +915,8 @@ export default function MomentNew() {
                 Everyone in this practice chooses their own time.
               </p>
             </div>
+              );
+            })()}
 
             <button
               onClick={handleSavePersonalTime}
@@ -1488,37 +1521,8 @@ export default function MomentNew() {
                     ))}
                   </div>
 
-                  {/* Timer duration */}
-                  {loggingType === "timer" && (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-                      <label className="block text-sm font-medium text-foreground">Duration</label>
-                      <div className="flex gap-2 flex-wrap">
-                        {TIMER_DURATIONS.map(d => (
-                          <button key={d} onClick={() => setTimerDuration(d)}
-                            className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${timerDuration === d ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                            {d} min
-                          </button>
-                        ))}
-                      </div>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <div className={`relative w-10 h-5 rounded-full transition-colors ${hasReflectionAfterTimer ? "bg-[#6B8F71]" : "bg-border"}`}
-                          onClick={() => setHasReflectionAfterTimer(v => !v)}>
-                          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hasReflectionAfterTimer ? "translate-x-5" : "translate-x-0.5"}`} />
-                        </div>
-                        <span className="text-sm text-muted-foreground">Add a reflection after the timer?</span>
-                      </label>
-                      {hasReflectionAfterTimer && (
-                        <input type="text" value={reflectionPrompt}
-                          onChange={e => setReflectionPrompt(e.target.value)}
-                          placeholder="What arose in the stillness?"
-                          className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] focus:outline-none"
-                        />
-                      )}
-                    </motion.div>
-                  )}
-
                   {/* Reflection prompt */}
-                  {loggingType === "reflection" && (
+                  {(loggingType === "reflection" || loggingType === "both") && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                       <label className="block text-sm font-medium text-foreground mb-2">Your reflection prompt</label>
                       <input autoFocus type="text" value={reflectionPrompt}

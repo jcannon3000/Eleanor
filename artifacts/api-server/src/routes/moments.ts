@@ -298,13 +298,12 @@ const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 const StandalonePlantSchema = z.object({
   name: z.string().min(1).max(100),
   intention: z.string().min(1).max(500),
-  loggingType: z.enum(["photo", "reflection", "both", "checkin", "timer", "timer_reflection"]),
+  loggingType: z.enum(["photo", "reflection", "both", "checkin"]),
   reflectionPrompt: z.string().max(300).optional(),
   templateType: z.string().optional(),
   intercessionTopic: z.string().max(300).optional(),
   intercessionSource: z.enum(["bcp", "custom"]).optional(),
   intercessionFullText: z.string().optional(),
-  timerDurationMinutes: z.number().int().min(1).max(60).optional(),
   frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
@@ -329,7 +328,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, timerDurationMinutes, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays } = parsed.data;
 
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
   const isBcp = BCP_TEMPLATE_IDS.has(templateType ?? "");
@@ -806,7 +805,6 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       templateType: moment.templateType,
       intercessionFullText: moment.intercessionFullText,
       intercessionTopic: moment.intercessionTopic,
-      timerDurationMinutes: moment.timerDurationMinutes ?? 10,
       currentStreak: moment.currentStreak,
       longestStreak: moment.longestStreak,
       state: moment.state,

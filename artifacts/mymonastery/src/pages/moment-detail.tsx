@@ -239,7 +239,7 @@ export default function MomentDetail() {
             className="mb-5 flex items-center justify-between bg-[#FFF8EC] border border-[#C17F24]/30 rounded-2xl px-4 py-3"
           >
             <div>
-              <p className="text-sm font-semibold text-[#C17F24]">Window open now · {minutesLeft} min left</p>
+              <p className="text-sm font-semibold text-[#C17F24]">Practice open now · {minutesLeft} min left</p>
               <p className="text-xs text-[#C17F24]/70 mt-0.5">{todayPostCount} of {memberCount} posted</p>
             </div>
             {postUrl && (
@@ -259,7 +259,7 @@ export default function MomentDetail() {
               <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
               <p className="text-sm text-muted-foreground italic mb-2">"{moment.intention}"</p>
               <p className="text-xs text-muted-foreground">
-                {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek)} · {moment.windowMinutes} min window
+                {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek)}
               </p>
             </div>
           </div>
@@ -282,25 +282,39 @@ export default function MomentDetail() {
         </div>
 
         {/* Goal Progress */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-              {moment.goalDays}-day goal
-            </span>
-            <span className="text-xs text-muted-foreground">{progress}% through</span>
-          </div>
-          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-[#6B8F71] rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1.5">
-            {windows.filter(w => w.status === "bloom").length} blooms of {windows.length} windows so far
-          </p>
-        </div>
+        {moment.goalDays > 0 && (() => {
+          const goalLabel =
+            moment.goalDays === 3  ? "🌱 Three days together" :
+            moment.goalDays === 7  ? "🌿 One week together" :
+            moment.goalDays === 14 ? "🌸 Two weeks together" :
+            `${moment.goalDays}-day goal`;
+          const progressLabel =
+            progress === 0   ? "Just planted" :
+            progress < 50    ? "Taking root" :
+            progress < 100   ? "Growing" :
+            "🌾 Harvested";
+          return (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                  {goalLabel}
+                </span>
+                <span className="text-xs text-muted-foreground">{progressLabel}</span>
+              </div>
+              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-[#6B8F71] rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {moment.totalBlooms} practices together so far
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Members */}
         <div className="mb-6">
@@ -314,74 +328,18 @@ export default function MomentDetail() {
           </div>
         </div>
 
-        {/* Window History */}
+        {/* Practice History */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">History</span>
             <div className="flex-1 h-px bg-border/40" />
-            <span className="text-xs text-muted-foreground">{windows.length} windows</span>
+            <span className="text-xs text-muted-foreground">{windows.length} practices</span>
           </div>
 
           {windows.length === 0 ? (
             <div>
-              {/* Plant a Seed — appears before the first window */}
-              <div className="bg-[#F4F9F5] border border-[#6B8F71]/30 rounded-2xl p-5 mb-4">
-                <p className="text-sm font-semibold text-[#4a6b50] mb-1">🌱 Set the tone</p>
-                <p className="text-xs text-[#4a6b50]/70 mb-3">
-                  No windows have opened yet. Plant a seed — share a thought or intention that inspires the group before the first window.
-                </p>
-
-                {seedPosts.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {seedPosts.map((post, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-xs font-medium text-[#4a6b50] shrink-0">
-                          {(post.guestName ?? "Someone").split(" ")[0]}
-                        </span>
-                        {post.reflectionText && (
-                          <p className="text-xs text-[#4a6b50]/80 italic">"{post.reflectionText}"</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {!showSeedForm ? (
-                  <button
-                    onClick={() => setShowSeedForm(true)}
-                    className="text-xs text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors"
-                  >
-                    + Plant a seed
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <textarea
-                      value={seedText}
-                      onChange={e => setSeedText(e.target.value)}
-                      placeholder="Share a thought or intention..."
-                      className="w-full text-xs rounded-xl border border-[#6B8F71]/30 bg-white p-3 resize-none h-20 focus:outline-none focus:ring-1 focus:ring-[#6B8F71]/50"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => seedMutation.mutate()}
-                        disabled={seedMutation.isPending || !seedText.trim()}
-                        className="text-xs text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors disabled:opacity-50"
-                      >
-                        {seedMutation.isPending ? "Planting…" : "Plant 🌱"}
-                      </button>
-                      <button
-                        onClick={() => setShowSeedForm(false)}
-                        className="text-xs text-muted-foreground hover:text-foreground px-3 py-2 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="text-center py-6 text-muted-foreground/50">
-                <p className="text-sm">First window opens at {formatTime(moment.scheduledTime)}</p>
+                <p className="text-sm">First practice opens at {formatTime(moment.scheduledTime)}</p>
               </div>
             </div>
           ) : (

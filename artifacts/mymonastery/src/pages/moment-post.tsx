@@ -6,7 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import clsx from "clsx";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type LoggingType = "reflection" | "checkin" | "timer" | "timer_reflection";
+type LoggingType = "photo" | "reflection" | "both" | "checkin";
 
 const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
 const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
@@ -22,7 +22,6 @@ type MomentData = {
     templateType: string | null;
     intercessionFullText: string | null;
     intercessionTopic: string | null;
-    timerDurationMinutes: number;
     currentStreak: number;
     longestStreak: number;
     state: string;
@@ -40,8 +39,6 @@ type MomentData = {
   userName: string;
 };
 
-type TimerState = "prestart" | "running" | "complete";
-
 // ─── Presence dots ────────────────────────────────────────────────────────────
 function PresenceDots({ count, total }: { count: number; total: number }) {
   const shown = Math.min(total, 8);
@@ -52,218 +49,6 @@ function PresenceDots({ count, total }: { count: number; total: number }) {
           className={clsx("w-2.5 h-2.5 rounded-full transition-colors", i < count ? "bg-[#6B8F71]" : "bg-[#c9b99a]/40")} />
       ))}
       {total > 8 && <span className="text-xs text-[#c9b99a]/60">+{total - 8}</span>}
-    </div>
-  );
-}
-
-// ─── SVG Timer Ring ───────────────────────────────────────────────────────────
-function TimerRing({ progress, size = 200, strokeWidth = 3 }: { progress: number; size?: number; strokeWidth?: number }) {
-  const r = (size - strokeWidth * 2) / 2;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference * (1 - progress);
-
-  return (
-    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      {/* Background ring */}
-      <circle cx={size / 2} cy={size / 2} r={r}
-        fill="none" stroke="rgba(245,237,216,0.2)" strokeWidth={strokeWidth} />
-      {/* Progress ring */}
-      <circle cx={size / 2} cy={size / 2} r={r}
-        fill="none" stroke="#6B8F71" strokeWidth={strokeWidth}
-        strokeDasharray={circumference} strokeDashoffset={offset}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dashoffset 1s linear" }} />
-    </svg>
-  );
-}
-
-// ─── Meditation Timer ─────────────────────────────────────────────────────────
-function MeditationTimer({
-  durationMinutes, intention, intercessionFullText, practiceNamed, memberCount, todayPostCount,
-  reflectionPrompt, hasReflection, onComplete,
-}: {
-  durationMinutes: number;
-  intention: string;
-  intercessionFullText: string | null;
-  practiceNamed: string;
-  memberCount: number;
-  todayPostCount: number;
-  reflectionPrompt: string | null;
-  hasReflection: boolean;
-  onComplete: (reflection: string) => void;
-}) {
-  const totalSecs = durationMinutes * 60;
-  const [timerState, setTimerState] = useState<TimerState>("prestart");
-  const [secondsLeft, setSecondsLeft] = useState(totalSecs);
-  const [reflection, setReflection] = useState("");
-  const [bcpExpanded, setBcpExpanded] = useState(true);
-  const [pulse, setPulse] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const secondsRef = useRef(totalSecs);
-  const hiddenAt = useRef<number | null>(null);
-
-  const start = useCallback(() => {
-    setTimerState("running");
-    intervalRef.current = setInterval(() => {
-      secondsRef.current -= 1;
-      setSecondsLeft(secondsRef.current);
-      if (secondsRef.current % 60 === 0 && secondsRef.current > 0) {
-        setPulse(true);
-        setTimeout(() => setPulse(false), 600);
-      }
-      if (secondsRef.current <= 0) {
-        clearInterval(intervalRef.current!);
-        setTimerState("complete");
-      }
-    }, 1000);
-  }, []);
-
-  // Pause/resume on tab hide
-  useEffect(() => {
-    function onHide() {
-      if (timerState === "running") {
-        hiddenAt.current = Date.now();
-        clearInterval(intervalRef.current!);
-      }
-    }
-    function onShow() {
-      if (timerState === "running" && hiddenAt.current) {
-        const elapsed = Math.floor((Date.now() - hiddenAt.current) / 1000);
-        secondsRef.current = Math.max(0, secondsRef.current - elapsed);
-        setSecondsLeft(secondsRef.current);
-        hiddenAt.current = null;
-        if (secondsRef.current <= 0) {
-          setTimerState("complete");
-          return;
-        }
-        intervalRef.current = setInterval(() => {
-          secondsRef.current -= 1;
-          setSecondsLeft(secondsRef.current);
-          if (secondsRef.current <= 0) { clearInterval(intervalRef.current!); setTimerState("complete"); }
-        }, 1000);
-      }
-    }
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) onHide(); else onShow();
-    });
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [timerState]);
-
-  const progress = 1 - secondsLeft / totalSecs;
-  const minsDisplay = Math.floor(secondsLeft / 60);
-  const secsDisplay = secondsLeft % 60;
-
-  // ── Pre-start screen ────────────────────────────────────────────────────────
-  if (timerState === "prestart") {
-    return (
-      <div className="min-h-screen bg-[#2C1A0E] flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-bold text-[#F5EDD8] text-center mb-2">{practiceNamed}</h1>
-          <p className="text-center text-[#a08060] italic font-serif text-base leading-relaxed mb-6 max-w-xs mx-auto">
-            {intention}
-          </p>
-
-          {/* BCP prayer */}
-          {intercessionFullText && (
-            <div className="bg-[#F5EDD8] rounded-2xl p-4 mb-6">
-              <button onClick={() => setBcpExpanded(e => !e)}
-                className="w-full flex items-center justify-between text-xs font-semibold text-[#4a3728] mb-2">
-                <span>The prayer</span>
-                <span>{bcpExpanded ? "▲" : "▼"}</span>
-              </button>
-              {bcpExpanded && (
-                <p className="text-sm text-[#4a3728] font-serif italic leading-relaxed">{intercessionFullText}</p>
-              )}
-              {bcpExpanded && (
-                <p className="text-xs text-[#4a3728]/60 mt-2">From the Book of Common Prayer</p>
-              )}
-            </div>
-          )}
-
-          {/* Ring preview */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="relative">
-              <TimerRing progress={0} size={180} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-3xl font-bold text-[#F5EDD8] font-mono">
-                  {durationMinutes}:00
-                </span>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <PresenceDots count={todayPostCount} total={memberCount} />
-              <span className="text-xs text-[#c9b99a]/70">{todayPostCount} of {memberCount} sitting with you</span>
-            </div>
-          </div>
-
-          <button onClick={start}
-            className="w-full py-4 bg-[#6B8F71] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:bg-[#5a7a60] transition-colors">
-            Begin 🌿
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Running screen ──────────────────────────────────────────────────────────
-  if (timerState === "running") {
-    return (
-      <div className="min-h-screen bg-[#2C1A0E] flex flex-col items-center justify-center">
-        <motion.div animate={pulse ? { scale: [1, 1.02, 1] } : {}} transition={{ duration: 0.6 }}
-          className="flex flex-col items-center">
-          <div className="relative">
-            <TimerRing progress={progress} size={220} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm text-[#c9b99a]/50 font-mono">
-                {String(minsDisplay).padStart(2, "0")}:{String(secsDisplay).padStart(2, "0")}
-              </span>
-            </div>
-          </div>
-          <p className="mt-6 text-xs text-[#c9b99a]/50">{todayPostCount} of {memberCount} sitting with you</p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ── Complete screen ─────────────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen bg-[#2C1A0E] flex flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-sm">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          className="text-center mb-8">
-          <div className="relative mx-auto w-32 h-32 mb-4">
-            <TimerRing progress={1} size={128} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-3xl">🌿</span>
-            </div>
-          </div>
-          <p className="text-2xl font-semibold text-[#F5EDD8] mb-2">
-            {durationMinutes} minutes of stillness, together.
-          </p>
-          <p className="text-sm text-[#c9b99a]/70">{todayPostCount} of {memberCount} sat with you.</p>
-        </motion.div>
-
-        {hasReflection && reflectionPrompt && (
-          <div className="mb-6">
-            <p className="text-center font-serif italic text-[#a08060] text-lg mb-3">
-              "{reflectionPrompt}"
-            </p>
-            <textarea value={reflection} onChange={e => setReflection(e.target.value.slice(0, 280))}
-              placeholder="Take a moment. Then share..."
-              rows={4}
-              className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/20 bg-[#3d2510] text-[#F5EDD8] placeholder:text-[#c9b99a]/40 resize-none focus:outline-none focus:border-[#6B8F71]"
-            />
-          </div>
-        )}
-
-        <button onClick={() => onComplete(reflection)}
-          className="w-full py-4 bg-[#6B8F71] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:bg-[#5a7a60] transition-colors">
-          I showed up 🌿
-        </button>
-        <p className="text-center text-xs text-[#c9b99a]/40 mt-3 italic">Reflection is always optional</p>
-      </div>
     </div>
   );
 }
@@ -391,10 +176,10 @@ export default function MomentPostPage() {
     const { loggingType } = data.moment;
     const finalReflection = extraReflection ?? reflection;
     postMutation.mutate({
-      reflectionText: (loggingType === "reflection" || loggingType === "timer_reflection")
+      reflectionText: (loggingType === "reflection" || loggingType === "both")
         ? finalReflection || undefined
         : undefined,
-      isCheckin: loggingType === "checkin" || loggingType === "timer" || loggingType === "timer_reflection",
+      isCheckin: loggingType === "checkin" || loggingType === "photo",
     });
   }
 
@@ -487,28 +272,6 @@ export default function MomentPostPage() {
 
   // ── Outside window for intercession ────────────────────────────────────────
   if (moment.templateType === "intercession" && !alreadyPosted && !effectiveWindowOpen) {
-    return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
-  }
-
-  // ── Timer pages — full screen, separate from main layout ───────────────────
-  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && effectiveWindowOpen && !alreadyPosted) {
-    return (
-      <MeditationTimer
-        durationMinutes={moment.timerDurationMinutes}
-        intention={moment.intention}
-        intercessionFullText={moment.intercessionFullText}
-        practiceNamed={moment.name}
-        memberCount={actualMemberCount}
-        todayPostCount={actualTodayCount}
-        reflectionPrompt={moment.reflectionPrompt}
-        hasReflection={moment.loggingType === "timer_reflection"}
-        onComplete={(refl) => handleSubmit(refl)}
-      />
-    );
-  }
-
-  // ── Outside window or already posted for timer ──────────────────────────────
-  if ((moment.loggingType === "timer" || moment.loggingType === "timer_reflection") && !alreadyPosted && !effectiveWindowOpen) {
     return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
   }
 
@@ -772,7 +535,7 @@ function OutsideWindowScreen({ moment, minutesRemaining }: { moment: MomentData[
       <div className="text-center max-w-xs">
         <p className="text-5xl mb-5">🌿</p>
         <p className="font-semibold text-[#2C1A0E] text-xl mb-2">This practice is resting.</p>
-        <p className="text-sm text-[#6b5c4a] mb-2">{moment.name} opens at the next window.</p>
+        <p className="text-sm text-[#6b5c4a] mb-2">{moment.name} opens at the next practice time.</p>
         {minutesRemaining > 0 && (
           <p className="text-xs text-[#6b5c4a]/70">{timeAway} away</p>
         )}
