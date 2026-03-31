@@ -418,7 +418,7 @@ export default function Dashboard() {
             )}
           </div>
           <Link
-            href="/create"
+            href="/moment/new"
             className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-medium text-sm shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
           >
             + New
@@ -430,7 +430,7 @@ export default function Dashboard() {
             🌿 Practices →
           </Link>
           <span className="text-muted-foreground/30 text-xs">·</span>
-          <Link href="/create" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+          <Link href="/tradition/new" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
             🌱 Traditions →
           </Link>
         </div>
