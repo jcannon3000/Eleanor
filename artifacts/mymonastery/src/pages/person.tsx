@@ -38,7 +38,7 @@ function getStatusLabel(status: string) {
   switch (status) {
     case "on_track":        return "Blooming";
     case "overdue":         return "Needs tending";
-    default:                return "Ready to plant";
+    default:                return "Just planted";
   }
 }
 

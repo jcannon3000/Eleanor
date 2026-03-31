@@ -27,8 +27,8 @@ export function RitualCard({ ritual, onDelete }: RitualCardProps) {
     switch (status) {
       case "on_track": return "Blooming";
       case "overdue": return "Needs tending";
-      case "needs_scheduling": return "Ready to plant";
-      default: return status;
+      case "needs_scheduling": return "Just planted";
+      default: return "";
     }
   };
 
@@ -66,9 +66,11 @@ export function RitualCard({ ritual, onDelete }: RitualCardProps) {
         <div className="h-full bg-card rounded-2xl p-6 border border-card-border shadow-[var(--shadow-warm-sm)] hover:shadow-[var(--shadow-warm-md)] hover:-translate-y-1 transition-all duration-300 ease-out flex flex-col focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
 
           <div className="flex justify-between items-start mb-4">
-            <div className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusStyle(ritual.status)}`}>
-              {getStatusLabel(ritual.status)}
-            </div>
+            {getStatusLabel(ritual.status) ? (
+              <div className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusStyle(ritual.status)}`}>
+                {getStatusLabel(ritual.status)}
+              </div>
+            ) : <div />}
             <StreakBadge count={ritual.streak} size="sm" />
           </div>
 

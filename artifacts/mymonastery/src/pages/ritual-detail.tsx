@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { format, parseISO, formatDistanceToNow, isPast } from "date-fns";
-import { CheckCircle2, XCircle, Settings, Sprout, CalendarCheck, RefreshCw, Flower2, Plus } from "lucide-react";
+import { CheckCircle2, XCircle, Settings, Sprout, CalendarCheck, RefreshCw, Flower2, Plus, UserPlus, X, Copy, Link2, Calendar } from "lucide-react";
 import { clsx } from "clsx";
 import {
   useGetRitual,
@@ -67,9 +67,9 @@ interface TimelineData {
 
 function getStatusMeta(status: string) {
   switch (status) {
-    case "on_track":   return { label: "Blooming",        style: "bg-green-50 text-green-800 border-green-200" };
-    case "overdue":    return { label: "Needs tending",   style: "bg-amber-50 text-amber-800 border-amber-200" };
-    default:           return { label: "Ready to plant",  style: "bg-secondary text-secondary-foreground border-secondary-border" };
+    case "on_track":   return { label: "Blooming",      style: "bg-green-50 text-green-800 border-green-200" };
+    case "overdue":    return { label: "Needs tending", style: "bg-amber-50 text-amber-800 border-amber-200" };
+    default:           return { label: null,             style: "" };
   }
 }
 
@@ -101,6 +101,20 @@ export default function RitualDetail() {
   const [calendarSynced, setCalendarSynced] = useState(false);
   const [loggingId, setLoggingId] = useState<number | null>(null);
   const [rsvp, setRsvp] = useState<"going" | "not-going" | null>(null);
+
+  // ── Invite sheet state ─────────────────────────────────────────────────────
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [inviteEmailInput, setInviteEmailInput] = useState("");
+  const [inviteQueue, setInviteQueue] = useState<Array<{ name: string; email: string }>>([]);
+  const [inviteConnections, setInviteConnections] = useState<Array<{ name: string; email: string }>>([]);
+  const [invitedEmails, setInvitedEmails] = useState<Set<string>>(new Set());
+  const [inviting, setInviting] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // ── Calendar sync state ────────────────────────────────────────────────────
+  const [calSyncNotifs, setCalSyncNotifs] = useState<Array<{ name: string; email: string }>>([]);
+  const [calSyncedEmails, setCalSyncedEmails] = useState<Set<string>>(new Set());
+  const [declinedEmails, setDeclinedEmails] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -172,6 +186,102 @@ export default function RitualDetail() {
     }
   };
 
+  // ── Calendar sync: run once on page load ──────────────────────────────────
+  useEffect(() => {
+    if (!ritualId) return;
+    fetch(`/api/rituals/${ritualId}/calendar-sync`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { synced: Array<{ name: string; email: string }>; declinedEmails: string[] } | null) => {
+        if (!data) return;
+        if (data.synced.length > 0) {
+          setCalSyncNotifs(data.synced);
+          setCalSyncedEmails(new Set(data.synced.map(m => m.email.toLowerCase())));
+          queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
+          // Auto-dismiss after 5 seconds
+          setTimeout(() => setCalSyncNotifs([]), 5000);
+        }
+        if (data.declinedEmails.length > 0) {
+          setDeclinedEmails(new Set(data.declinedEmails));
+        }
+      })
+      .catch(() => null);
+  }, [ritualId]);
+
+  // ── Invite sheet: fetch connections when opened ───────────────────────────
+  useEffect(() => {
+    if (!showInviteSheet || !ritualId) return;
+    fetch(`/api/rituals/${ritualId}/connections`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { connections: Array<{ name: string; email: string }> } | null) => {
+        if (data) setInviteConnections(data.connections);
+      })
+      .catch(() => null);
+  }, [showInviteSheet, ritualId]);
+
+  const joinLink = `${window.location.origin}/join/${ritual?.scheduleToken ?? ""}`;
+
+  const handleAddEmailToQueue = () => {
+    const email = inviteEmailInput.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (inviteQueue.some(p => p.email.toLowerCase() === email.toLowerCase())) return;
+    setInviteQueue(prev => [...prev, { name: email.split("@")[0], email }]);
+    setInviteEmailInput("");
+  };
+
+  const handleRemoveFromQueue = (email: string) => {
+    setInviteQueue(prev => prev.filter(p => p.email !== email));
+  };
+
+  const handleQuickInvite = async (name: string, email: string) => {
+    if (invitedEmails.has(email.toLowerCase())) return;
+    try {
+      const res = await fetch(`/api/rituals/${ritualId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ participants: [{ name, email }] }),
+      });
+      if (res.ok) {
+        setInvitedEmails(prev => new Set([...prev, email.toLowerCase()]));
+        queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleSendInvites = async () => {
+    const all = [...inviteQueue];
+    if (all.length === 0) { setShowInviteSheet(false); return; }
+    setInviting(true);
+    try {
+      const res = await fetch(`/api/rituals/${ritualId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ participants: all }),
+      });
+      if (res.ok) {
+        const data: { added: Array<{ name: string; email: string }> } = await res.json();
+        const newEmails = new Set(data.added.map(p => p.email.toLowerCase()));
+        setInvitedEmails(prev => new Set([...prev, ...newEmails]));
+        setInviteQueue([]);
+        setShowInviteSheet(false);
+        toast({ title: `${data.added.length} invitation${data.added.length !== 1 ? "s" : ""} sent 🌱` });
+        queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Could not send invitations" });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(joinLink).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    });
+  };
+
   const handleSaveSettings = async () => {
     try {
       await updateMutation.mutateAsync({ id: ritualId, data: { name: editName, intention: editIntention } });
@@ -210,9 +320,11 @@ export default function RitualDetail() {
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <div className={`px-3 py-1 rounded-full text-xs font-medium border ${statusMeta.style}`}>
-                  {statusMeta.label}
-                </div>
+                {statusMeta.label && (
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium border ${statusMeta.style}`}>
+                    {statusMeta.label}
+                  </div>
+                )}
                 <StreakBadge count={ritual.streak} />
               </div>
               <h1 className="text-3xl md:text-4xl font-serif text-foreground truncate">{ritual.name}</h1>
@@ -228,30 +340,51 @@ export default function RitualDetail() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Member avatars + Add people */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
               <div className="flex -space-x-2">
-                {ritual.participants.slice(0, 5).map((p, i) => (
-                  <Link
-                    key={i}
-                    href={`/people/${encodeURIComponent(p.email)}`}
-                    className="w-9 h-9 rounded-full border-2 border-card bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shadow-sm hover:z-10 hover:scale-110 transition-all"
-                    title={p.name}
-                  >
-                    {p.name.charAt(0).toUpperCase()}
-                  </Link>
-                ))}
+                {ritual.participants.slice(0, 3).map((p, i) => {
+                  const isPending = invitedEmails.has(p.email.toLowerCase()) || false;
+                  const isDeclined = declinedEmails.has(p.email.toLowerCase());
+                  const isSynced = calSyncedEmails.has(p.email.toLowerCase());
+                  return (
+                    <div key={i} className="relative group/avatar">
+                      <Link
+                        href={`/people/${encodeURIComponent(p.email)}`}
+                        className={clsx(
+                          "w-9 h-9 rounded-full border-2 border-card flex items-center justify-center text-xs font-medium shadow-sm hover:z-10 hover:scale-110 transition-all",
+                          isPending ? "bg-secondary text-muted-foreground" : "bg-primary/10 text-primary"
+                        )}
+                        title={p.name}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </Link>
+                      {isSynced && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 border border-card flex items-center justify-center">
+                          <Calendar size={8} className="text-white" />
+                        </span>
+                      )}
+                      {isDeclined && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-card" title="May have declined" />
+                      )}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-foreground text-background text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/avatar:opacity-100 transition-opacity pointer-events-none z-20">
+                        {p.name}
+                      </div>
+                    </div>
+                  );
+                })}
+                {ritual.participants.length > 3 && (
+                  <div className="w-9 h-9 rounded-full border-2 border-card bg-secondary flex items-center justify-center text-xs font-medium text-muted-foreground shadow-sm">
+                    +{ritual.participants.length - 3}
+                  </div>
+                )}
               </div>
               <button
-                onClick={() => setActiveTab("settings")}
-                className={clsx(
-                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
-                  activeTab === "settings"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                )}
-                title="Settings"
+                onClick={() => setShowInviteSheet(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#6B8F71]/50 text-[#4a6b50] text-xs font-medium hover:bg-[#6B8F71]/10 transition-colors"
               >
-                <Settings size={16} />
+                <UserPlus size={12} />
+                Add people
               </button>
             </div>
           </div>
@@ -289,6 +422,28 @@ export default function RitualDetail() {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
+              {/* Calendar sync notifications */}
+              <AnimatePresence>
+                {calSyncNotifs.map((m, i) => (
+                  <motion.div
+                    key={m.email}
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: i * 0.08 }}
+                    onClick={() => setCalSyncNotifs(prev => prev.filter(n => n.email !== m.email))}
+                    className="flex items-center gap-3 bg-[#F0F8F0] border border-[#6B8F71]/30 rounded-2xl px-4 py-3 cursor-pointer"
+                  >
+                    <span className="text-xl">🌱</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#2a402c]">{m.name} was added from your calendar</p>
+                      <p className="text-xs text-[#4a6b50]/70">They've been added to {ritual.name}.</p>
+                    </div>
+                    <X size={14} className="text-[#4a6b50]/50 flex-shrink-0" />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
               {/* Upcoming gathering */}
               {timelineLoading ? (
                 <div className="h-40 bg-card rounded-2xl border border-card-border animate-pulse" />
@@ -686,6 +841,133 @@ export default function RitualDetail() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ── Invite bottom sheet ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showInviteSheet && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowInviteSheet(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            />
+            {/* Sheet */}
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 bg-background rounded-t-3xl z-50 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="px-6 pt-5 pb-8 max-w-lg mx-auto">
+                {/* Handle */}
+                <div className="w-10 h-1 bg-border rounded-full mx-auto mb-5" />
+
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold">Invite to {ritual.name} 🌱</h2>
+                  <button onClick={() => setShowInviteSheet(false)} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Section 1: Existing connections */}
+                {inviteConnections.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Already in Eleanor with you</p>
+                    <div className="space-y-2">
+                      {inviteConnections.map(c => {
+                        const already = ritual.participants.some(p => p.email.toLowerCase() === c.email.toLowerCase());
+                        const justInvited = invitedEmails.has(c.email.toLowerCase());
+                        return (
+                          <div key={c.email} className="flex items-center gap-3 p-3 rounded-2xl bg-secondary/50">
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary flex-shrink-0">
+                              {c.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{c.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                            </div>
+                            {already ? (
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">Already here ✓</span>
+                            ) : justInvited ? (
+                              <span className="text-xs text-[#4a6b50] font-medium whitespace-nowrap">Invited ✓</span>
+                            ) : (
+                              <button
+                                onClick={() => handleQuickInvite(c.name, c.email)}
+                                className="text-xs font-medium text-[#4a6b50] border border-[#6B8F71]/50 rounded-full px-3 py-1 hover:bg-[#6B8F71]/10 transition-colors whitespace-nowrap"
+                              >
+                                Invite →
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section 2: Email invite */}
+                <div className="mb-6">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Invite someone new</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={inviteEmailInput}
+                      onChange={e => setInviteEmailInput(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAddEmailToQueue()}
+                      placeholder="name@example.com"
+                      className="flex-1 px-4 py-2.5 rounded-2xl border border-border focus:border-[#6B8F71] outline-none bg-secondary/30 text-sm"
+                    />
+                    <button
+                      onClick={handleAddEmailToQueue}
+                      className="px-4 py-2.5 rounded-2xl bg-[#6B8F71] text-white text-sm font-medium hover:bg-[#5a7a60] transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {inviteQueue.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {inviteQueue.map(p => (
+                        <span key={p.email} className="flex items-center gap-1.5 px-3 py-1 bg-[#6B8F71]/10 border border-[#6B8F71]/30 rounded-full text-sm text-[#4a6b50]">
+                          {p.email}
+                          <button onClick={() => handleRemoveFromQueue(p.email)} className="text-[#4a6b50]/50 hover:text-[#4a6b50]">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 3: Share link */}
+                <div className="mb-8">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Or share a link</p>
+                  <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-2xl">
+                    <Link2 size={14} className="text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground truncate flex-1">{joinLink}</span>
+                    <button
+                      onClick={handleCopyLink}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background border border-border text-xs font-medium hover:bg-secondary transition-colors flex-shrink-0"
+                    >
+                      <Copy size={12} />
+                      {copiedLink ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Send invites button */}
+                <button
+                  onClick={handleSendInvites}
+                  disabled={inviting || inviteQueue.length === 0}
+                  className="w-full py-4 bg-[#6B8F71] text-white rounded-2xl font-semibold text-base hover:bg-[#5a7a60] transition-all disabled:opacity-50"
+                >
+                  {inviting ? "Sending…" : `Send invites 🌱${inviteQueue.length > 0 ? ` (${inviteQueue.length})` : ""}`}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }

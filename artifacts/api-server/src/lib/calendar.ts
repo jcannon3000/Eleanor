@@ -234,6 +234,57 @@ export async function getCalendarEvent(
   }
 }
 
+export async function getCalendarEventAttendees(
+  userId: number,
+  eventId: string
+): Promise<Array<{ email: string; displayName?: string; responseStatus?: string }> | null> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return null;
+
+  const calendar = google.calendar({ version: "v3", auth });
+  try {
+    const res = await calendar.events.get({ calendarId: "primary", eventId });
+    const attendees = res.data.attendees ?? [];
+    return attendees
+      .filter(a => a.email && !a.self)
+      .map(a => ({
+        email: a.email!,
+        displayName: a.displayName ?? undefined,
+        responseStatus: a.responseStatus ?? undefined,
+      }));
+  } catch {
+    return null;
+  }
+}
+
+export async function addAttendeesToCalendarEvent(
+  userId: number,
+  eventId: string,
+  newEmails: string[]
+): Promise<boolean> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return false;
+
+  const calendar = google.calendar({ version: "v3", auth });
+  try {
+    const existing = await calendar.events.get({ calendarId: "primary", eventId });
+    const currentAttendees = existing.data.attendees ?? [];
+    const currentEmails = new Set(currentAttendees.map(a => a.email));
+    const toAdd = newEmails.filter(e => !currentEmails.has(e));
+    if (toAdd.length === 0) return true;
+    const merged = [...currentAttendees, ...toAdd.map(email => ({ email }))];
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId,
+      sendUpdates: "all",
+      requestBody: { attendees: merged },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function searchContacts(userId: number, query: string): Promise<Array<{ name: string; email: string }>> {
   const auth = await getAuthedClient(userId);
   if (!auth) return [];

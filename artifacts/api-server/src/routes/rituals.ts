@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable } from "@workspace/db";
-import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent, deleteCalendarEvent } from "../lib/calendar";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
+import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent, deleteCalendarEvent, getCalendarEventAttendees, addAttendeesToCalendarEvent } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
   CreateRitualBody,
@@ -1034,6 +1034,173 @@ router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
   }
 
   res.json({ confirmedTime: confirmedTime.toISOString() });
+});
+
+// ─── GET /api/rituals/:id/connections ─────────────────────────────────────────
+// Returns Eleanor users who share a moment or tradition with the current user
+// but are NOT already a member of this tradition
+router.get("/rituals/:id/connections", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const ritualId = parseInt(req.params.id, 10);
+  if (isNaN(ritualId)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!currentUser) { res.status(404).json({ error: "User not found" }); return; }
+
+  const currentParticipants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+  const currentEmails = new Set(currentParticipants.map(p => p.email.toLowerCase()));
+
+  // Collect emails from existing moment connections
+  const myMomentTokens = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.email, currentUser.email));
+  const momentIds = [...new Set(myMomentTokens.map(t => t.momentId))];
+  const allConnections: Map<string, string> = new Map(); // email -> name
+
+  if (momentIds.length > 0) {
+    for (const mid of momentIds) {
+      const allTokens = await db.select().from(momentUserTokensTable)
+        .where(eq(momentUserTokensTable.momentId, mid));
+      for (const t of allTokens) {
+        if (t.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+          allConnections.set(t.email.toLowerCase(), t.name ?? t.email);
+        }
+      }
+    }
+  }
+
+  // Collect emails from other rituals the user is in
+  const allRituals = await db.select().from(ritualsTable);
+  for (const r of allRituals) {
+    const parts = (r.participants as Array<{ name: string; email: string }>) ?? [];
+    const isMember = parts.some(p => p.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (isMember) {
+      for (const p of parts) {
+        if (p.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+          allConnections.set(p.email.toLowerCase(), p.name ?? p.email);
+        }
+      }
+    }
+  }
+
+  // Filter out already-members of this tradition
+  const connections = Array.from(allConnections.entries())
+    .filter(([email]) => !currentEmails.has(email))
+    .map(([email, name]) => ({ email, name }));
+
+  res.json({ connections });
+});
+
+// ─── POST /api/rituals/:id/invite ────────────────────────────────────────────
+// Adds new participants to the tradition and invites them via calendar
+router.post("/rituals/:id/invite", async (req, res): Promise<void> => {
+  try {
+    const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+    if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const ritualId = parseInt(req.params.id, 10);
+    if (isNaN(ritualId)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+    const parsed = z.object({
+      participants: z.array(z.object({ name: z.string(), email: z.string().email() })).min(1),
+    }).safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Validation failed" }); return; }
+
+    const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+    if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+    const current = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+    const currentEmails = new Set(current.map(p => p.email.toLowerCase()));
+
+    // Merge new participants (deduplicate by email)
+    const newParts = parsed.data.participants.filter(p => !currentEmails.has(p.email.toLowerCase()));
+    if (newParts.length === 0) {
+      res.json({ participants: current, added: [] });
+      return;
+    }
+    const merged = [...current, ...newParts];
+
+    await db.update(ritualsTable).set({ participants: merged }).where(eq(ritualsTable.id, ritualId));
+
+    // Add invite tokens for new participants
+    const appBase = process.env["REPLIT_DEV_DOMAIN"]
+      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
+      : "http://localhost:23896";
+    for (const p of newParts) {
+      const existingToken = await db.select().from(inviteTokensTable)
+        .where(eq(inviteTokensTable.ritualId, ritualId));
+      const alreadyHasToken = existingToken.find(t => t.email.toLowerCase() === p.email.toLowerCase());
+      if (!alreadyHasToken) {
+        const token = randomUUID();
+        await db.insert(inviteTokensTable).values({ ritualId, email: p.email, name: p.name, token });
+      }
+    }
+
+    // Add new participants to the Google Calendar event (if one exists)
+    const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
+    const eventMeetup = meetups.find(m => m.googleCalendarEventId);
+    if (eventMeetup?.googleCalendarEventId) {
+      await addAttendeesToCalendarEvent(
+        sessionUserId,
+        eventMeetup.googleCalendarEventId,
+        newParts.map(p => p.email)
+      ).catch(() => null);
+    }
+
+    res.json({ participants: merged, added: newParts });
+  } catch (err) {
+    console.error("POST /api/rituals/:id/invite error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /api/rituals/:id/calendar-sync ──────────────────────────────────────
+// Syncs attendees from the Google Calendar event into tradition members
+router.get("/rituals/:id/calendar-sync", async (req, res): Promise<void> => {
+  try {
+    const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+    if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const ritualId = parseInt(req.params.id, 10);
+    if (isNaN(ritualId)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+    const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+    if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+    const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
+    const eventMeetup = meetups.find(m => m.googleCalendarEventId);
+    if (!eventMeetup?.googleCalendarEventId) {
+      res.json({ synced: [], declinedEmails: [] });
+      return;
+    }
+
+    const attendees = await getCalendarEventAttendees(sessionUserId, eventMeetup.googleCalendarEventId);
+    if (!attendees) {
+      res.json({ synced: [], declinedEmails: [] });
+      return;
+    }
+
+    const current = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+    const currentEmails = new Set(current.map(p => p.email.toLowerCase()));
+
+    // Find attendees not in tradition — add them
+    const toAdd = attendees.filter(a => !currentEmails.has(a.email.toLowerCase()));
+    const declinedEmails = attendees
+      .filter(a => a.responseStatus === "declined" && currentEmails.has(a.email.toLowerCase()))
+      .map(a => a.email.toLowerCase());
+
+    if (toAdd.length > 0) {
+      const newParts = toAdd.map(a => ({ email: a.email, name: a.displayName ?? a.email }));
+      await db.update(ritualsTable)
+        .set({ participants: [...current, ...newParts] })
+        .where(eq(ritualsTable.id, ritualId));
+    }
+
+    res.json({ synced: toAdd.map(a => ({ email: a.email, name: a.displayName ?? a.email })), declinedEmails });
+  } catch (err) {
+    console.error("GET /api/rituals/:id/calendar-sync error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

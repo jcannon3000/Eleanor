@@ -1,0 +1,108 @@
+Here’s the updated prompt:
+
+Require at least two members in the invite step for both Practices and Traditions — with recommended participants
+Find the invite step in both the Plant a Practice creation flow and the Plant a Tradition creation flow. Apply the changes below to both.
+
+THE RULE
+A practice or tradition requires at least two people — the creator and at least one other person. The creator counts as one. The invite step must collect at least one additional person before the user can proceed.
+“Plant this practice” and “Plant this tradition” buttons are disabled until at least one other person has been added.
+
+UPDATE THE INVITE SCREEN
+For Practices:
+Header: “Who will tend this practice with you? 🌿”
+Muted subtitle:
+“Practices are meant to be done together across distance. Add at least one person to begin.”
+For Traditions:
+Header: “Who will tend this tradition with you? 🌱”
+Muted subtitle:
+“Traditions bring people together. Add at least one person so Eleanor can coordinate everyone’s calendars.”
+
+SECTION 1 — RECOMMENDED PARTICIPANTS
+Before the manual input fields show a recommended participants section. This is populated from everyone the current user shares any existing practice or tradition with — queried from moment_members and circle_members, deduplicated by email, excluding the current user.
+Label above the section:
+“From your practices and traditions 🌿”
+If there are three or fewer connections:
+Display as a row of static cards side by side. Each card:
+
+[Avatar — initials or photo, 40px circle]
+[First name bold, 13px]
+[Muted email, 11px]
+[+ Add]
+
+
+Sage outlined + Add button beneath each card. Tapping + Add selects that person, their card background fills sage, the button changes to “Added ✓” in cream text on sage background.
+If there are more than three connections:
+Display as a horizontal scrolling ticker — continuous, looping, animated left to right. Same card format as above but they scroll slowly across the screen.
+Animation specs:
+	∙	Speed: approximately 35px per second. Slow, unhurried, browsable.
+	∙	The ticker scrolls automatically but the user can also swipe horizontally to browse manually. On manual swipe the auto-scroll pauses for 3 seconds then resumes.
+	∙	Fade edges: left and right edges fade to transparent using a CSS gradient mask so cards appear and disappear softly.
+	∙	Gap between cards: 12px
+	∙	The ticker loops seamlessly — when it reaches the last card it continues from the first without a jump.
+Tapping a card in the ticker selects it. The card’s background fills sage and shows “Added ✓.” Selected cards remain in the ticker but visually marked. They do not jump out of the ticker to a separate list — they stay in place, marked.
+Below the ticker or static cards show a count of how many have been selected:
+
+[X] people added from your connections
+
+
+This count updates as cards are tapped.
+
+SECTION 2 — ADD SOMEONE NEW
+Below the recommended section show the manual input:
+Label: “Or invite someone new”
+Name field and Email field side by side as currently shown.
+“+ Add another person” link to add multiple manual entries.
+Validation: email must be valid format before the person is counted. Name optional — falls back to email as display name.
+
+SECTION 3 — EVERYONE BEING INVITED
+Once at least one person has been added (from recommended or manual) show a summary beneath the input fields:
+
+Inviting:
+[Name 1]  [Name 2]  [Name 3 ×]
+
+
+Each name shows as a small sage pill with an × to remove. This gives the user a clear view of who they are inviting before planting.
+
+DISABLED BUTTON STATE
+Button starts greyed out, non-tappable. Label:
+“Plant this practice 🌿” (or tradition 🌱)
+If user taps the disabled button show inline message beneath it — warm not alarming, sage tint background:
+For Practices:
+
+🌿 This practice needs at least one other person.
+
+Eleanor is built for doing things together across distance —
+praying the same words, sitting in the same silence,
+keeping the same fast. Add someone to share it with.
+
+
+For Traditions:
+
+🌱 This tradition needs at least one other person.
+
+Eleanor coordinates shifting calendars so the things
+worth repeating actually happen. Add someone to gather with.
+
+
+ACTIVE BUTTON STATE
+Once at least one person is added the button activates:
+One person added:
+“Plant this practice with [Name] 🌿”
+Two or more added:
+“Plant this practice with [X] people 🌿”
+Same pattern for traditions with 🌱.
+
+What does not change
+The rest of the creation flow is unchanged. This update applies only to the invite step and the button behavior on that step.
+
+Build order
+	1.	Disable Plant button by default
+	2.	Build recommended participants section — query connections, deduplicate by email
+	3.	Static card layout for three or fewer connections
+	4.	Horizontal looping ticker for more than three connections — auto-scroll, fade edges, manual swipe pauses auto-scroll
+	5.	Selection state on cards — sage fill, “Added ✓” label, count updates
+	6.	Manual invite section — name and email fields, add multiple, email validation
+	7.	Invited people summary — sage pills with × to remove
+	8.	Button activates when at least one person added — dynamic label
+	9.	Inline message on disabled button tap — different copy for practices vs traditions
+	10.	Update subtitle copy for practices and traditions separately​​​​​​​​​​​​​​​​
