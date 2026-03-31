@@ -1060,6 +1060,7 @@ router.get("/moments/:momentToken/info", async (req, res): Promise<void> => {
       timeOfDay: moment.timeOfDay,
       frequency: moment.frequency,
       dayOfWeek: moment.dayOfWeek,
+      practiceDays: moment.practiceDays,
       goalDays: moment.goalDays,
       loggingType: moment.loggingType,
       intercessionTopic: moment.intercessionTopic,

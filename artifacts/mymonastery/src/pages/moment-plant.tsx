@@ -43,7 +43,7 @@ const LOGGING_OPTIONS: {
   {
     type: "checkin",
     icon: "✅",
-    label: "Just show up",
+    label: "Just practice",
     description: "No words needed. Just mark that you were here.",
     bestFor: "Meditation, prayer, breathing practices",
   },
@@ -227,7 +227,7 @@ export default function MomentPlant() {
           {/* Step 2: Logging type */}
           {step === 2 && (
             <motion.div key="step-logging" variants={stepVariants} initial="initial" animate="animate" exit="exit">
-              <h2 className="text-xl font-semibold text-foreground mb-2">How will your circle show up? 📷</h2>
+              <h2 className="text-xl font-semibold text-foreground mb-2">How will your circle practice? 📷</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 Choose how members log their moment. Everyone uses the same format.
               </p>
@@ -305,7 +305,7 @@ export default function MomentPlant() {
             <motion.div key="step-time" variants={stepVariants} initial="initial" animate="animate" exit="exit">
               <h2 className="text-xl font-semibold text-foreground mb-2">When does your circle gather? 🗓️</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                A one-hour window opens at this time. Members show up and log whenever they can.
+                A one-hour window opens at this time. Members practice and log whenever they can.
               </p>
 
               <div className="space-y-4">

@@ -479,7 +479,7 @@ export default function RitualDetail() {
 
               {/* Streak rule note */}
               <p className="text-xs text-muted-foreground italic text-center px-4">
-                The streak blooms when at least two of you show up together.
+                The streak blooms when at least two of you practice together.
               </p>
 
               {/* Moments list */}

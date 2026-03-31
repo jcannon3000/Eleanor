@@ -14,6 +14,43 @@ const RRULE_DAY_MAP: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 
 
 type MomentMember = { name: string; userToken: string; prayed: boolean };
 
+const TIME_OF_DAY_LABELS_POST: Record<string, string> = {
+  "early-morning": "early morning", morning: "morning", midday: "midday",
+  afternoon: "afternoon", "late-afternoon": "late afternoon", evening: "evening", night: "night",
+};
+const DAY_DOW_LC: Record<string, number> = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+};
+const DAY_NAMES_FULL: Record<string, string> = {
+  sunday: "Sunday", monday: "Monday", tuesday: "Tuesday",
+  wednesday: "Wednesday", thursday: "Thursday", friday: "Friday", saturday: "Saturday",
+};
+
+function computeNextWindowLabel(
+  frequency: string,
+  dayOfWeek: string | null,
+  practiceDays: string | null,
+  timeOfDay: string | null,
+): string {
+  const tod = timeOfDay ? TIME_OF_DAY_LABELS_POST[timeOfDay] ?? timeOfDay : null;
+  const todStr = tod ? ` ${tod}` : "";
+  if (frequency === "daily") return `Come back tomorrow${todStr}`;
+  let rawDays: string[] = [];
+  try { rawDays = practiceDays ? JSON.parse(practiceDays) as string[] : []; } catch { /* ignore */ }
+  if (!rawDays.length && dayOfWeek) rawDays = [dayOfWeek];
+  const today = new Date().getDay();
+  for (let i = 1; i <= 7; i++) {
+    const checkDow = (today + i) % 7;
+    const isMatch = rawDays.some(d => DAY_DOW_LC[d.toLowerCase()] === checkDow);
+    if (isMatch) {
+      if (i === 1) return `Come back tomorrow${todStr}`;
+      const name = Object.keys(DAY_DOW_LC).find(k => DAY_DOW_LC[k] === checkDow);
+      return `Come back ${name ? DAY_NAMES_FULL[name] : "next week"}${todStr}`;
+    }
+  }
+  return `Come back next time${todStr}`;
+}
+
 type MomentData = {
   moment: {
     id: number;
@@ -29,6 +66,7 @@ type MomentData = {
     state: string;
     frequency: string;
     dayOfWeek: string | null;
+    practiceDays: string | null;
     timeOfDay: string | null;
   };
   ritualName: string;
@@ -97,7 +135,7 @@ function NamedPresence({ members, myToken }: { members: MomentMember[]; myToken?
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
   topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
-  members, myToken, canPray, alreadyPosted, myReflection, isPraying, onComplete, onBack,
+  members, myToken, canPray, alreadyPosted, myReflection, isPraying, nextWindowLabel, onComplete, onBack,
 }: {
   topic: string;
   fullText: string;
@@ -111,6 +149,7 @@ function IntercessionPrayerPage({
   alreadyPosted: boolean;
   myReflection: string | null;
   isPraying: boolean;
+  nextWindowLabel: string;
   onComplete: (reflection: string) => void;
   onBack: () => void;
 }) {
@@ -275,13 +314,10 @@ function IntercessionPrayerPage({
             </p>
           </>
         ) : (
-          /* Window not open — read-only, just go back */
-          <button
-            onClick={onBack}
-            className="w-full py-4 rounded-2xl border border-[#c9b99a]/50 text-[#6b5c4a] text-base font-medium hover:bg-[#c9b99a]/10 transition-colors"
-          >
-            ← Back to practice
-          </button>
+          /* Window not open — preview only, show next window time */
+          <div className="text-center py-4">
+            <p className="text-sm text-[#6b5c4a]/60 font-serif italic">{nextWindowLabel}</p>
+          </div>
         )}
       </div>
     </div>
@@ -420,6 +456,7 @@ export default function MomentPostPage() {
         alreadyPosted={alreadyPosted}
         myReflection={myPost?.reflectionText ?? null}
         isPraying={postMutation.isPending}
+        nextWindowLabel={computeNextWindowLabel(moment.frequency, moment.dayOfWeek, moment.practiceDays, moment.timeOfDay)}
         onComplete={handleIntercessionComplete}
         onBack={() => setLocation(detailUrl)}
       />
@@ -615,8 +652,8 @@ export default function MomentPostPage() {
                 </p>
               ) : (
                 <p className="text-sm text-[#6b5c4a]">
-                  {actualTodayCount} of {actualMemberCount} have shown up.
-                  <br /><span className="text-xs italic opacity-70 mt-1 block">The practice blooms when two of you show up together.</span>
+                  {actualTodayCount} of {actualMemberCount} have practiced.
+                  <br /><span className="text-xs italic opacity-70 mt-1 block">The practice blooms when two of you practice together.</span>
                 </p>
               )}
             </motion.div>

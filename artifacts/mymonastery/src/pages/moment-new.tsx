@@ -359,7 +359,7 @@ const LOGGING_OPTIONS: { type: LoggingType; icon: string; label: string; descrip
   { type: "photo",      icon: "📸", label: "Photo",      description: "Capture a moment to share with the group" },
   { type: "reflection", icon: "✍️", label: "Reflection",  description: "A written response to a prompt" },
   { type: "both",       icon: "📸✍️", label: "Photo + Reflection", description: "Share a photo and a written reflection" },
-  { type: "checkin",    icon: "✅", label: "Just show up", description: "No words needed. Mark that you were present." },
+  { type: "checkin",    icon: "✅", label: "Just practice", description: "No words needed. Mark that you were present." },
 ];
 
 // ─── Contact search hook ──────────────────────────────────────────────────────
@@ -964,7 +964,7 @@ export default function MomentNew() {
           <p className="text-[#c9b99a] mb-8 text-sm leading-relaxed">
             Invites are on their way.<br />
             {isSpiritual ? "Each person will choose their own time." : "Eleanor will ring the bell when it's time."}<br />
-            You just have to show up.
+            You just have to practice.
           </p>
           <button
             onClick={() => createdMomentId ? setLocation(`/moments/${createdMomentId}`) : setLocation("/moments")}
@@ -1676,7 +1676,7 @@ export default function MomentNew() {
                     <>
                   <div>
                     <h2 className="text-2xl font-semibold mb-1">When does the window open?</h2>
-                    <p className="text-sm text-muted-foreground">Everyone has one hour to show up.</p>
+                    <p className="text-sm text-muted-foreground">Everyone has one hour to practice.</p>
                   </div>
 
                   {/* Frequency */}
