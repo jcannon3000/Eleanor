@@ -185,12 +185,12 @@ function NamedPresenceWithBloom({ members, myToken, justBloomed }: { members: Mo
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
   topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
-  members, myToken, canPray, alreadyPosted, myReflection, isPraying, nextWindowLabel: _nwl, onComplete, onBack,
+  members, myToken, canPray, alreadyPosted, myReflection, isPraying, postFailed, nextWindowLabel: _nwl, onComplete, onBack,
 }: {
   topic: string; fullText: string; intention: string; reflectionPrompt: string;
   memberCount: number; todayPostCount: number; members: MomentMember[]; myToken?: string;
   canPray: boolean; alreadyPosted: boolean; myReflection: string | null;
-  isPraying: boolean; nextWindowLabel: string;
+  isPraying: boolean; postFailed: boolean; nextWindowLabel: string;
   onComplete: (reflection: string) => void; onBack: () => void;
 }) {
   const [reflection, setReflection] = useState(myReflection ?? "");
@@ -401,16 +401,22 @@ function IntercessionPrayerPage({
                 />
                 <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
               </div>
+              {/* Error state — shown when the post request failed */}
+              {postFailed && (
+                <p className="text-center text-sm text-red-600 mb-3">
+                  Couldn't save — check your connection and try again.
+                </p>
+              )}
               {/* Amen button — amber pulse on tap, then "🙏 Amen" text */}
               <motion.button
                 onClick={handleAmen}
                 disabled={isPraying}
-                animate={amenPulse ? { backgroundColor: ["#2C1A0E", "#B45309", "#2C1A0E"] } : { backgroundColor: "#2C1A0E" }}
+                animate={amenPulse && !postFailed ? { backgroundColor: ["#2C1A0E", "#B45309", "#2C1A0E"] } : { backgroundColor: "#2C1A0E" }}
                 transition={{ duration: 0.3 }}
                 className="w-full py-5 rounded-2xl text-[#F5EDD8] text-lg font-bold hover:opacity-90 disabled:opacity-40"
                 style={{ fontFamily: "Space Grotesk, sans-serif" }}
               >
-                {isPraying ? "Marking…" : "Amen 🙏"}
+                {isPraying ? "Marking…" : postFailed ? "Try again 🙏" : "Amen 🙏"}
               </motion.button>
               <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
                 Tapping Amen marks that you have prayed this together.
@@ -470,6 +476,9 @@ export default function MomentPostPage() {
       setPosted(true);
       setTodayCount(res.todayPostCount);
       setMemberCount(res.memberCount);
+    },
+    onError: () => {
+      // Reset amenPulse so the button returns to its normal state for retry
     },
   });
 
@@ -741,6 +750,7 @@ export default function MomentPostPage() {
         alreadyPosted={alreadyPosted}
         myReflection={myPost?.reflectionText ?? null}
         isPraying={postMutation.isPending}
+        postFailed={postMutation.isError}
         nextWindowLabel={computeNextWindowLabel(moment.frequency, moment.dayOfWeek, moment.practiceDays, moment.timeOfDay)}
         onComplete={handleIntercessionComplete}
         onBack={() => setLocation(detailUrl)}
@@ -808,12 +818,15 @@ export default function MomentPostPage() {
               </div>
 
               {/* Check-in button */}
+              {postMutation.isError && (
+                <p className="text-center text-sm text-red-600 mb-2">Couldn't save — tap to try again.</p>
+              )}
               <button
                 onClick={() => postMutation.mutate({ isCheckin: true, reflectionText: reflection.trim() || undefined })}
                 disabled={postMutation.isPending}
                 className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base tracking-wide hover:bg-[#5a7a60] transition-all disabled:opacity-60"
               >
-                {postMutation.isPending ? "Logging…" : "✓ I am keeping the fast"}
+                {postMutation.isPending ? "Logging…" : postMutation.isError ? "Try again ✓" : "✓ I am keeping the fast"}
               </button>
             </div>
           )}
@@ -1033,10 +1046,13 @@ export default function MomentPostPage() {
             )}
 
             {/* Submit */}
+            {postMutation.isError && (
+              <p className="text-center text-sm text-red-600">Couldn't save — tap to try again.</p>
+            )}
             <button onClick={() => handleSubmit()}
               disabled={!canSubmit() || postMutation.isPending}
               className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-40">
-              {postMutation.isPending ? "Practicing..." : "I practiced 🌿"}
+              {postMutation.isPending ? "Practicing..." : postMutation.isError ? "Try again 🌿" : "I practiced 🌿"}
             </button>
           </div>
         )}
