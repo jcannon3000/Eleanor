@@ -1064,21 +1064,21 @@ export default function MomentNew() {
           <p className="font-serif italic text-[#F7F0E6]/80 text-base leading-loose mb-8">
             {isMorning ? (
               <>
-                "Morning Prayer is the first office of the day.<br />
-                Prayed from the same book, in your own home<br />
-                — but not alone.<br /><br />
-                Your circle will pray the same words<br />
-                at the same time, wherever they are.<br />
-                That is what makes it fellowship."
+                "You can't always be together.<br />
+                But you can always pray together.<br />
+                Every morning, from wherever you are,<br />
+                your people open the same book<br />
+                and pray the same words.<br />
+                Not alone."
               </>
             ) : (
               <>
-                "Evening Prayer is the closing office of the day.<br />
-                Prayed as the light changes, from the same book,<br />
-                in your own home — but not alone.<br /><br />
-                Your circle will pray the same words<br />
-                at the same time, wherever they are.<br />
-                That is what makes it fellowship."
+                "You can't always be together.<br />
+                But you can always pray together.<br />
+                Every evening, from wherever you are,<br />
+                your people close the day<br />
+                with the same words.<br />
+                Not alone."
               </>
             )}
           </p>
