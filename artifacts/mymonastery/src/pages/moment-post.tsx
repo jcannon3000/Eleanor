@@ -889,11 +889,12 @@ export default function MomentPostPage() {
             <p className="text-[#F7F0E6]/60 text-sm mb-4">{officeName} Rite II</p>
             <div className="border-t border-[#F7F0E6]/10 pt-4">
               <p className="text-[#F7F0E6]/50 text-xs mb-2">No BCP? Pray online:</p>
-              <a href={bcpUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-block px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+              <button
+                onClick={() => window.open(bcpUrl, "_blank", "noopener,noreferrer")}
+                className="inline-block px-5 py-2.5 rounded-full text-sm font-semibold transition-all cursor-pointer"
                 style={{ background: accentColor, color: "#2C1810" }}>
                 Open {officeName} online →
-              </a>
+              </button>
             </div>
           </div>
 
