@@ -1476,21 +1476,27 @@ router.patch("/moments/:id/archive", async (req, res): Promise<void> => {
   const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
   if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
 
-  // Must be a member
-  const membership = await db.select().from(momentUserTokensTable)
-    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
-  if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
-
-  // Delete all Google Calendar events for this practice before archiving
-  const calRows = await db
-    .select({ googleCalendarEventId: momentUserTokensTable.googleCalendarEventId })
-    .from(momentUserTokensTable)
+  // Get all member tokens — used both for auth check and calendar cleanup
+  const allMemberTokens = await db.select().from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.momentId, momentId));
 
+  const isMember = allMemberTokens.some(t => t.email === user.email);
+  if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Determine organizer (lowest ID row) — all calendar events were created with their credentials
+  const organizerToken = allMemberTokens.length > 0
+    ? allMemberTokens.reduce((min, t) => t.id < min.id ? t : min, allMemberTokens[0])
+    : null;
+  const [organizerUser] = organizerToken
+    ? await db.select().from(usersTable).where(eq(usersTable.email, organizerToken.email))
+    : [null];
+  const calDeleteUserId = organizerUser?.id ?? sessionUserId;
+
+  // Delete all Google Calendar events using organizer credentials (events were created by them)
   await Promise.allSettled(
-    calRows
-      .filter((r) => r.googleCalendarEventId)
-      .map((r) => deleteCalendarEvent(sessionUserId, r.googleCalendarEventId!))
+    allMemberTokens
+      .filter((t) => t.googleCalendarEventId)
+      .map((t) => deleteCalendarEvent(calDeleteUserId, t.googleCalendarEventId!))
   );
 
   await db.update(sharedMomentsTable)
@@ -1514,21 +1520,27 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
   if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
 
-  // Must be a member
-  const membership = await db.select().from(momentUserTokensTable)
-    .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
-  if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
-
-  // Delete all Google Calendar events for this practice before hard-deleting
-  const calRows = await db
-    .select({ googleCalendarEventId: momentUserTokensTable.googleCalendarEventId })
-    .from(momentUserTokensTable)
+  // Get all member tokens — used both for auth check and calendar cleanup
+  const allMemberTokens = await db.select().from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.momentId, momentId));
 
+  const isMember = allMemberTokens.some(t => t.email === user.email);
+  if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Determine organizer (lowest ID row) — all calendar events were created with their credentials
+  const organizerToken = allMemberTokens.length > 0
+    ? allMemberTokens.reduce((min, t) => t.id < min.id ? t : min, allMemberTokens[0])
+    : null;
+  const [organizerUser] = organizerToken
+    ? await db.select().from(usersTable).where(eq(usersTable.email, organizerToken.email))
+    : [null];
+  const calDeleteUserId = organizerUser?.id ?? sessionUserId;
+
+  // Delete all Google Calendar events using organizer credentials (events were created by them)
   await Promise.allSettled(
-    calRows
-      .filter((r) => r.googleCalendarEventId)
-      .map((r) => deleteCalendarEvent(sessionUserId, r.googleCalendarEventId!))
+    allMemberTokens
+      .filter((t) => t.googleCalendarEventId)
+      .map((t) => deleteCalendarEvent(calDeleteUserId, t.googleCalendarEventId!))
   );
 
   // Hard delete — cascades remove windows, posts, tokens, calendar events, renewals
