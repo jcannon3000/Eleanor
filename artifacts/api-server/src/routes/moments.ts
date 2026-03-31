@@ -266,18 +266,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
   const insertedTokens = await db.insert(momentUserTokensTable).values(memberTokenRows).returning();
 
-  // Build calendar description — short, link-first
-  const linkLines = insertedTokens.map(t => `  ${t.name ?? t.email}: ${baseUrl}/${momentToken}/${t.userToken}`);
-
-  const calDescription = [
-    name,
-    ...(intention ? [`"${intention}"`] : []),
-    "",
-    "Tap your personal link to log:",
-    ...linkLines,
-  ].join("\n");
-
-  // Create recurring calendar event on the organizer's calendar
+  // Calendar setup
   const recurrenceRule = frequency === "daily"
     ? ["RRULE:FREQ=DAILY"]
     : frequency === "weekly"
@@ -287,37 +276,52 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   const [hh, mm] = scheduledTime.split(":").map(Number);
   const startDate = new Date();
   startDate.setHours(hh, mm, 0, 0);
-  // If that time has already passed today, start from tomorrow
-  if (startDate < new Date()) {
-    startDate.setDate(startDate.getDate() + 1);
-  }
+  if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
   const endDate = new Date(startDate.getTime() + 60 * 60_000);
 
-  const attendeeEmails = uniqueMembers.map(m => m.email);
+  const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
 
-  const gcalEventId = await createCalendarEvent(sessionUserId, {
-    summary: `🌿 ${name}`,
-    description: calDescription,
-    startDate,
-    endDate,
-    attendees: attendeeEmails,
-    recurrence: recurrenceRule,
-  }).catch(() => null);
+  // ── One personalised event per member — only THEIR link in the description ──
+  const eventResults = await Promise.allSettled(
+    insertedTokens.map(t => {
+      const personalLink = `${baseUrl}/${momentToken}/${t.userToken}`;
+      const description = [
+        `${organizerName} invited you to practice together.`,
+        ...(intention ? [`"${intention}"`] : []),
+        "",
+        "Tap to log:",
+        personalLink,
+        "",
+        "No login needed. 🌿",
+      ].join("\n");
 
-  // Store the gcal event ID on the organizer's token row
-  if (gcalEventId) {
-    const organizerTokenRow = insertedTokens.find(t => t.email === organizer.email);
-    if (organizerTokenRow) {
+      return createCalendarEvent(sessionUserId, {
+        summary: `🌿 ${name}`,
+        description,
+        startDate,
+        endDate,
+        attendees: [t.email],
+        recurrence: recurrenceRule,
+      }).catch(() => null);
+    })
+  );
+
+  // Store each member's individual event ID
+  let gcalCreated = false;
+  for (let i = 0; i < insertedTokens.length; i++) {
+    const result = eventResults[i];
+    if (result.status === "fulfilled" && result.value) {
       await db.update(momentUserTokensTable)
-        .set({ googleCalendarEventId: gcalEventId })
-        .where(eq(momentUserTokensTable.id, organizerTokenRow.id));
+        .set({ googleCalendarEventId: result.value })
+        .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
+      gcalCreated = true;
     }
   }
 
   res.status(201).json({
     moment: { ...moment },
     memberCount: uniqueMembers.length,
-    gcalCreated: !!gcalEventId,
+    gcalCreated,
   });
 });
 
@@ -875,7 +879,71 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
     userToken: generateToken(),
   }));
 
-  await db.insert(momentUserTokensTable).values(newTokenRows);
+  const insertedNewTokens = await db.insert(momentUserTokensTable).values(newTokenRows).returning();
+
+  // Create individual calendar events for each new member
+  try {
+    const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+    if (moment) {
+      // Find the organizer (lowest-ID token row) for auth
+      const allTokens = await db.select().from(momentUserTokensTable)
+        .where(eq(momentUserTokensTable.momentId, momentId));
+      const organizerToken = allTokens.reduce((min, t) => t.id < min.id ? t : min, allTokens[0]);
+      const [organizer] = await db.select().from(usersTable)
+        .where(eq(usersTable.email, organizerToken.email));
+
+      if (organizer?.googleAccessToken) {
+        const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
+          ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
+          : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+
+        const [hh, mm] = moment.scheduledTime.split(":").map(Number);
+        const startDate = new Date();
+        startDate.setHours(hh, mm, 0, 0);
+        if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
+        const endDate = new Date(startDate.getTime() + 60 * 60_000);
+
+        const recurrenceRule = moment.frequency === "daily"
+          ? ["RRULE:FREQ=DAILY"]
+          : moment.frequency === "weekly"
+          ? ["RRULE:FREQ=WEEKLY"]
+          : ["RRULE:FREQ=MONTHLY"];
+
+        const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
+
+        for (const t of insertedNewTokens) {
+          const personalLink = `${baseUrl}/${moment.momentToken}/${t.userToken}`;
+          const description = [
+            `${organizerName} invited you to practice together.`,
+            ...(moment.intention ? [`"${moment.intention}"`] : []),
+            "",
+            "Tap to log:",
+            personalLink,
+            "",
+            "No login needed. 🌿",
+          ].join("\n");
+
+          const eventId = await createCalendarEvent(organizer.id, {
+            summary: `🌿 ${moment.name}`,
+            description,
+            startDate,
+            endDate,
+            attendees: [t.email],
+            recurrence: recurrenceRule,
+          }).catch(() => null);
+
+          if (eventId) {
+            await db.update(momentUserTokensTable)
+              .set({ googleCalendarEventId: eventId })
+              .where(eq(momentUserTokensTable.id, t.id));
+          }
+        }
+      }
+    }
+  } catch (calErr) {
+    console.error("Invite calendar event creation failed (non-fatal):", calErr);
+  }
+
   res.json({ added: newPeople.length, people: newPeople });
 });
 
