@@ -1,0 +1,103 @@
+Here’s the Replit prompt:
+
+Fix the Intercession template flow and detail screen
+Do not change anything that is not described below. Apply these fixes only to the Intercession template and its creation flow, detail screen, and posting page.
+
+FIX 1 — BCP prayer list: collapsible categories, prayer titles only
+Find the Book of Common Prayer intercession scroll. Currently categories are not collapsible and the individual prayer rows show full text.
+Make every category header collapsible. Tapping a category header expands it to show the prayers beneath. Tapping again collapses it. All categories start collapsed by default so the user sees only the category headers when the screen first loads. They tap a category to reveal its prayers.
+Each prayer within a category shows only its title as a tappable row with an arrow →. Nothing else. No preview text. No expand inline. Tapping the prayer title selects it and returns to the creation flow.
+The selected prayer’s name becomes the practice name. The selected prayer’s full text is stored in intercession_full_text and displayed on the posting page. Nothing else changes in how selection works.
+
+FIX 2 — Practice name should be the prayer title, not “Intercession 🙏”
+When a user selects a BCP prayer the practice name should automatically become the title of that prayer — not “Intercession 🙏.”
+For example if they select “For the Conservation of Natural Resources” the practice name field should read “For the Conservation of Natural Resources.”
+If they select a custom intention the practice name should remain editable and default to “Intercession 🙏” as it does now.
+Remove the “What is this practice called?” name step entirely for BCP-sourced intercessions. The prayer title is the name. Do not ask the user to confirm or edit it. Proceed directly from prayer selection to the intention step.
+For custom intercessions keep the name step as it is.
+
+FIX 3 — The intention step should be about who is being prayed for, not editing the prayer
+The intention field currently shows the full BCP prayer text pre-filled into an editable text area with a character count. This is wrong. The prayer text is not the intention. The intention is who or what is being held in prayer.
+Replace the current intention step for BCP intercessions with this:
+Header: “Who are you praying for? 🙏”
+Muted subtitle:
+“This is the intention your group will hold together. It appears when everyone opens their link.”
+Large warm text area, starts empty.
+Rotating placeholder examples in muted italic — visible beneath the input, not as placeholder text:
+“The climate and all those most affected by its changes”
+“Our parish and those we serve in this community”
+“Those who lead our nation — that they find courage and wisdom”
+“The sick, the suffering, and those who care for them”
+“Our enemies and those with whom we are in conflict”
+“The earth and every living thing that depends on it”
+Character limit: 200 characters. Show count only when approaching the limit.
+This intention text is what appears on the posting page and in the calendar invite — not the prayer text. The prayer text is stored separately and shown as a reference beneath the intention on the posting page.
+Below the text area show a collapsible card:
+“📖 The full prayer” — tap to expand and read the BCP prayer text they selected. This is for reference only, not editable. Muted italic, Playfair Display. Beneath it in very small muted text: “From the Book of Common Prayer.”
+For custom intercessions the intention step remains as it is — they are writing their own intention from scratch.
+
+FIX 4 — Remove the logging type selection screen for Intercession
+The “How will your practice be held?” screen showing Photo, Reflection, Photo + Reflection, and Just show up should not appear for the Intercession template.
+Intercession always uses reflection as its logging type. The reflection prompt is always “What are you holding today?” This is not configurable. Remove the logging type selection step entirely from the Intercession creation flow.
+The reflection prompt field should not appear in the creation flow either. It is pre-set. The user does not configure it.
+
+FIX 5 — Detail screen language and branding
+Find the practice detail screen for Intercession. Fix the following:
+The detail screen currently says “Every day at 7:00 AM” — this is correct, keep it.
+The intention display is correct — “We hold this together in prayer. For the Environment — We call on you, O God…” Keep this format but ensure it is showing the user’s custom intention text followed by the prayer title, not the full prayer text. Full prayer text belongs on the posting page only.
+The streak cards showing Current streak, Best streak, and Blooms are correct. Keep them.
+“ONE WEEK TOGETHER — Just planted” and “0 practices together so far” are correct. Keep them.
+MEMBERS section showing member names is correct. Keep it.
+HISTORY showing “0 practices” is correct. Keep it.
+“First practice opens at 7:00 AM” — remove this line. It is unnecessary. The calendar invite handles timing.
+Replace “Manage this practice” at the bottom with a quietly styled link: “⚙️ Settings” — same functionality, better tone.
+
+FIX 6 — Posting page: remove “Post” button, use gardening language, show the prayer
+Find the posting page for Intercession practices. Fix the following:
+Remove the word “Post” everywhere on this page. Replace with:
+Primary log button: “I prayed 🙏”
+If they have already logged today replace the button with:
+“🌸 You prayed today” — not tappable, just a confirmation state.
+Show the full BCP prayer text on the posting page in a warm cream card beneath the intention. This is so members can actually read and pray the prayer when they open their link.
+Display format:
+
+[Practice name — e.g. "For the Conservation of Natural Resources"]
+
+[Intention text — Playfair Display italic, sage:]
+"[What the user wrote as their intention]"
+
+[Cream card:]
+📖 The prayer
+
+[Full BCP prayer text — Playfair Display italic, muted,
+ comfortable reading size, generous line height]
+
+From the Book of Common Prayer
+
+[Reflection prompt — sage italic, larger:]
+"What are you holding today?"
+
+[Warm text area]
+
+      I prayed 🙏
+
+
+The prayer text card should not be collapsible on the posting page — it should be fully visible so members can read and pray it without any extra taps.
+Replace all instances of “Post” across the Shared Moments feature with appropriate alternatives:
+	∙	“Post your moment” → “Log your moment 🌿”
+	∙	“0 of 1 posted” → “0 of 1 logged”
+	∙	“Post →” button → “Log 🌿”
+	∙	Any other “Post” language → context-appropriate alternative from: Log, I prayed, I showed up, I walked, I reflected — whatever matches the practice type
+
+FIX 7 — The intention screen character count
+The intention screen currently shows “404/280” — this means the BCP prayer text was pre-filled into the intention field and is over the 280 character limit. This is caused by Bug 3 above. Fixing Bug 3 will resolve this. After the fix confirm the intention field starts empty and the character count shows “0/200.”
+
+Build order
+	1.	Make BCP category headers collapsible — all start collapsed, tap to expand
+	2.	Show only prayer titles in each category — no preview text
+	3.	Auto-populate practice name from selected prayer title — remove name step for BCP intercessions
+	4.	Replace intention step — empty field for “Who are you praying for?”, rotating examples, collapsible full prayer reference card
+	5.	Remove logging type selection screen from Intercession flow entirely
+	6.	Fix detail screen — remove “First practice opens at” line, replace “Manage this practice” with “⚙️ Settings”
+	7.	Fix posting page — show full prayer text in cream card, replace all “Post” language with “I prayed 🙏”, show reflection prompt and text area
+	8.	Replace “Post” language across entire Shared Moments feature with appropriate gardening and practice language​​​​​​​​​​​​​​​​

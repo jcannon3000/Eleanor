@@ -55,6 +55,15 @@ const TOD_CONSTRAINTS: Record<string, { hours: number[]; amPm: "AM" | "PM" | "mi
   "night":          { hours: [9,10,11],       amPm: "PM",    defaultH: 9,  defaultAmPm: "PM" },
 };
 
+const INTERCESSION_EXAMPLES = [
+  "The climate and all those most affected by its changes",
+  "Our parish and those we serve in this community",
+  "Those who lead our nation — that they find courage and wisdom",
+  "The sick, the suffering, and those who care for them",
+  "Our enemies and those with whom we are in conflict",
+  "The earth and every living thing that depends on it",
+];
+
 interface ContactSuggestion { name: string; email: string; }
 
 interface BcpPrayer { category: string; title: string; text: string; }
@@ -458,7 +467,7 @@ function PersonRow({ person, index, showRemove, onUpdate, onRemove, onSelect }: 
 
 // ─── BCP Prayer List ──────────────────────────────────────────────────────────
 function BcpPrayerList({ onSelect }: { onSelect: (prayer: BcpPrayer) => void }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const grouped = BCP_PRAYERS.reduce<Record<string, BcpPrayer[]>>((acc, p) => {
     if (!acc[p.category]) acc[p.category] = [];
     acc[p.category].push(p);
@@ -466,34 +475,30 @@ function BcpPrayerList({ onSelect }: { onSelect: (prayer: BcpPrayer) => void }) 
   }, {});
 
   return (
-    <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+    <div className="space-y-1.5 max-h-[440px] overflow-y-auto pr-1">
       {Object.entries(grouped).map(([cat, prayers]) => (
-        <div key={cat}>
-          <p className="text-xs font-bold text-[#4a3728] uppercase tracking-widest mb-2">{cat}</p>
-          {prayers.map(p => (
-            <div key={p.title} className="border border-border/40 rounded-xl mb-2 overflow-hidden">
-              <button
-                className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-secondary/30 transition-colors"
-                onClick={() => setExpanded(expanded === p.title ? null : p.title)}
-              >
-                <span className="font-medium text-sm text-foreground">{p.title}</span>
-                <span className="text-muted-foreground text-xs">{expanded === p.title ? "▲" : "▼"}</span>
-              </button>
-              {expanded === p.title && (
-                <div className="px-4 pb-4">
-                  <p className="text-sm text-muted-foreground italic leading-relaxed mb-3 font-serif">
-                    {p.text}
-                  </p>
-                  <button
-                    onClick={() => onSelect(p)}
-                    className="text-sm text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors"
-                  >
-                    Select this prayer →
-                  </button>
-                </div>
-              )}
+        <div key={cat} className="border border-border/40 rounded-xl overflow-hidden">
+          <button
+            className="w-full text-left px-4 py-3 flex items-center justify-between bg-secondary/20 hover:bg-secondary/40 transition-colors"
+            onClick={() => setExpandedCat(expandedCat === cat ? null : cat)}
+          >
+            <span className="text-sm font-semibold text-foreground">{cat}</span>
+            <span className="text-muted-foreground text-xs ml-2 shrink-0">{expandedCat === cat ? "▲" : "▼"}</span>
+          </button>
+          {expandedCat === cat && (
+            <div className="divide-y divide-border/20 bg-background">
+              {prayers.map(p => (
+                <button
+                  key={p.title}
+                  className="w-full text-left px-5 py-3 flex items-center justify-between hover:bg-secondary/20 transition-colors"
+                  onClick={() => onSelect(p)}
+                >
+                  <span className="text-sm text-foreground">{p.title}</span>
+                  <span className="text-muted-foreground/60 text-sm shrink-0 ml-2">→</span>
+                </button>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       ))}
     </div>
@@ -515,6 +520,13 @@ export default function MomentNew() {
 
   // Intro splash (1.5s, first use only)
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem("eleanor_practice_intro_seen"));
+
+  // Rotating examples for BCP intercession intention step
+  const [exampleIdx, setExampleIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setExampleIdx(i => (i + 1) % INTERCESSION_EXAMPLES.length), 3500);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (showIntro) {
@@ -637,10 +649,12 @@ export default function MomentNew() {
     setIntercessionTopic(prayer.title);
     setIntercessionSource("bcp");
     setIntercessionFullText(prayer.text);
-    const firstSentence = prayer.text.split(". ")[0];
-    setIntention(`We hold this together in prayer. ${prayer.title} — ${firstSentence}.`);
+    setName(prayer.title);
+    setIntention("");
+    setLoggingType("reflection");
+    setReflectionPrompt("What are you holding today?");
     setIntercessionMode(null);
-    setStep("name");
+    setStep("intention");
   }
 
   function confirmCustomIntercession() {
@@ -656,7 +670,11 @@ export default function MomentNew() {
   const BCP_STEP_ORDER: StepId[] = ["template", "bcp-commitment", "bcp-frequency", "bcp-time", "bcp-invite"];
   const STEP_ORDER: StepId[] = isBcpTemplate
     ? BCP_STEP_ORDER
-    : ["template", ...(templateId === "intercession" ? ["intercession" as StepId] : []), "name", "intention", "logging", "schedule", "goal", "invite"];
+    : templateId === "intercession"
+      ? selectedBcpPrayer !== null
+        ? ["template", "intercession", "intention", "schedule", "goal", "invite"]
+        : ["template", "intercession", "name", "intention", "logging", "schedule", "goal", "invite"]
+      : ["template", "name", "intention", "logging", "schedule", "goal", "invite"];
 
   function goNext() {
     const idx = STEP_ORDER.indexOf(step);
@@ -1471,7 +1489,49 @@ export default function MomentNew() {
               )}
 
               {/* ── Intention ──────────────────────────────────────── */}
-              {step === "intention" && (
+              {step === "intention" && selectedBcpPrayer ? (
+                <div className="space-y-5 flex-1">
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-1.5">Who are you praying for? 🙏</h2>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      This is the intention your group will hold together. It appears when everyone opens their link.
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <textarea autoFocus value={intention}
+                      onChange={e => setIntention(e.target.value.slice(0, 200))}
+                      rows={4}
+                      className="w-full px-4 py-4 bg-card border-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors resize-none text-base placeholder:text-muted-foreground/40 font-serif rounded-2xl"
+                    />
+                    {intention.length > 150 && (
+                      <p className="text-right text-xs text-muted-foreground/50 mt-1">{intention.length}/200</p>
+                    )}
+                  </div>
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={exampleIdx}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.4 }}
+                      className="text-xs text-muted-foreground/50 italic"
+                    >
+                      e.g. "{INTERCESSION_EXAMPLES[exampleIdx]}"
+                    </motion.p>
+                  </AnimatePresence>
+                  <div className="bg-[#F5EDD8] border border-[#c9b99a]/40 rounded-2xl overflow-hidden">
+                    <details>
+                      <summary className="px-4 py-3 text-xs font-semibold text-[#4a3728] cursor-pointer flex items-center gap-2 list-none">
+                        📖 The full prayer
+                      </summary>
+                      <div className="px-4 pb-4 pt-1">
+                        <p className="text-sm text-[#4a3728] italic leading-[1.85] font-serif">{selectedBcpPrayer.text}</p>
+                        <p className="text-xs text-[#4a3728]/50 mt-3">From the Book of Common Prayer</p>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              ) : step === "intention" && (
                 <div className="space-y-6 flex-1">
                   <div>
                     <h2 className="text-3xl font-semibold mb-2">What is the intention?</h2>
@@ -1484,17 +1544,6 @@ export default function MomentNew() {
                     className="w-full px-0 py-3 bg-transparent border-b-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors resize-none text-lg placeholder:text-muted-foreground/40 font-serif italic"
                   />
                   <p className="text-right text-xs text-muted-foreground/50">{intention.length}/280</p>
-
-                  {/* BCP full prayer preview */}
-                  {selectedBcpPrayer && (
-                    <div className="bg-[#F5EDD8] border border-[#c9b99a]/40 rounded-2xl p-4">
-                      <details>
-                        <summary className="text-xs font-medium text-[#4a3728] cursor-pointer">The full prayer ↓</summary>
-                        <p className="mt-3 text-sm text-[#4a3728] italic leading-relaxed font-serif">{selectedBcpPrayer.text}</p>
-                        <p className="text-xs text-[#4a3728]/60 mt-2">From the Book of Common Prayer</p>
-                      </details>
-                    </div>
-                  )}
                 </div>
               )}
 

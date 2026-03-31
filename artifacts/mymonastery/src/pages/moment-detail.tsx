@@ -240,12 +240,12 @@ export default function MomentDetail() {
           >
             <div>
               <p className="text-sm font-semibold text-[#C17F24]">Practice open now · {minutesLeft} min left</p>
-              <p className="text-xs text-[#C17F24]/70 mt-0.5">{todayPostCount} of {memberCount} posted</p>
+              <p className="text-xs text-[#C17F24]/70 mt-0.5">{todayPostCount} of {memberCount} logged</p>
             </div>
             {postUrl && (
               <Link href={postUrl}>
                 <span className="text-sm font-medium text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors whitespace-nowrap">
-                  Post →
+                  Log 🌿
                 </span>
               </Link>
             )}
@@ -338,8 +338,8 @@ export default function MomentDetail() {
 
           {windows.length === 0 ? (
             <div>
-              <div className="text-center py-6 text-muted-foreground/50">
-                <p className="text-sm">First practice opens at {formatTime(moment.scheduledTime)}</p>
+              <div className="text-center py-8 text-muted-foreground/40">
+                <p className="text-sm">No practices yet</p>
               </div>
             </div>
           ) : (
@@ -377,7 +377,7 @@ export default function MomentDetail() {
             onClick={() => setShowManage(m => !m)}
             className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1"
           >
-            {showManage ? "▲" : "▾"} Manage this practice
+            ⚙️ Settings
           </button>
 
           {showManage && (

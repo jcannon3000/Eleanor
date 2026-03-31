@@ -55,92 +55,105 @@ function PresenceDots({ count, total }: { count: number; total: number }) {
 
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
-  topic, fullText, intention, memberCount, todayPostCount, onComplete,
+  topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
+  alreadyPosted, myReflection, isPraying, onComplete,
 }: {
   topic: string;
   fullText: string;
   intention: string;
+  reflectionPrompt: string;
   memberCount: number;
   todayPostCount: number;
+  alreadyPosted: boolean;
+  myReflection: string | null;
+  isPraying: boolean;
   onComplete: (reflection: string) => void;
 }) {
-  const [showReflection, setShowReflection] = useState(false);
-  const [reflection, setReflection] = useState("");
-
-  if (!showReflection) {
-    return (
-      <div className="min-h-screen bg-[#F5EDD8] flex flex-col">
-        <div className="flex-1 overflow-y-auto px-6 py-10 max-w-sm mx-auto w-full">
-          <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-3">
-            Today's intercession
-          </p>
-          <h1 className="text-2xl font-bold text-[#2C1A0E] text-center leading-snug mb-2">
-            {topic}
-          </h1>
-          {intention && (
-            <p className="text-center text-[#6b5c4a] italic font-serif text-sm leading-relaxed mb-6">
-              {intention}
-            </p>
-          )}
-          {fullText ? (
-            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-6 mb-6">
-              <p className="font-serif text-[#2C1A0E] text-[15px] leading-[1.9] whitespace-pre-wrap">
-                {fullText}
-              </p>
-              <p className="text-[11px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
-                — The Book of Common Prayer
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-8 mb-6 text-center">
-              <p className="font-serif text-[#2C1A0E] text-base italic">{intention}</p>
-            </div>
-          )}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <PresenceDots count={todayPostCount} total={memberCount} />
-            <span className="text-xs text-[#6b5c4a]/70">
-              {todayPostCount} of {memberCount} praying with you
-            </span>
-          </div>
-        </div>
-        <div className="px-6 pb-10 pt-4 bg-[#F5EDD8] border-t border-[#c9b99a]/20 max-w-sm mx-auto w-full">
-          <button
-            onClick={() => setShowReflection(true)}
-            className="w-full py-4 bg-[#2C1A0E] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:opacity-90 transition-opacity"
-          >
-            I prayed this prayer 🙏
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const [reflection, setReflection] = useState(myReflection ?? "");
 
   return (
-    <div className="min-h-screen bg-[#F5EDD8] flex flex-col px-6 py-10">
-      <div className="w-full max-w-sm mx-auto">
-        <button
-          onClick={() => setShowReflection(false)}
-          className="text-sm text-[#6b5c4a] mb-6 flex items-center gap-1 hover:text-[#2C1A0E]"
-        >
-          ← Back to prayer
-        </button>
-        <h2 className="text-xl font-bold text-[#2C1A0E] mb-1">A few words</h2>
-        <p className="text-sm text-[#6b5c4a] mb-6 leading-relaxed">
-          Who or what did you hold in prayer today? <span className="opacity-60">(optional)</span>
+    <div className="min-h-screen bg-[#F5EDD8]">
+      <div className="max-w-md mx-auto px-5 py-10 pb-24">
+
+        {/* Header */}
+        <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-2">
+          Today's intercession
         </p>
-        <textarea
-          value={reflection}
-          onChange={e => setReflection(e.target.value.slice(0, 280))}
-          placeholder="Who are you holding in prayer today?"
-          rows={4}
-          className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-base leading-relaxed mb-6"
-        />
-        <button
-          onClick={() => onComplete(reflection)}
-          className="w-full py-4 bg-[#6B8F71] text-[#F5EDD8] rounded-2xl text-lg font-semibold hover:bg-[#5a7a60] transition-colors"
-        >
-          I showed up 🙏
-        </button>
+        <h1 className="text-2xl font-bold text-[#2C1A0E] text-center leading-snug mb-4">
+          {topic}
+        </h1>
+
+        {/* Intention */}
+        {intention && (
+          <p className="text-center text-[#6B8F71] italic font-serif text-sm leading-relaxed mb-6">
+            "{intention}"
+          </p>
+        )}
+
+        {/* Full prayer card — always visible, not collapsible */}
+        {fullText && (
+          <div className="bg-white rounded-2xl border border-[#c9b99a]/30 shadow-sm px-6 py-6 mb-6">
+            <p className="text-xs font-semibold text-[#6b5c4a]/70 mb-3">📖 The prayer</p>
+            <p className="font-serif text-[#2C1A0E] text-[15px] leading-[1.9] whitespace-pre-wrap">
+              {fullText}
+            </p>
+            <p className="text-[11px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
+              From the Book of Common Prayer
+            </p>
+          </div>
+        )}
+
+        {/* Presence count */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <PresenceDots count={todayPostCount} total={memberCount} />
+          <span className="text-xs text-[#6b5c4a]/70">
+            {todayPostCount} of {memberCount} {alreadyPosted ? "logged today" : "praying with you"}
+          </span>
+        </div>
+
+        {/* Reflection prompt */}
+        <p className="text-center font-serif italic text-[#6B8F71] text-base mb-4">
+          "{reflectionPrompt}"
+        </p>
+
+        {/* Reflection — show text if already posted, textarea otherwise */}
+        {alreadyPosted ? (
+          <div className="mb-6">
+            {myReflection ? (
+              <div className="bg-white rounded-2xl border border-[#c9b99a]/30 p-5">
+                <p className="text-sm text-[#2C1A0E] italic leading-relaxed font-serif">"{myReflection}"</p>
+              </div>
+            ) : (
+              <p className="text-center text-sm text-[#6b5c4a]/60 italic">Presence marked — you were here.</p>
+            )}
+          </div>
+        ) : (
+          <div className="mb-6">
+            <textarea
+              value={reflection}
+              onChange={e => setReflection(e.target.value.slice(0, 280))}
+              placeholder="Who or what are you holding today?"
+              rows={3}
+              className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
+            />
+            <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
+          </div>
+        )}
+
+        {/* Primary action */}
+        {alreadyPosted ? (
+          <div className="w-full py-4 rounded-2xl bg-[#6B8F71]/15 border border-[#6B8F71]/30 text-[#6B8F71] text-lg font-semibold text-center">
+            🌸 You prayed today
+          </div>
+        ) : (
+          <button
+            onClick={() => onComplete(reflection)}
+            disabled={isPraying}
+            className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            {isPraying ? "Marking…" : "I prayed 🙏"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -256,15 +269,19 @@ export default function MomentPostPage() {
     );
   }
 
-  // ── Intercession — prayer recitation + reflection ──────────────────────────
-  if (moment.templateType === "intercession" && effectiveWindowOpen && !alreadyPosted) {
+  // ── Intercession — full prayer page (open window or already logged) ─────────
+  if (moment.templateType === "intercession" && (effectiveWindowOpen || alreadyPosted)) {
     return (
       <IntercessionPrayerPage
         topic={moment.intercessionTopic ?? moment.name}
         fullText={moment.intercessionFullText ?? ""}
         intention={moment.intention}
+        reflectionPrompt={moment.reflectionPrompt ?? "What are you holding today?"}
         memberCount={actualMemberCount}
         todayPostCount={actualTodayCount}
+        alreadyPosted={alreadyPosted}
+        myReflection={myPost?.reflectionText ?? null}
+        isPraying={postMutation.isPending}
         onComplete={handleIntercessionComplete}
       />
     );
@@ -519,7 +536,7 @@ function OutsideWindowContent({ moment, minutesRemaining: _ }: { moment: MomentD
     <div className="text-center py-12">
       <p className="text-4xl mb-4">🌿</p>
       <p className="font-semibold text-[#2C1A0E] text-lg mb-2">This practice is resting.</p>
-      <p className="text-sm text-[#6b5c4a]">{moment.name} opens again at the next window.</p>
+      <p className="text-sm text-[#6b5c4a]">{moment.name} opens again at the next practice time.</p>
     </div>
   );
 }

@@ -309,7 +309,7 @@ const StandalonePlantSchema = z.object({
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).optional(),
   goalDays: z.number().int().min(0).max(365).default(7),
   timezone: z.string().default("UTC"),
-  timeOfDay: z.enum(["morning", "midday", "afternoon", "night"]).optional(),
+  timeOfDay: z.enum(["early-morning", "morning", "midday", "afternoon", "late-afternoon", "evening", "night"]).optional(),
   participants: z.array(z.object({ name: z.string(), email: z.string().min(3) })).max(20).default([]),
   // BCP-specific fields
   frequencyType: z.string().optional(),
@@ -344,7 +344,6 @@ router.post("/moments", async (req, res): Promise<void> => {
     intercessionTopic: intercessionTopic ?? null,
     intercessionSource: intercessionSource ?? null,
     intercessionFullText: intercessionFullText ?? null,
-    timerDurationMinutes: timerDurationMinutes ?? 10,
     frequency,
     scheduledTime,
     dayOfWeek: dayOfWeek ?? null,
