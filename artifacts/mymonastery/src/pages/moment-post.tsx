@@ -414,16 +414,27 @@ export default function MomentPostPage() {
   const isPracticeDay = (() => {
     if (!isSpiritual) return true;
     if (moment.frequency === "daily") return true;
-    if (moment.frequency === "weekly" && moment.dayOfWeek) {
-      const todayDow = new Date().getDay();
-      return RRULE_DAY_MAP[moment.dayOfWeek] === todayDow;
+    const todayDow = new Date().getDay();
+    // Try practiceDays JSON array (lowercase day names, e.g. "wednesday")
+    if (moment.practiceDays) {
+      try {
+        const days: string[] = JSON.parse(moment.practiceDays);
+        if (days.length > 0) return days.some(d => DAY_DOW_LC[d.toLowerCase()] === todayDow);
+      } catch { /* ignore */ }
+    }
+    // Fallback: dayOfWeek in lowercase ("wednesday") or RRULE ("WE")
+    if (moment.dayOfWeek) {
+      const lc = moment.dayOfWeek.toLowerCase();
+      if (DAY_DOW_LC[lc] !== undefined) return DAY_DOW_LC[lc] === todayDow;
+      if (RRULE_DAY_MAP[moment.dayOfWeek] !== undefined) return RRULE_DAY_MAP[moment.dayOfWeek] === todayDow;
     }
     return true;
   })();
   const effectiveWindowOpen = isSpiritual ? isPracticeDay : windowOpen;
 
   // ── Spiritual practice — rests today (not a practice day) ──────────────────
-  if (isSpiritual && !isPracticeDay && !alreadyPosted) {
+  // Intercession is always accessible (prayer can be read any time), so skip this guard for it
+  if (isSpiritual && !isPracticeDay && !alreadyPosted && moment.templateType !== "intercession") {
     return (
       <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
         <div className="text-center max-w-xs">
