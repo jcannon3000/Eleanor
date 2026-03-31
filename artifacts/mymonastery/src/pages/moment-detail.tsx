@@ -46,6 +46,13 @@ interface MomentDetail {
     timezone?: string | null;
     practiceDays?: string | string[] | null;
     timeOfDay?: string | null;
+    contemplativeDurationMinutes?: number | null;
+    fastingFrom?: string | null;
+    fastingIntention?: string | null;
+    fastingFrequency?: string | null;
+    fastingDate?: string | null;
+    fastingDay?: string | null;
+    fastingDayOfMonth?: number | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -280,6 +287,8 @@ export default function MomentDetail() {
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
   const isIntercession = moment.templateType === "intercession";
+  const isContemplative = moment.templateType === "contemplative";
+  const isFasting = moment.templateType === "fasting";
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
   // Use the backend's computed windowOpen for all practices — it checks day-of-week + time window
   const isOpenNow = data.windowOpen;
@@ -326,6 +335,60 @@ export default function MomentDetail() {
             {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
         </div>
+
+        {/* Contemplative Prayer — duration card */}
+        {isContemplative && moment.contemplativeDurationMinutes && (
+          <div className="mb-5 bg-[#F5F0FF] border border-[#8B7CF6]/25 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl">🕯️</span>
+            <div>
+              <p className="text-sm font-semibold text-[#5B4B9A]">
+                {moment.contemplativeDurationMinutes} minutes of silence together
+              </p>
+              <p className="text-xs text-[#5B4B9A]/70 mt-0.5">Everyone sits for the same length, wherever they are</p>
+            </div>
+          </div>
+        )}
+
+        {/* Fasting — what & why cards */}
+        {isFasting && (
+          <div className="mb-5 space-y-2">
+            {moment.fastingFrom && (
+              <div className="bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
+                <span className="text-xl mt-0.5">🌿</span>
+                <div>
+                  <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">Fasting from</p>
+                  <p className="text-sm text-[#3a5a40]">{moment.fastingFrom}</p>
+                </div>
+              </div>
+            )}
+            {moment.fastingIntention && (
+              <div className="bg-[#FFF8EC] border border-[#C17F24]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
+                <span className="text-xl mt-0.5">🙏</span>
+                <div>
+                  <p className="text-xs font-semibold text-[#C17F24] uppercase tracking-wider mb-0.5">Intention</p>
+                  <p className="text-sm text-[#8B5E1A]">{moment.fastingIntention}</p>
+                </div>
+              </div>
+            )}
+            {(moment.fastingFrequency || moment.fastingDate) && (
+              <div className="bg-secondary/40 border border-border/60 rounded-2xl px-4 py-3 flex items-start gap-3">
+                <span className="text-xl mt-0.5">📅</span>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">When</p>
+                  <p className="text-sm text-foreground/80">
+                    {moment.fastingFrequency === "specific" && moment.fastingDate
+                      ? new Date(moment.fastingDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+                      : moment.fastingFrequency === "weekly" && moment.fastingDay
+                        ? `Every ${moment.fastingDay.charAt(0).toUpperCase() + moment.fastingDay.slice(1)}`
+                        : moment.fastingFrequency === "monthly" && moment.fastingDayOfMonth
+                          ? `Monthly · the ${moment.fastingDayOfMonth}${["st","nd","rd"][((moment.fastingDayOfMonth % 100 - 11) % 10 - 1 + 3) % 3] ?? "th"}`
+                          : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Open Now Banner — only when actually open */}
         {isOpenNow ? (

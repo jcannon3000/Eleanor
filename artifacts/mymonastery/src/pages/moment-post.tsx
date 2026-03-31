@@ -68,6 +68,13 @@ type MomentData = {
     dayOfWeek: string | null;
     practiceDays: string | null;
     timeOfDay: string | null;
+    contemplativeDurationMinutes?: number | null;
+    fastingFrom?: string | null;
+    fastingIntention?: string | null;
+    fastingFrequency?: string | null;
+    fastingDate?: string | null;
+    fastingDay?: string | null;
+    fastingDayOfMonth?: number | null;
   };
   ritualName: string;
   windowDate: string;
@@ -535,7 +542,7 @@ export default function MomentPostPage() {
 
   // ── Spiritual practice — rests today (not a practice day) ──────────────────
   // Intercession is always accessible (prayer can be read any time), so skip this guard for it
-  if (isSpiritual && !isPracticeDay && !alreadyPosted && moment.templateType !== "intercession") {
+  if (isSpiritual && !isPracticeDay && !alreadyPosted && moment.templateType !== "intercession" && moment.templateType !== "fasting") {
     return (
       <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
         <div className="text-center max-w-xs">
@@ -572,6 +579,80 @@ export default function MomentPostPage() {
         onComplete={handleIntercessionComplete}
         onBack={() => setLocation(detailUrl)}
       />
+    );
+  }
+
+  // ── Fasting — simple check-in page with reflection ─────────────────────────
+  if (moment.templateType === "fasting") {
+    const fastingConfirmed = posted || alreadyPosted;
+    return (
+      <div className="min-h-screen bg-[#F2F7F2] flex flex-col">
+        <div className="flex-1 flex flex-col px-6 pt-10 pb-8 max-w-md mx-auto w-full">
+          {/* Back */}
+          <button onClick={() => setLocation(`/moments/${moment.id}`)} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-8 text-sm transition-colors">
+            ← Back
+          </button>
+
+          {/* Header */}
+          <div className="mb-7">
+            <div className="text-4xl mb-3">🌿</div>
+            <h1 className="text-2xl font-semibold text-[#2a402c] mb-1">Fasting together</h1>
+            {moment.fastingFrom && (
+              <p className="text-sm text-[#4a6b50] italic mb-1">From: {moment.fastingFrom}</p>
+            )}
+            {moment.fastingIntention && (
+              <p className="text-sm text-muted-foreground italic">"{moment.fastingIntention}"</p>
+            )}
+          </div>
+
+          {fastingConfirmed ? (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="text-5xl mb-4">✅</div>
+              <h2 className="text-xl font-semibold text-[#2a402c] mb-2">Fast logged</h2>
+              <p className="text-sm text-muted-foreground mb-6">Your practice today is complete.</p>
+              {myPost?.reflectionText && (
+                <div className="bg-white/70 border border-[#6B8F71]/25 rounded-2xl px-4 py-3 text-sm text-[#3a5a40] italic w-full text-left">
+                  "{myPost.reflectionText}"
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              {/* Scripture of the fast */}
+              <div className="bg-white/60 border border-[#6B8F71]/20 rounded-2xl px-5 py-4 mb-6">
+                <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-2">A word for fasting</p>
+                <p className="text-sm text-[#2a402c] leading-relaxed italic">
+                  "Is not this the kind of fasting I have chosen: to loose the chains of injustice and untie the cords of the yoke, to set the oppressed free and break every yoke?"
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">— Isaiah 58:6</p>
+              </div>
+
+              {/* Reflection */}
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-[#2a402c] mb-2">
+                  {moment.reflectionPrompt ?? "What is arising for you in this fast?"}
+                </label>
+                <textarea
+                  value={reflection}
+                  onChange={e => setReflection(e.target.value)}
+                  rows={4}
+                  placeholder="A thought, a prayer, a word…"
+                  className="w-full px-4 py-3 rounded-2xl border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white/80 resize-none text-sm leading-relaxed"
+                />
+              </div>
+
+              {/* Check-in button */}
+              <button
+                onClick={() => postMutation.mutate({ isCheckin: true, reflectionText: reflection.trim() || undefined })}
+                disabled={postMutation.isPending}
+                className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base tracking-wide hover:bg-[#5a7a60] transition-all disabled:opacity-60"
+              >
+                {postMutation.isPending ? "Logging…" : "✓ I am keeping the fast"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 

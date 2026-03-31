@@ -29,6 +29,15 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   frequencyDaysPerWeek: integer("frequency_days_per_week"),
   practiceDays: text("practice_days"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Contemplative Prayer duration
+  contemplativeDurationMinutes: integer("contemplative_duration_minutes"),
+  // Fasting-specific fields
+  fastingFrom: text("fasting_from"),
+  fastingIntention: text("fasting_intention"),
+  fastingFrequency: text("fasting_frequency"),
+  fastingDate: text("fasting_date"),
+  fastingDay: text("fasting_day"),
+  fastingDayOfMonth: integer("fasting_day_of_month"),
 });
 
 export type SharedMoment = typeof sharedMomentsTable.$inferSelect;

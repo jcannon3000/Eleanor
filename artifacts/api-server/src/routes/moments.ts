@@ -6,7 +6,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -346,6 +346,15 @@ const StandalonePlantSchema = z.object({
   practiceDays: z.string().optional(),
   // Optional link to a tradition/circle
   ritualId: z.number().int().positive().optional(),
+  // Contemplative Prayer duration
+  contemplativeDurationMinutes: z.number().int().min(1).max(60).optional(),
+  // Fasting-specific fields
+  fastingFrom: z.string().max(140).optional(),
+  fastingIntention: z.string().max(200).optional(),
+  fastingFrequency: z.enum(["specific", "weekly", "monthly"]).optional(),
+  fastingDate: z.string().optional(),
+  fastingDay: z.string().optional(),
+  fastingDayOfMonth: z.number().int().min(1).max(31).optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -359,7 +368,8 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth } = parsed.data;
+  const isFasting = templateType === "fasting";
 
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
   const isBcp = BCP_TEMPLATE_IDS.has(templateType ?? "");
@@ -386,6 +396,13 @@ router.post("/moments", async (req, res): Promise<void> => {
     ...(frequencyType !== undefined ? { frequencyType } : {}),
     ...(frequencyDaysPerWeek !== undefined ? { frequencyDaysPerWeek } : {}),
     ...(practiceDays !== undefined ? { practiceDays } : {}),
+    ...(contemplativeDurationMinutes !== undefined ? { contemplativeDurationMinutes } : {}),
+    ...(fastingFrom !== undefined ? { fastingFrom } : {}),
+    ...(fastingIntention !== undefined ? { fastingIntention } : {}),
+    ...(fastingFrequency !== undefined ? { fastingFrequency } : {}),
+    ...(fastingDate !== undefined ? { fastingDate } : {}),
+    ...(fastingDay !== undefined ? { fastingDay } : {}),
+    ...(fastingDayOfMonth !== undefined ? { fastingDayOfMonth } : {}),
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -513,38 +530,116 @@ router.post("/moments", async (req, res): Promise<void> => {
     ].join("\n");
   }
 
+  // ─── Helpers for fasting all-day event date ─────────────────────────────────
+  function getFastingStartDateStr(): string {
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    if (fastingFrequency === "specific" && fastingDate) return fastingDate;
+    if (fastingFrequency === "weekly" && fastingDay) {
+      const DAY_MAP: Record<string, number> = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+      const target = DAY_MAP[fastingDay.toLowerCase()] ?? 5;
+      const d = new Date(today);
+      const diff = (target - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
+      return d.toISOString().split("T")[0];
+    }
+    if (fastingFrequency === "monthly" && fastingDayOfMonth) {
+      const d = new Date(today.getFullYear(), today.getMonth(), fastingDayOfMonth);
+      if (d <= today) d.setMonth(d.getMonth() + 1);
+      return d.toISOString().split("T")[0];
+    }
+    return todayStr;
+  }
+
+  function getFastingRecurrence(): string[] {
+    if (fastingFrequency === "specific") return [];
+    if (fastingFrequency === "weekly" && fastingDay) {
+      const DAY_RRULE: Record<string, string> = { sunday:"SU", monday:"MO", tuesday:"TU", wednesday:"WE", thursday:"TH", friday:"FR", saturday:"SA" };
+      const byday = DAY_RRULE[fastingDay.toLowerCase()] ?? "FR";
+      return [`RRULE:FREQ=WEEKLY;BYDAY=${byday}`];
+    }
+    if (fastingFrequency === "monthly" && fastingDayOfMonth) {
+      return [`RRULE:FREQ=MONTHLY;BYMONTHDAY=${fastingDayOfMonth}`];
+    }
+    return [];
+  }
+
+  function buildFastingDescription(memberToken: string): string {
+    const baseUrl2 = process.env["REPLIT_DEV_DOMAIN"]
+      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
+      : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+    const personalLink = `${baseUrl2}/${momentToken}/${memberToken}`;
+    return [
+      `🌿 Fasting — ${fastingFrom ?? name}`,
+      "",
+      fastingIntention ? `Why we fast: ${fastingIntention}` : "",
+      "",
+      "Your personal link:",
+      personalLink,
+      "",
+      "Eleanor — a shared practice companion",
+    ].filter(l => l !== undefined).join("\n");
+  }
+
   // ─── Create one personalised calendar event per member ─────────────────────
   // (Like Calendly: each invitee gets their own event with only their link)
-  const gcalEventId = await createCalendarEvent(sessionUserId, {
-    summary: `🌿 ${name}`,
-    description: buildDescription(
-      insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "",
-      organizer.name ?? organizer.email
-    ),
-    startDate,
-    startLocalStr,
-    endLocalStr,
-    timeZone: tz,
-    attendees: uniqueMembers.map(m => m.email),
-    recurrence: recurrenceRule,
-  }).catch(() => null);
+  let gcalEventId: string | null = null;
+  if (isFasting) {
+    const fastingDateStr = getFastingStartDateStr();
+    const fastingRec = getFastingRecurrence();
+    const orgToken = insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "";
+    gcalEventId = await createAllDayCalendarEvent(sessionUserId, {
+      summary: `🌿 Fasting — ${fastingFrom ?? name}`,
+      description: buildFastingDescription(orgToken),
+      dateStr: fastingDateStr,
+      attendees: uniqueMembers.map(m => m.email),
+      recurrence: fastingRec,
+    }).catch(() => null);
 
-  // Create individual personalised events for non-organizer members
-  const guestTokens = insertedTokens.filter(t => t.email !== organizer.email);
-  await Promise.allSettled(
-    guestTokens.map(t =>
-      createCalendarEvent(sessionUserId, {
-        summary: `🌿 ${name}`,
-        description: buildDescription(t.userToken, t.name ?? t.email),
-        startDate,
-        startLocalStr,
-        endLocalStr,
-        timeZone: tz,
-        attendees: [t.email],
-        recurrence: recurrenceRule,
-      })
-    )
-  );
+    const guestTokensFasting = insertedTokens.filter(t => t.email !== organizer.email);
+    await Promise.allSettled(
+      guestTokensFasting.map(t =>
+        createAllDayCalendarEvent(sessionUserId, {
+          summary: `🌿 Fasting — ${fastingFrom ?? name}`,
+          description: buildFastingDescription(t.userToken),
+          dateStr: fastingDateStr,
+          attendees: [t.email],
+          recurrence: fastingRec,
+        })
+      )
+    );
+  } else {
+    gcalEventId = await createCalendarEvent(sessionUserId, {
+      summary: `🌿 ${name}`,
+      description: buildDescription(
+        insertedTokens.find(t => t.email === organizer.email)?.userToken ?? "",
+        organizer.name ?? organizer.email
+      ),
+      startDate,
+      startLocalStr,
+      endLocalStr,
+      timeZone: tz,
+      attendees: uniqueMembers.map(m => m.email),
+      recurrence: recurrenceRule,
+    }).catch(() => null);
+
+    // Create individual personalised events for non-organizer members
+    const guestTokens = insertedTokens.filter(t => t.email !== organizer.email);
+    await Promise.allSettled(
+      guestTokens.map(t =>
+        createCalendarEvent(sessionUserId, {
+          summary: `🌿 ${name}`,
+          description: buildDescription(t.userToken, t.name ?? t.email),
+          startDate,
+          startLocalStr,
+          endLocalStr,
+          timeZone: tz,
+          attendees: [t.email],
+          recurrence: recurrenceRule,
+        })
+      )
+    );
+  }
 
   if (gcalEventId) {
     const organizerTokenRow = insertedTokens.find(t => t.email === organizer.email);

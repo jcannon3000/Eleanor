@@ -8,7 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
-  | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite" | "intercession-frequency";
+  | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite" | "intercession-frequency"
+  | "contemplative-duration" | "fasting-what" | "fasting-why" | "fasting-when";
 type LoggingType = "photo" | "reflection" | "both" | "checkin";
 type Frequency = "daily" | "weekly";
 type TimeOfDay = "early-morning" | "morning" | "midday" | "afternoon" | "late-afternoon" | "evening" | "night";
@@ -256,32 +257,8 @@ const BCP_PRAYERS: BcpPrayer[] = [
 // ─── Templates ───────────────────────────────────────────────────────────────
 const TEMPLATES = [
   {
-    id: "morning-prayer", emoji: "🌅", name: "Morning Prayer",
-    desc: "Pray the Daily Office together each morning",
-    prefill: {
-      name: "Morning Prayer 🌅",
-      intention: "We open the day together. Before the world begins, we pray.",
-      loggingType: "checkin" as LoggingType,
-      reflectionPrompt: "",
-      scheduledHour: 7, scheduledAmPm: "AM" as "AM" | "PM",
-      frequency: "daily" as Frequency,
-    },
-  },
-  {
-    id: "evening-prayer", emoji: "🌙", name: "Evening Prayer",
-    desc: "Close each day together in prayer",
-    prefill: {
-      name: "Evening Prayer 🌙",
-      intention: "Before we rest, we release the day together. We pray.",
-      loggingType: "checkin" as LoggingType,
-      reflectionPrompt: "",
-      scheduledHour: 9, scheduledAmPm: "PM" as "AM" | "PM",
-      frequency: "daily" as Frequency,
-    },
-  },
-  {
     id: "intercession", emoji: "🙏", name: "Intercession",
-    desc: "Hold something in prayer together",
+    desc: "Start a practice of prayer together",
     prefill: {
       name: "Intercession 🙏",
       intention: "",
@@ -304,10 +281,10 @@ const TEMPLATES = [
     },
   },
   {
-    id: "fasting", emoji: "🍃", name: "Fasting",
+    id: "fasting", emoji: "🌿", name: "Fasting",
     desc: "Keep a shared fast as a discipline",
     prefill: {
-      name: "Fasting 🍃",
+      name: "Fasting 🌿",
       intention: "We fast together — not alone. A shared discipline, a shared surrender.",
       loggingType: "checkin" as LoggingType,
       reflectionPrompt: "",
@@ -316,8 +293,32 @@ const TEMPLATES = [
     },
   },
   {
-    id: "custom", emoji: "🌱", name: "Begin from stillness",
-    desc: "Create your own practice together",
+    id: "morning-prayer", emoji: "🌅", name: "Morning Prayer",
+    desc: "Pray the Daily Office together each morning",
+    prefill: {
+      name: "Morning Prayer 🌅",
+      intention: "We open the day together. Before the world begins, we pray.",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
+      scheduledHour: 7, scheduledAmPm: "AM" as "AM" | "PM",
+      frequency: "daily" as Frequency,
+    },
+  },
+  {
+    id: "evening-prayer", emoji: "🌙", name: "Evening Prayer",
+    desc: "Pray the Daily Office together each evening",
+    prefill: {
+      name: "Evening Prayer 🌙",
+      intention: "Before we rest, we release the day together. We pray.",
+      loggingType: "checkin" as LoggingType,
+      reflectionPrompt: "",
+      scheduledHour: 9, scheduledAmPm: "PM" as "AM" | "PM",
+      frequency: "daily" as Frequency,
+    },
+  },
+  {
+    id: "custom", emoji: "🌱", name: "Create your own",
+    desc: "Build your own practice from scratch",
     prefill: null,
   },
 ];
@@ -595,6 +596,45 @@ export default function MomentNew() {
   const [bcpDone, setBcpDone] = useState(false);
   const [bcpCreatedToken, setBcpCreatedToken] = useState<string | null>(null);
 
+  // ─── Contemplative Prayer duration ───────────────────────────────────────────
+  const [contemplativeDuration, setContemplativeDuration] = useState<number | null>(null);
+  const [customDurationInput, setCustomDurationInput] = useState("20");
+
+  // ─── Fasting-specific state ───────────────────────────────────────────────────
+  const [fastingFrom, setFastingFrom] = useState("");
+  const [fastingIntention, setFastingIntention] = useState("");
+  const [fastingFrequency, setFastingFrequency] = useState<"specific" | "weekly" | "monthly" | null>(null);
+  const [fastingDate, setFastingDate] = useState("");
+  const [fastingDay, setFastingDay] = useState("");
+  const [fastingDayOfMonth, setFastingDayOfMonth] = useState<number | null>(null);
+
+  // Rotating fasting examples
+  const [fastingFromIdx, setFastingFromIdx] = useState(0);
+  const [fastingIntentionIdx, setFastingIntentionIdx] = useState(0);
+  const FASTING_FROM_EXAMPLES = [
+    "Food — eating only one meal today",
+    "Social media and screens",
+    "Alcohol",
+    "Meat",
+    "News and consumption",
+    "Spending and buying",
+  ];
+  const FASTING_INTENTION_EXAMPLES = [
+    "In solidarity with those who go without",
+    "For clarity and discernment",
+    "As a discipline of Lent",
+    "In prayer for those we carry",
+    "To create space for God",
+  ];
+  useEffect(() => {
+    const t = setInterval(() => setFastingFromIdx(i => (i + 1) % 6), 3500);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const t = setInterval(() => setFastingIntentionIdx(i => (i + 1) % 5), 3700);
+    return () => clearInterval(t);
+  }, []);
+
   // Organizer personal time (after creation for spiritual templates)
   const [showPersonalTimePrompt, setShowPersonalTimePrompt] = useState(false);
   const [personalTimeDone, setPersonalTimeDone] = useState(false);
@@ -653,6 +693,29 @@ export default function MomentNew() {
       setStep("bcp-commitment");
       return;
     }
+    // Contemplative Prayer: duration selection first
+    if (t.id === "contemplative") {
+      if (t.prefill) {
+        setName(t.prefill.name);
+        setIntention(t.prefill.intention);
+        setLoggingType(t.prefill.loggingType);
+        setReflectionPrompt(t.prefill.reflectionPrompt);
+        setFrequency(t.prefill.frequency);
+      }
+      setStep("contemplative-duration");
+      return;
+    }
+    // Fasting: dedicated 3-step flow
+    if (t.id === "fasting") {
+      setFastingFrom("");
+      setFastingIntention("");
+      setFastingFrequency(null);
+      setFastingDate("");
+      setFastingDay("");
+      setFastingDayOfMonth(null);
+      setStep("fasting-what");
+      return;
+    }
     if (t.prefill) {
       setName(t.prefill.name);
       setIntention(t.prefill.intention);
@@ -699,6 +762,10 @@ export default function MomentNew() {
       ? selectedBcpPrayer !== null
         ? ["template", "intercession", "intention", "schedule", "goal", "invite"]
         : ["template", "intercession", "name", "intention", "logging", "schedule", "goal", "invite"]
+    : templateId === "contemplative"
+      ? ["template", "contemplative-duration", "name", "intention", "logging", "schedule", "goal", "invite"]
+    : templateId === "fasting"
+      ? ["template", "fasting-what", "fasting-why", "fasting-when", "goal", "invite"]
       : ["template", "name", "intention", "logging", "schedule", "goal", "invite"];
 
   function goNext() {
@@ -733,6 +800,16 @@ export default function MomentNew() {
   const canNext = () => {
     if (step === "template") return false;
     if (step === "intercession") return false;
+    if (step === "contemplative-duration") return contemplativeDuration !== null;
+    if (step === "fasting-what") return fastingFrom.trim().length >= 2;
+    if (step === "fasting-why") return fastingIntention.trim().length >= 4;
+    if (step === "fasting-when") {
+      if (!fastingFrequency) return false;
+      if (fastingFrequency === "specific") return fastingDate.length > 0;
+      if (fastingFrequency === "weekly") return fastingDay.length > 0;
+      if (fastingFrequency === "monthly") return fastingDayOfMonth !== null;
+      return false;
+    }
     if (step === "bcp-commitment") return true;
     if (step === "bcp-frequency") {
       if (!bcpFreqType) return false;
@@ -847,21 +924,34 @@ export default function MomentNew() {
 
   function handleSubmit() {
     const validParticipants = participants.filter(p => p.name.trim() && p.email.trim());
+    const isFasting = templateId === "fasting";
+
+    // Fasting: derive name/intention/scheduling from fasting-specific fields
+    const finalName = isFasting ? `Fasting from ${fastingFrom.trim()}` : name.trim();
+    const finalIntention = isFasting ? fastingIntention.trim() : intention.trim();
+
+    // Fasting frequency/day mapping
+    const fastingFreqForApi = isFasting
+      ? (fastingFrequency === "specific" ? "weekly" : fastingFrequency ?? "weekly")
+      : frequency;
+    const fastingDayOfWeekRrule = isFasting && fastingFrequency === "weekly"
+      ? fastingDay.toUpperCase().slice(0, 2)
+      : undefined;
 
     plantMutation.mutate({
-      name: name.trim(),
-      intention: intention.trim(),
-      loggingType,
-      reflectionPrompt: (loggingType === "reflection" || loggingType === "both")
+      name: finalName,
+      intention: finalIntention,
+      loggingType: isFasting ? "checkin" : loggingType,
+      reflectionPrompt: (loggingType === "reflection" || loggingType === "both") && !isFasting
         ? reflectionPrompt.trim() || undefined
         : undefined,
       templateType: templateId,
       intercessionTopic: intercessionTopic.trim() || undefined,
       intercessionSource: intercessionTopic.trim() ? intercessionSource : undefined,
       intercessionFullText: intercessionFullText.trim() || undefined,
-      frequency,
-      scheduledTime: isSpiritual ? "08:00" : scheduledTime,
-      dayOfWeek,
+      frequency: fastingFreqForApi as "daily" | "weekly" | "monthly",
+      scheduledTime: (isSpiritual || isFasting) ? "00:00" : scheduledTime,
+      dayOfWeek: isFasting ? (fastingDayOfWeekRrule as "MO"|"TU"|"WE"|"TH"|"FR"|"SA"|"SU" | undefined) : dayOfWeek,
       practiceDays: isSpiritual && frequency === "weekly" && scheduledDays.length > 0
         ? JSON.stringify(scheduledDays)
         : undefined,
@@ -870,6 +960,15 @@ export default function MomentNew() {
       timeOfDay: isSpiritual ? timeOfDay : undefined,
       participants: validParticipants,
       ritualId: ritualIdFromUrl ?? undefined,
+      // Contemplative
+      contemplativeDurationMinutes: templateId === "contemplative" ? (contemplativeDuration ?? undefined) : undefined,
+      // Fasting
+      fastingFrom: isFasting ? fastingFrom.trim() || undefined : undefined,
+      fastingIntention: isFasting ? fastingIntention.trim() || undefined : undefined,
+      fastingFrequency: isFasting ? fastingFrequency ?? undefined : undefined,
+      fastingDate: isFasting && fastingFrequency === "specific" ? fastingDate || undefined : undefined,
+      fastingDay: isFasting && fastingFrequency === "weekly" ? fastingDay || undefined : undefined,
+      fastingDayOfMonth: isFasting && fastingFrequency === "monthly" ? fastingDayOfMonth ?? undefined : undefined,
     });
   }
 
@@ -1095,8 +1194,9 @@ export default function MomentNew() {
             )}
           </p>
           <p className="text-[#F7F0E6]/50 text-sm mb-8">
-            {isMorning ? "Morning Prayer Rite II" : "Evening Prayer Rite II"}<br />
-            Book of Common Prayer · Page {isMorning ? "75" : "115"}
+            {isMorning
+              ? "Morning Prayer Rite II · Book of Common Prayer · Page 75 · A Daily Office"
+              : "Evening Prayer Rite II · Book of Common Prayer · Page 115 · A Daily Office"}
           </p>
           <button onClick={goNext}
             className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors">
@@ -1145,7 +1245,7 @@ export default function MomentNew() {
         {step !== "template" && (
           <div className="mb-8">
             <button onClick={goBack} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-6 transition-colors">
-              ← {step === "name" ? "Templates" : "Previous"}
+              ← {(step === "name" || step === "contemplative-duration" || step === "fasting-what") ? "Templates" : "Previous"}
             </button>
             <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
               <motion.div
@@ -1944,11 +2044,168 @@ export default function MomentNew() {
                 </div>
               )}
 
+              {/* ── Contemplative Prayer — duration selection ────── */}
+              {step === "contemplative-duration" && (
+                <div className="flex-1">
+                  <h2 className="text-2xl font-semibold mb-1">How long will you sit together? 🕯️</h2>
+                  <p className="text-sm text-muted-foreground italic mb-6">Everyone sits for the same length of time, wherever they are.</p>
+                  <div className="grid gap-3">
+                    {([
+                      { emoji: "🌱", label: "5 minutes", sub: "A brief stillness", mins: 5 },
+                      { emoji: "🌿", label: "10 minutes", sub: "A gentle practice", mins: 10 },
+                      { emoji: "🌸", label: "20 minutes", sub: "A deeper sit", mins: 20 },
+                      { emoji: "🌳", label: "30 minutes", sub: "A sustained silence", mins: 30 },
+                    ] as const).map(opt => (
+                      <button key={opt.mins}
+                        onClick={() => { setContemplativeDuration(opt.mins); goNext(); }}
+                        className="w-full text-left p-4 rounded-2xl border border-border/60 hover:border-[#6B8F71]/60 hover:bg-[#6B8F71]/5 transition-all flex items-center gap-4 group">
+                        <span className="text-3xl">{opt.emoji}</span>
+                        <div>
+                          <p className="font-semibold text-sm group-hover:text-[#4a6b50]">{opt.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{opt.sub}</p>
+                        </div>
+                        <span className="ml-auto text-muted-foreground/40 text-sm">→</span>
+                      </button>
+                    ))}
+                    {contemplativeDuration === -1 ? (
+                      <div className="p-4 rounded-2xl border-2 border-[#6B8F71]/60 bg-[#6B8F71]/5">
+                        <p className="font-semibold text-sm text-[#4a6b50] mb-3">✨ Choose your own</p>
+                        <div className="flex items-center gap-3">
+                          <input type="number" min={1} max={60} value={customDurationInput}
+                            onChange={e => setCustomDurationInput(e.target.value)}
+                            className="w-20 px-3 py-2 rounded-xl border border-border text-center text-lg font-semibold bg-background" />
+                          <span className="text-muted-foreground text-sm">minutes</span>
+                          <button
+                            onClick={() => { const n = Math.max(1, Math.min(60, parseInt(customDurationInput) || 20)); setContemplativeDuration(n); goNext(); }}
+                            className="ml-auto py-2 px-4 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold">
+                            Continue →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setContemplativeDuration(-1)}
+                        className="w-full text-left p-4 rounded-2xl border border-border/60 hover:border-[#6B8F71]/60 hover:bg-[#6B8F71]/5 transition-all flex items-center gap-4 group">
+                        <span className="text-3xl">✨</span>
+                        <div>
+                          <p className="font-semibold text-sm group-hover:text-[#4a6b50]">Choose your own</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Set your own length</p>
+                        </div>
+                        <span className="ml-auto text-muted-foreground/40 text-sm">→</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Fasting — what are you fasting from ─────────── */}
+              {step === "fasting-what" && (
+                <div className="flex-1 flex flex-col">
+                  <h2 className="text-2xl font-semibold mb-1">What are you fasting from? 🌿</h2>
+                  <p className="text-sm text-muted-foreground italic mb-6">Name the fast your group will keep together.</p>
+                  <textarea value={fastingFrom}
+                    onChange={e => setFastingFrom(e.target.value.slice(0, 140))}
+                    rows={3} autoFocus
+                    className="w-full px-4 py-4 rounded-2xl border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-background resize-none text-base leading-relaxed mb-2"
+                  />
+                  <p className="text-xs text-muted-foreground/60 italic mb-2">e.g. "{FASTING_FROM_EXAMPLES[fastingFromIdx]}"</p>
+                  <span className="text-xs text-muted-foreground/40">{fastingFrom.length}/140</span>
+                </div>
+              )}
+
+              {/* ── Fasting — why are you fasting ────────────────── */}
+              {step === "fasting-why" && (
+                <div className="flex-1 flex flex-col">
+                  <h2 className="text-2xl font-semibold mb-1">Why are you fasting together? 🙏</h2>
+                  <p className="text-sm text-muted-foreground italic mb-6">The intention your group will hold. This is what gives the fast its meaning.</p>
+                  <textarea value={fastingIntention}
+                    onChange={e => setFastingIntention(e.target.value.slice(0, 200))}
+                    rows={4} autoFocus
+                    className="w-full px-4 py-4 rounded-2xl border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-background resize-none text-base leading-relaxed mb-2"
+                  />
+                  <p className="text-xs text-muted-foreground/60 italic mb-2">e.g. "{FASTING_INTENTION_EXAMPLES[fastingIntentionIdx]}"</p>
+                  <span className="text-xs text-muted-foreground/40">{fastingIntention.length}/200</span>
+                </div>
+              )}
+
+              {/* ── Fasting — when: date, weekly, or monthly ─────── */}
+              {step === "fasting-when" && (() => {
+                const ordinal = (n: number) => n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+                const FASTING_FREQ_OPTS = [
+                  { id: "specific" as const, emoji: "📅", label: "A specific date", sub: "Choose one day on the calendar" },
+                  { id: "weekly" as const, emoji: "🗓", label: "Weekly", sub: "The same day every week" },
+                  { id: "monthly" as const, emoji: "📆", label: "Monthly", sub: "The same day every month" },
+                ];
+                const FAST_DAYS = [
+                  { id: "monday", label: "Mon" }, { id: "tuesday", label: "Tue" }, { id: "wednesday", label: "Wed" },
+                  { id: "thursday", label: "Thu" }, { id: "friday", label: "Fri" }, { id: "saturday", label: "Sat" }, { id: "sunday", label: "Sun" },
+                ];
+                return (
+                  <div className="flex-1 flex flex-col">
+                    <h2 className="text-2xl font-semibold mb-1">When will you fast together? 📅</h2>
+                    <p className="text-sm text-muted-foreground italic mb-5">Fasting is a full day practice. Choose the day or days.</p>
+                    <div className="grid gap-3 mb-5">
+                      {FASTING_FREQ_OPTS.map(opt => (
+                        <button key={opt.id}
+                          onClick={() => { setFastingFrequency(opt.id); setFastingDate(""); setFastingDay(""); setFastingDayOfMonth(null); }}
+                          className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${fastingFrequency === opt.id ? "border-[#6B8F71] bg-[#6B8F71]/5" : "border-border/60 hover:border-[#6B8F71]/40"}`}>
+                          <span className="text-2xl">{opt.emoji}</span>
+                          <div>
+                            <p className={`font-semibold text-sm ${fastingFrequency === opt.id ? "text-[#4a6b50]" : ""}`}>{opt.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{opt.sub}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {fastingFrequency === "specific" && (
+                      <div className="mt-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Choose a date</p>
+                        <input type="date" value={fastingDate}
+                          onChange={e => setFastingDate(e.target.value)}
+                          min={new Date().toISOString().split("T")[0]}
+                          className="w-full px-4 py-3 rounded-2xl border border-border focus:border-[#6B8F71] outline-none bg-background text-base"
+                        />
+                      </div>
+                    )}
+                    {fastingFrequency === "weekly" && (
+                      <div className="mt-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Which day?</p>
+                        <div className="grid grid-cols-7 gap-1.5">
+                          {FAST_DAYS.map(d => (
+                            <button key={d.id} onClick={() => setFastingDay(d.id)}
+                              className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${fastingDay === d.id ? "bg-[#6B8F71] text-white border-[#6B8F71]" : "border-border text-muted-foreground hover:border-[#6B8F71]/40"}`}>
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {fastingFrequency === "monthly" && (
+                      <div className="mt-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Which day of the month?</p>
+                        <div className="grid grid-cols-7 gap-1.5">
+                          {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                            <button key={d} onClick={() => setFastingDayOfMonth(d)}
+                              className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${fastingDayOfMonth === d ? "bg-[#6B8F71] text-white border-[#6B8F71]" : "border-border text-muted-foreground hover:border-[#6B8F71]/40"}`}>
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                        {fastingDayOfMonth && (
+                          <p className="text-xs text-muted-foreground/60 mt-2 text-center">
+                            Fasting on the {ordinal(fastingDayOfMonth)} of each month
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
             </motion.div>
           </AnimatePresence>
 
-          {/* ── Next button (not shown for template, intercession main, or bcp-commitment) ── */}
-          {step !== "template" && step !== "intercession" && step !== "bcp-commitment" && (
+          {/* ── Next button (not shown for template, intercession main, bcp-commitment, or contemplative-duration) ── */}
+          {step !== "template" && step !== "intercession" && step !== "bcp-commitment" && step !== "contemplative-duration" && (
             <div className="mt-6 pt-4 border-t border-border/30">
               <button
                 onClick={goNext}

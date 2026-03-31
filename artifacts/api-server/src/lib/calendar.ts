@@ -92,6 +92,47 @@ export async function createCalendarEvent(
   }
 }
 
+export async function createAllDayCalendarEvent(
+  userId: number,
+  opts: {
+    summary: string;
+    description?: string;
+    dateStr: string;
+    attendees?: string[];
+    recurrence?: string[];
+  }
+): Promise<string | null> {
+  const auth = await getAuthedClient(userId);
+  if (!auth) return null;
+
+  const calendar = google.calendar({ version: "v3", auth });
+  const attendeeList = opts.attendees?.map(email => ({ email })) ?? [];
+
+  const nextDay = new Date(opts.dateStr + "T00:00:00Z");
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const endDateStr = nextDay.toISOString().split("T")[0];
+
+  try {
+    const event = await calendar.events.insert({
+      calendarId: "primary",
+      sendUpdates: attendeeList.length > 0 ? "all" : "none",
+      requestBody: {
+        summary: opts.summary,
+        description: opts.description,
+        start: { date: opts.dateStr },
+        end: { date: endDateStr },
+        attendees: attendeeList.length > 0 ? attendeeList : undefined,
+        recurrence: opts.recurrence,
+        reminders: { useDefault: false, overrides: [] },
+      },
+    });
+    return event.data.id ?? null;
+  } catch (err) {
+    console.error("All-day calendar event create failed:", err);
+    return null;
+  }
+}
+
 export async function deleteCalendarEvent(userId: number, eventId: string): Promise<void> {
   const auth = await getAuthedClient(userId);
   if (!auth) return;
