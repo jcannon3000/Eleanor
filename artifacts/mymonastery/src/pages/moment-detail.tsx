@@ -84,20 +84,29 @@ const TIME_OF_DAY_LABELS: Record<string, string> = {
   "afternoon": "afternoon", "late-afternoon": "late afternoon", "evening": "evening", "night": "night",
 };
 
+// Convert a 24h hour to a friendly time-of-day label
+function clockToTimeLabel(scheduledTime: string): string {
+  const [h] = scheduledTime.split(":").map(Number);
+  if (h < 6) return "early morning";
+  if (h < 12) return "morning";
+  if (h < 14) return "midday";
+  if (h < 17) return "afternoon";
+  if (h < 20) return "evening";
+  return "night";
+}
+
 function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
-  const todLabel = timeOfDay ? TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay : null;
-  const clockTime = formatTime(scheduledTime);
-  const whenStr = todLabel ?? `at ${clockTime}`;
-  if (frequency === "daily") return `Every ${todLabel ?? `day at ${clockTime}`}`;
+  const todLabel = timeOfDay ? (TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay) : clockToTimeLabel(scheduledTime);
+  if (frequency === "daily") return `Every ${todLabel}`;
   if (frequency === "weekly") {
     if (practiceDays && practiceDays.length > 1) {
       const names = practiceDays.map(d => DAY_NAMES[d]?.slice(0, 3) ?? d).join(", ");
-      return `${names} ${whenStr}`;
+      return `${names} ${todLabel}`;
     }
-    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} ${whenStr}`;
-    return `Weekly ${whenStr}`;
+    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} ${todLabel}`;
+    return `Weekly ${todLabel}`;
   }
-  return `Monthly ${whenStr}`;
+  return `Monthly ${todLabel}`;
 }
 
 function goalProgress(createdAt: string, goalDays: number): number {
@@ -127,34 +136,32 @@ function isTodayPracticeDay(frequency: string, dayOfWeek?: string | null, practi
   return true;
 }
 
-// Next practice description
+// Next practice description — always uses friendly time-of-day words
 function nextPracticeLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
-  const todLabel = timeOfDay ? TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay : null;
-  const time = formatTime(scheduledTime);
-  const whenStr = todLabel ?? `at ${time}`;
+  const todLabel = timeOfDay ? (TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay) : clockToTimeLabel(scheduledTime);
   const today = new Date().getDay(); // 0=Sun
   const pastTime = isPastScheduledTime(scheduledTime);
 
   if (frequency === "daily") {
-    return pastTime ? `Tomorrow ${whenStr}` : `Today ${whenStr}`;
+    return pastTime ? `Tomorrow ${todLabel}` : `Today ${todLabel}`;
   }
 
   if (frequency === "weekly") {
     const days = practiceDays && practiceDays.length > 0 ? practiceDays : (dayOfWeek ? [dayOfWeek] : []);
-    if (days.length === 0) return `Next practice ${whenStr}`;
+    if (days.length === 0) return `Next practice ${todLabel}`;
 
     for (let i = 0; i <= 7; i++) {
       const checkDow = (today + i) % 7;
       const isDayMatch = days.some(d => DAY_DOW[d] === checkDow);
       if (isDayMatch) {
-        if (i === 0 && !pastTime) return `Today ${whenStr}`;
-        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow ${whenStr}`;
+        if (i === 0 && !pastTime) return `Today ${todLabel}`;
+        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow ${todLabel}`;
         const name = Object.keys(DAY_DOW).find(k => DAY_DOW[k] === checkDow);
-        return `${name ? DAY_NAMES[name] : "Next"} ${whenStr}`;
+        return `${name ? DAY_NAMES[name] : "Next"} ${todLabel}`;
       }
     }
   }
-  return `Next practice ${whenStr}`;
+  return `Next practice ${todLabel}`;
 }
 
 const STATUS_ICON: Record<string, string> = { bloom: "🌸", solo: "👤", wither: "🥀" };
@@ -345,19 +352,30 @@ export default function MomentDetail() {
             )}
           </motion.div>
         ) : (
-          /* Not open: quiet next-practice line + always-accessible Pray button for intercession */
-          <div className="mb-5">
-            <p className="text-xs text-muted-foreground mb-3">
-              Next {isIntercession ? "prayer" : "practice"}: {nextPracticeLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
-            </p>
-            {isIntercession && postUrl && (
+          /* Not open: next-practice card */
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-5 bg-card border border-border/60 rounded-2xl px-4 py-4 flex items-center justify-between"
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                Next {isIntercession ? "prayer" : "practice"}
+              </p>
+              <p className="text-base font-semibold text-foreground capitalize">
+                {nextPracticeLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
+              </p>
+            </div>
+            {isIntercession && postUrl ? (
               <Link href={postUrl}>
-                <span className="inline-flex items-center text-sm font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-4 py-2 hover:bg-[#6B8F71]/5 transition-colors cursor-pointer">
+                <span className="shrink-0 text-sm font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-4 py-2 hover:bg-[#6B8F71]/5 transition-colors cursor-pointer whitespace-nowrap">
                   Pray 🙏
                 </span>
               </Link>
+            ) : (
+              <span className="text-2xl" aria-hidden>🌿</span>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* Stats */}

@@ -906,7 +906,7 @@ export default function MomentNew() {
             <div className="text-5xl mb-4 text-center">{todEmoji}</div>
             <h2 className="text-2xl font-semibold text-center mb-2">You've planted {["a","e","i","o","u"].includes(todLabel[0]) ? "an" : "a"} {todLabel} practice.</h2>
             <p className="text-[#c9b99a] text-center text-sm mb-8">
-              When in the {todLabel} works best for you?
+              When would you like to be notified via a calendar invite?
             </p>
 
             {(() => {
@@ -967,8 +967,8 @@ export default function MomentNew() {
                 </select>
               </div>
               <p className="text-xs text-[#c9b99a]/60 italic text-center">
-                This is when Eleanor will put it in your calendar.<br />
-                Everyone in this practice chooses their own time.
+                Eleanor will send your calendar invite at this time.<br />
+                Everyone in this practice chooses their own.
               </p>
             </div>
               );

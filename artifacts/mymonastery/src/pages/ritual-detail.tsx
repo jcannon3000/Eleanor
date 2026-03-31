@@ -100,6 +100,7 @@ export default function RitualDetail() {
   const [timelineLoading, setTimelineLoading] = useState(true);
   const [calendarSynced, setCalendarSynced] = useState(false);
   const [loggingId, setLoggingId] = useState<number | null>(null);
+  const [rsvp, setRsvp] = useState<"going" | "not-going" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -132,6 +133,20 @@ export default function RitualDetail() {
   }, [ritualId]);
 
   useEffect(() => { fetchTimeline(); }, [fetchTimeline]);
+
+  // Load RSVP preference from localStorage when meetup changes
+  useEffect(() => {
+    if (timeline?.upcoming?.id) {
+      const stored = localStorage.getItem(`rsvp-meetup-${timeline.upcoming.id}`);
+      setRsvp((stored as "going" | "not-going" | null) ?? null);
+    }
+  }, [timeline?.upcoming?.id]);
+
+  const handleRsvp = (choice: "going" | "not-going") => {
+    if (!timeline?.upcoming?.id) return;
+    localStorage.setItem(`rsvp-meetup-${timeline.upcoming.id}`, choice);
+    setRsvp(choice);
+  };
 
   const handleLog = async (meetupId: number, status: "completed" | "skipped") => {
     setLoggingId(meetupId);
@@ -281,6 +296,7 @@ export default function RitualDetail() {
                 <div className={`bg-card rounded-2xl border p-6 shadow-[var(--shadow-warm-sm)] ${
                   timeline.confirmedTime ? "border-primary/30" : "border-card-border border-dashed"
                 }`}>
+                  {/* Card header — always includes Reschedule */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <CalendarCheck size={16} className={timeline.confirmedTime ? "text-primary" : "text-muted-foreground"} />
@@ -299,17 +315,17 @@ export default function RitualDetail() {
                       )}
                       <Link
                         href={`/ritual/${ritualId}/schedule`}
-                        className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors underline"
+                        className="text-xs font-medium text-primary/80 hover:text-primary border border-primary/30 rounded-full px-3 py-1 transition-colors"
                       >
                         Reschedule
                       </Link>
                     </div>
                   </div>
 
-                  {/* Confirmed badge */}
+                  {/* Status badge */}
                   {timeline.confirmedTime ? (
                     <div className="flex items-center gap-2 mb-4">
-                      {timeline.upcoming.googleCalendarEventId && (
+                      {timeline.upcoming.googleCalendarEventId ? (
                         <a
                           href="https://calendar.google.com"
                           target="_blank"
@@ -319,6 +335,11 @@ export default function RitualDetail() {
                           <CheckCircle2 size={12} />
                           Confirmed in Google Calendar
                         </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
+                          <CheckCircle2 size={12} />
+                          Time confirmed
+                        </span>
                       )}
                     </div>
                   ) : (
@@ -330,6 +351,7 @@ export default function RitualDetail() {
                     </div>
                   )}
 
+                  {/* Date & time */}
                   <p className="text-2xl font-semibold text-foreground mb-1">
                     {format(parseISO(timeline.upcoming.scheduledDate), "EEEE, MMMM d")}
                   </p>
@@ -345,6 +367,7 @@ export default function RitualDetail() {
                     )}
                   </p>
 
+                  {/* Bottom action zone */}
                   {upcomingIsPast ? (
                     <div className="flex gap-3 pt-2 border-t border-border/50">
                       <button
@@ -363,12 +386,39 @@ export default function RitualDetail() {
                       </button>
                     </div>
                   ) : timeline.confirmedTime ? (
-                    <div className="pt-2 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground text-center italic">
-                        Come back after your gathering to log it 🌱
-                      </p>
+                    /* Fixed future event — RSVP */
+                    <div className="pt-3 border-t border-border/50">
+                      <p className="text-xs text-muted-foreground mb-2.5 font-medium">Will you be there?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleRsvp("going")}
+                          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                            rsvp === "going"
+                              ? "bg-[#6B8F71] border-[#6B8F71] text-white shadow-sm"
+                              : "border-border text-muted-foreground hover:border-[#6B8F71]/60 hover:text-[#6B8F71]"
+                          }`}
+                        >
+                          I'll be there ✓
+                        </button>
+                        <button
+                          onClick={() => handleRsvp("not-going")}
+                          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                            rsvp === "not-going"
+                              ? "bg-rose-50 border-rose-300 text-rose-700"
+                              : "border-border text-muted-foreground hover:border-rose-300/60 hover:text-rose-500"
+                          }`}
+                        >
+                          Can't make it
+                        </button>
+                      </div>
+                      {rsvp && (
+                        <p className="text-xs text-muted-foreground/60 text-center mt-2 italic">
+                          {rsvp === "going" ? "Marked as attending 🌱" : "Noted — maybe next time."}
+                        </p>
+                      )}
                     </div>
                   ) : (
+                    /* Flexible pending event */
                     <div className="pt-2 border-t border-border/50 flex items-center justify-between">
                       <p className="text-xs text-muted-foreground italic">
                         Waiting for circle responses via invite links
