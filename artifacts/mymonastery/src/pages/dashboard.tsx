@@ -234,13 +234,13 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
           <p className="text-sm italic text-[#6b5c4a] font-serif mb-3">"{moment.intention}"</p>
         )}
 
-        {/* Presence progress bar (pinned) */}
-        {pinned && (
+        {/* Goal progress bar (pinned) — shows milestone progress toward 3/7/14 day goals */}
+        {pinned && hasGoal && (
           <div className="mb-3">
             <div className="w-full h-1.5 bg-[#c9b99a]/30 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#6B8F71] rounded-full transition-all"
-                style={{ width: `${Math.min(100, moment.memberCount > 0 ? (moment.todayPostCount / moment.memberCount) * 100 : 0)}%` }}
+                style={{ width: `${Math.round(mProgress * 100)}%` }}
               />
             </div>
           </div>
@@ -252,10 +252,6 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
             {hasGoal ? (
               <div>
                 <span className="text-[11px] text-[#6b5c4a]/80">{mLabel}</span>
-                <div className="mt-1 w-full h-0.5 bg-[#c9b99a]/30 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#6B8F71] rounded-full transition-all"
-                    style={{ width: `${Math.round(mProgress * 100)}%` }} />
-                </div>
               </div>
             ) : (
               moment.currentStreak > 0 && (
