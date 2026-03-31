@@ -45,6 +45,7 @@ interface MomentDetail {
     intercessionTopic: string | null;
     timezone?: string | null;
     practiceDays?: string | string[] | null;
+    timeOfDay?: string | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -78,18 +79,25 @@ function parsePracticeDays(raw: string | string[] | null | undefined): string[] 
   try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch { return null; }
 }
 
-function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null): string {
-  const time = formatTime(scheduledTime);
-  if (frequency === "daily") return `Every day at ${time}`;
+const TIME_OF_DAY_LABELS: Record<string, string> = {
+  "early-morning": "early morning", "morning": "morning", "midday": "midday",
+  "afternoon": "afternoon", "late-afternoon": "late afternoon", "evening": "evening", "night": "night",
+};
+
+function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
+  const todLabel = timeOfDay ? TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay : null;
+  const clockTime = formatTime(scheduledTime);
+  const whenStr = todLabel ?? `at ${clockTime}`;
+  if (frequency === "daily") return `Every ${todLabel ?? `day at ${clockTime}`}`;
   if (frequency === "weekly") {
     if (practiceDays && practiceDays.length > 1) {
       const names = practiceDays.map(d => DAY_NAMES[d]?.slice(0, 3) ?? d).join(", ");
-      return `${names} at ${time}`;
+      return `${names} ${whenStr}`;
     }
-    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} at ${time}`;
-    return `Weekly at ${time}`;
+    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} ${whenStr}`;
+    return `Weekly ${whenStr}`;
   }
-  return `Monthly at ${time}`;
+  return `Monthly ${whenStr}`;
 }
 
 function goalProgress(createdAt: string, goalDays: number): number {
@@ -120,32 +128,33 @@ function isTodayPracticeDay(frequency: string, dayOfWeek?: string | null, practi
 }
 
 // Next practice description
-function nextPracticeLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null): string {
+function nextPracticeLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
+  const todLabel = timeOfDay ? TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay : null;
   const time = formatTime(scheduledTime);
+  const whenStr = todLabel ?? `at ${time}`;
   const today = new Date().getDay(); // 0=Sun
   const pastTime = isPastScheduledTime(scheduledTime);
 
   if (frequency === "daily") {
-    return pastTime ? `Tomorrow at ${time}` : `Today at ${time}`;
+    return pastTime ? `Tomorrow ${whenStr}` : `Today ${whenStr}`;
   }
 
   if (frequency === "weekly") {
     const days = practiceDays && practiceDays.length > 0 ? practiceDays : (dayOfWeek ? [dayOfWeek] : []);
-    if (days.length === 0) return `Next practice at ${time}`;
+    if (days.length === 0) return `Next practice ${whenStr}`;
 
-    // Find the next occurrence
     for (let i = 0; i <= 7; i++) {
       const checkDow = (today + i) % 7;
       const isDayMatch = days.some(d => DAY_DOW[d] === checkDow);
       if (isDayMatch) {
-        if (i === 0 && !pastTime) return `Today at ${time}`;
-        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow at ${time}`;
+        if (i === 0 && !pastTime) return `Today ${whenStr}`;
+        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow ${whenStr}`;
         const name = Object.keys(DAY_DOW).find(k => DAY_DOW[k] === checkDow);
-        return `${name ? DAY_NAMES[name] : "Next"} at ${time}`;
+        return `${name ? DAY_NAMES[name] : "Next"} ${whenStr}`;
       }
     }
   }
-  return `Next practice at ${time}`;
+  return `Next practice ${whenStr}`;
 }
 
 const STATUS_ICON: Record<string, string> = { bloom: "🌸", solo: "👤", wither: "🥀" };
@@ -269,8 +278,9 @@ export default function MomentDetail() {
   const pastTime = isPastScheduledTime(moment.scheduledTime);
   const isOpenNow = isSpiritual ? (practiceDay && pastTime) : data.windowOpen;
 
-  const postUrl = isOpenNow && myUserToken
-    ? `/moment/${moment.momentToken}/${myUserToken}`
+  // Intercession: Pray button always accessible (prayer can be read any time; Amen only logs when window open)
+  const postUrl = myUserToken
+    ? (isIntercession || isOpenNow) ? `/moment/${moment.momentToken}/${myUserToken}` : null
     : null;
 
   // Label for action button — context-sensitive
@@ -307,7 +317,7 @@ export default function MomentDetail() {
           ) : null}
 
           <p className="text-xs text-muted-foreground">
-            {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays)}
+            {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
         </div>
 
@@ -335,10 +345,19 @@ export default function MomentDetail() {
             )}
           </motion.div>
         ) : (
-          /* Not open: show quiet next-practice line */
-          <p className="text-xs text-muted-foreground mb-5">
-            Next {isIntercession ? "prayer" : "practice"}: {nextPracticeLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays)}
-          </p>
+          /* Not open: quiet next-practice line + always-accessible Pray button for intercession */
+          <div className="mb-5">
+            <p className="text-xs text-muted-foreground mb-3">
+              Next {isIntercession ? "prayer" : "practice"}: {nextPracticeLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
+            </p>
+            {isIntercession && postUrl && (
+              <Link href={postUrl}>
+                <span className="inline-flex items-center text-sm font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-4 py-2 hover:bg-[#6B8F71]/5 transition-colors cursor-pointer">
+                  Pray 🙏
+                </span>
+              </Link>
+            )}
+          </div>
         )}
 
         {/* Stats */}

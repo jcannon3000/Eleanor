@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
@@ -97,7 +97,7 @@ function NamedPresence({ members, myToken }: { members: MomentMember[]; myToken?
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
   topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
-  members, myToken, alreadyPosted, myReflection, isPraying, onComplete,
+  members, myToken, canPray, alreadyPosted, myReflection, isPraying, onComplete, onBack,
 }: {
   topic: string;
   fullText: string;
@@ -107,10 +107,12 @@ function IntercessionPrayerPage({
   todayPostCount: number;
   members: MomentMember[];
   myToken?: string;
+  canPray: boolean;
   alreadyPosted: boolean;
   myReflection: string | null;
   isPraying: boolean;
   onComplete: (reflection: string) => void;
+  onBack: () => void;
 }) {
   const [reflection, setReflection] = useState(myReflection ?? "");
   const [showReflection, setShowReflection] = useState(false);
@@ -173,9 +175,14 @@ function IntercessionPrayerPage({
             </div>
           )}
 
-          <p className="text-xs text-[#6b5c4a]/50 italic">
-            Come back at your next prayer time. 🌿
-          </p>
+          {/* Continue button — goes back to detail */}
+          <button
+            onClick={onBack}
+            className="w-full py-4 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-base font-semibold hover:opacity-90 transition-opacity"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
+            Continue →
+          </button>
         </motion.div>
       </div>
     );
@@ -185,9 +192,16 @@ function IntercessionPrayerPage({
     <div className="min-h-screen bg-[#F5EDD8]">
       <div className="max-w-md mx-auto px-5 py-10 pb-24">
 
+        {/* Back link — shown when window is closed (read-only) */}
+        {!canPray && (
+          <button onClick={onBack} className="text-xs text-[#6b5c4a]/60 hover:text-[#6b5c4a] flex items-center gap-1 mb-6 transition-colors">
+            ← Back
+          </button>
+        )}
+
         {/* Header */}
         <p className="text-[11px] uppercase tracking-widest text-[#6b5c4a]/50 text-center mb-2">
-          Today's intercession
+          {canPray ? "Today's intercession" : "Intercession prayer"}
         </p>
         <h1 className="text-[22px] font-bold text-[#2C1A0E] text-center leading-snug mb-2"
           style={{ fontFamily: "Space Grotesk, sans-serif" }}>
@@ -230,33 +244,45 @@ function IntercessionPrayerPage({
 
         <div className="mt-6 mb-3" />
 
-        {/* Reflection (optional, before Amen) */}
-        <div className="mb-5">
-          <p className="font-serif italic text-[#6B8F71] text-sm mb-2 text-center">
-            "{reflectionPrompt}"
-          </p>
-          <textarea
-            value={reflection}
-            onChange={e => setReflection(e.target.value.slice(0, 280))}
-            placeholder="Who or what are you holding today?"
-            rows={3}
-            className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
-          />
-          <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
-        </div>
+        {canPray ? (
+          <>
+            {/* Reflection (optional, before Amen) */}
+            <div className="mb-5">
+              <p className="font-serif italic text-[#6B8F71] text-sm mb-2 text-center">
+                "{reflectionPrompt}"
+              </p>
+              <textarea
+                value={reflection}
+                onChange={e => setReflection(e.target.value.slice(0, 280))}
+                placeholder="Who or what are you holding today?"
+                rows={3}
+                className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
+              />
+              <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
+            </div>
 
-        {/* Amen button */}
-        <button
-          onClick={() => onComplete(reflection)}
-          disabled={isPraying}
-          className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-40"
-          style={{ fontFamily: "Space Grotesk, sans-serif" }}
-        >
-          {isPraying ? "Marking…" : "Amen 🙏"}
-        </button>
-        <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
-          Tapping Amen marks that you have prayed this together.
-        </p>
+            {/* Amen button */}
+            <button
+              onClick={() => onComplete(reflection)}
+              disabled={isPraying}
+              className="w-full py-5 rounded-2xl bg-[#2C1A0E] text-[#F5EDD8] text-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-40"
+              style={{ fontFamily: "Space Grotesk, sans-serif" }}
+            >
+              {isPraying ? "Marking…" : "Amen 🙏"}
+            </button>
+            <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
+              Tapping Amen marks that you have prayed this together.
+            </p>
+          </>
+        ) : (
+          /* Window not open — read-only, just go back */
+          <button
+            onClick={onBack}
+            className="w-full py-4 rounded-2xl border border-[#c9b99a]/50 text-[#6b5c4a] text-base font-medium hover:bg-[#c9b99a]/10 transition-colors"
+          >
+            ← Back to practice
+          </button>
+        )}
       </div>
     </div>
   );
@@ -265,6 +291,7 @@ function IntercessionPrayerPage({
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function MomentPostPage() {
   const { momentToken, userToken } = useParams<{ momentToken: string; userToken: string }>();
+  const [, setLocation] = useLocation();
 
   const [reflection, setReflection] = useState("");
   const [posted, setPosted] = useState(false);
@@ -372,13 +399,13 @@ export default function MomentPostPage() {
     );
   }
 
-  // ── Intercession — full prayer page (open window or already logged) ─────────
-  if (moment.templateType === "intercession" && (effectiveWindowOpen || alreadyPosted)) {
-    // Build live member presence using latest data merged with local `posted` state
+  // ── Intercession — prayer page always accessible; Amen only when window is open ─
+  if (moment.templateType === "intercession") {
     const liveMembers: MomentMember[] = members.map(m => ({
       ...m,
       prayed: m.prayed || (posted && m.userToken === userToken),
     }));
+    const detailUrl = `/moments/${moment.id}`;
     return (
       <IntercessionPrayerPage
         topic={moment.intercessionTopic ?? moment.name}
@@ -389,17 +416,14 @@ export default function MomentPostPage() {
         todayPostCount={actualTodayCount}
         members={liveMembers}
         myToken={userToken}
+        canPray={effectiveWindowOpen && !alreadyPosted}
         alreadyPosted={alreadyPosted}
         myReflection={myPost?.reflectionText ?? null}
         isPraying={postMutation.isPending}
         onComplete={handleIntercessionComplete}
+        onBack={() => setLocation(detailUrl)}
       />
     );
-  }
-
-  // ── Outside window for intercession ────────────────────────────────────────
-  if (moment.templateType === "intercession" && !alreadyPosted && !effectiveWindowOpen) {
-    return <OutsideWindowScreen moment={moment} minutesRemaining={minutesRemaining} />;
   }
 
   // ── BCP (Morning Prayer / Evening Prayer) posting page ─────────────────────
