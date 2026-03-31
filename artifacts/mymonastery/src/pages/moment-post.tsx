@@ -840,7 +840,7 @@ export default function MomentPostPage() {
     const isMorning = moment.templateType === "morning-prayer";
     const officeName = isMorning ? "Morning Prayer" : "Evening Prayer";
     const bcpPage = isMorning ? "75" : "115";
-    const bcpUrl = isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html";
+    const bcpUrl = isMorning ? "https://bcponline.org/DailyOffice/mp2.html" : "https://bcponline.org/DailyOffice/ep2.html";
     const bgColor = isMorning ? "#2C1810" : "#1A1C2E";
     const accentColor = isMorning ? "#C8975A" : "#7B9EBE";
 
