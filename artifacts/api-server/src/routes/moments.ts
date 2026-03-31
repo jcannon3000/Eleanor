@@ -1255,8 +1255,9 @@ function nextOccurrences(personalTime: string, personalTimezone: string, frequen
 
     if (included) {
       const tzOffsetMs = getTimezoneOffsetMs(personalTimezone, new Date(`${localDate}T00:00:00`));
+      // Convert local time to UTC: local + offset = UTC (offset is positive for zones behind UTC)
       const eventUtc = new Date(`${localDate}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:00`);
-      eventUtc.setTime(eventUtc.getTime() - tzOffsetMs);
+      eventUtc.setTime(eventUtc.getTime() + tzOffsetMs);
       if (eventUtc > now) results.push(eventUtc);
     }
 
@@ -1321,8 +1322,8 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
     }
 
     // Update the Google Calendar event to the new personal time
-    // Events live on the organizer's calendar, so use organizer's auth credentials
-    if (myTokenRow.googleCalendarEventId && occurrences.length > 0) {
+    // Use buildLocalEventTimes for correct timezone-aware local strings (avoids UTC math bugs)
+    if (myTokenRow.googleCalendarEventId) {
       try {
         const allTokenRows = await db.select().from(momentUserTokensTable)
           .where(eq(momentUserTokensTable.momentId, momentId));
@@ -1331,11 +1332,15 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
           .where(eq(usersTable.email, organizerToken.email));
 
         if (organizer?.googleAccessToken) {
-          await updateCalendarEvent(organizer.id, myTokenRow.googleCalendarEventId, {
-            startDate: occurrences[0],
-            endDate: new Date(occurrences[0].getTime() + 60 * 60 * 1000),
+          const [hh2, mm2] = personalTime.split(":").map(Number);
+          const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone);
+          const updated = await updateCalendarEvent(organizer.id, myTokenRow.googleCalendarEventId, {
+            startLocalStr,
+            endLocalStr,
+            timeZone: personalTimezone,
             attendees: [myTokenRow.email],
           });
+          console.info(`Personal time GCal update for moment ${momentId}: ${updated ? "ok" : "failed"} → ${startLocalStr} ${personalTimezone}`);
         }
       } catch (gcalErr) {
         console.error("Personal time GCal update failed (non-fatal):", gcalErr);

@@ -179,8 +179,11 @@ export async function updateCalendarEvent(
   opts: {
     summary?: string;
     description?: string;
-    startDate: Date;
+    startDate?: Date;
+    startLocalStr?: string;  // "2026-04-01T12:15:00" — preferred for tz-aware updates
     endDate?: Date;
+    endLocalStr?: string;    // "2026-04-01T13:15:00"
+    timeZone?: string;       // e.g. "America/Chicago" — required when using startLocalStr
     attendees?: string[];
   }
 ): Promise<boolean> {
@@ -188,9 +191,22 @@ export async function updateCalendarEvent(
   if (!auth) return false;
 
   const calendar = google.calendar({ version: "v3", auth });
-  const start = opts.startDate;
-  const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
   const attendeeList = opts.attendees?.map((email) => ({ email })) ?? [];
+  const useLocalTime = !!(opts.startLocalStr && opts.timeZone);
+  const tz = opts.timeZone ?? "UTC";
+
+  let startField: { dateTime: string; timeZone: string };
+  let endField: { dateTime: string; timeZone: string };
+
+  if (useLocalTime) {
+    startField = { dateTime: opts.startLocalStr!, timeZone: tz };
+    endField = { dateTime: opts.endLocalStr ?? opts.startLocalStr!, timeZone: tz };
+  } else {
+    const start = opts.startDate ?? new Date();
+    const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
+    startField = { dateTime: start.toISOString(), timeZone: "UTC" };
+    endField = { dateTime: end.toISOString(), timeZone: "UTC" };
+  }
 
   try {
     await calendar.events.patch({
@@ -200,8 +216,8 @@ export async function updateCalendarEvent(
       requestBody: {
         summary: opts.summary,
         description: opts.description,
-        start: { dateTime: start.toISOString(), timeZone: "UTC" },
-        end: { dateTime: end.toISOString(), timeZone: "UTC" },
+        start: startField,
+        end: endField,
         attendees: attendeeList.length > 0 ? attendeeList : undefined,
       },
     });
