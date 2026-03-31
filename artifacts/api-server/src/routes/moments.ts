@@ -6,7 +6,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable,
 } from "@workspace/db";
-import { createCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -1174,6 +1174,18 @@ router.patch("/moments/:id/archive", async (req, res): Promise<void> => {
     .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
   if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  // Delete all Google Calendar events for this practice before archiving
+  const calRows = await db
+    .select({ googleCalendarEventId: momentUserTokensTable.googleCalendarEventId })
+    .from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+
+  await Promise.allSettled(
+    calRows
+      .filter((r) => r.googleCalendarEventId)
+      .map((r) => deleteCalendarEvent(sessionUserId, r.googleCalendarEventId!))
+  );
+
   await db.update(sharedMomentsTable)
     .set({ state: "archived" })
     .where(eq(sharedMomentsTable.id, momentId));
@@ -1199,6 +1211,18 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   const membership = await db.select().from(momentUserTokensTable)
     .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
   if (membership.length === 0) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Delete all Google Calendar events for this practice before hard-deleting
+  const calRows = await db
+    .select({ googleCalendarEventId: momentUserTokensTable.googleCalendarEventId })
+    .from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+
+  await Promise.allSettled(
+    calRows
+      .filter((r) => r.googleCalendarEventId)
+      .map((r) => deleteCalendarEvent(sessionUserId, r.googleCalendarEventId!))
+  );
 
   // Hard delete — cascades remove windows, posts, tokens, calendar events, renewals
   await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));

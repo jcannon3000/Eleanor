@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable } from "@workspace/db";
-import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent, deleteCalendarEvent } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
   CreateRitualBody,
@@ -248,6 +248,22 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
+  }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+
+  // Delete any Google Calendar events attached to this ritual's meetups
+  if (sessionUserId) {
+    const meetups = await db
+      .select({ googleCalendarEventId: meetupsTable.googleCalendarEventId })
+      .from(meetupsTable)
+      .where(eq(meetupsTable.ritualId, params.data.id));
+
+    await Promise.allSettled(
+      meetups
+        .filter((m) => m.googleCalendarEventId)
+        .map((m) => deleteCalendarEvent(sessionUserId, m.googleCalendarEventId!))
+    );
   }
 
   await db.delete(ritualsTable).where(eq(ritualsTable.id, params.data.id));
