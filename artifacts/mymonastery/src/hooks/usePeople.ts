@@ -5,6 +5,8 @@ export interface PersonSummary {
   email: string;
   sharedCircleCount: number;
   firstCircleDate: string;
+  maxSharedStreak: number;
+  score: number;
 }
 
 export interface SharedMeetup {
@@ -49,7 +51,12 @@ export interface PersonProfile {
   email: string;
   stats: {
     sharedCircleCount: number;
+    sharedPracticesCount: number;
     totalGatherings: number;
+    totalBloomWindows: number;
+    score: number;
+    currentBestStreak: number;
+    longestEverStreak: number;
     firstCircleDate: string | null;
   };
   sharedRituals: SharedRitual[];

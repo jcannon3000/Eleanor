@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, or, sql, inArray } from "drizzle-orm";
-import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable, momentPostsTable } from "@workspace/db";
+import { eq, desc, or, sql, inArray, and } from "drizzle-orm";
+import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable, momentWindowsTable } from "@workspace/db";
 import { computeStreak } from "../lib/streak";
 
 const router: IRouter = Router();
@@ -30,15 +30,15 @@ router.get("/people", async (req, res): Promise<void> => {
   }
 
   const { user: owner, rituals } = await getUserRituals(ownerId);
-
   const ownerEmail = owner?.email ?? "";
 
-  // Map email -> person summary
+  // Map email -> ritual info
   const map = new Map<string, {
     name: string;
     email: string;
     sharedCircleCount: number;
     firstCircleDate: Date;
+    sharedRitualIds: number[];
   }>();
 
   for (const ritual of rituals) {
@@ -48,6 +48,7 @@ router.get("/people", async (req, res): Promise<void> => {
       if (map.has(p.email)) {
         const existing = map.get(p.email)!;
         existing.sharedCircleCount++;
+        existing.sharedRitualIds.push(ritual.id);
         if (ritual.createdAt < existing.firstCircleDate) {
           existing.firstCircleDate = ritual.createdAt;
         }
@@ -57,40 +58,75 @@ router.get("/people", async (req, res): Promise<void> => {
           email: p.email,
           sharedCircleCount: 1,
           firstCircleDate: ritual.createdAt,
+          sharedRitualIds: [ritual.id],
         });
       }
     }
   }
 
-  // Enrich each person with max current streak from shared practices
-  const ownerTokenRows = await db.select().from(momentUserTokensTable)
+  // Owner's shared moment IDs
+  const ownerTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
+    .from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.email, ownerEmail));
   const ownerMomentIds = ownerTokenRows.map(t => t.momentId);
 
-  const peopleWithStreaks = await Promise.all(
+  const peopleEnriched = await Promise.all(
     Array.from(map.values()).map(async (p) => {
       let maxStreak = 0;
+      let score = 0;
+      let sharedMomentIds: number[] = [];
+
+      // Completed meetups across shared rituals
+      if (p.sharedRitualIds.length > 0) {
+        const completedRows = await db
+          .select({ count: sql<number>`cast(count(*) as int)` })
+          .from(meetupsTable)
+          .where(and(
+            inArray(meetupsTable.ritualId, p.sharedRitualIds),
+            eq(meetupsTable.status, "completed")
+          ));
+        score += completedRows[0]?.count ?? 0;
+      }
+
+      // Shared practices
       if (ownerMomentIds.length > 0) {
-        const personTokenRows = await db.select().from(momentUserTokensTable)
+        const personTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
+          .from(momentUserTokensTable)
           .where(eq(momentUserTokensTable.email, p.email));
-        const personMomentIds = new Set(personTokenRows.map(t => t.momentId));
-        const sharedMomentIds = ownerMomentIds.filter(id => personMomentIds.has(id));
+        const personMomentIdSet = new Set(personTokenRows.map(t => t.momentId));
+        sharedMomentIds = ownerMomentIds.filter(id => personMomentIdSet.has(id));
+
         if (sharedMomentIds.length > 0) {
-          const sharedMoments = await db.select({ currentStreak: sharedMomentsTable.currentStreak })
+          const sharedMoments = await db
+            .select({ currentStreak: sharedMomentsTable.currentStreak })
             .from(sharedMomentsTable)
             .where(inArray(sharedMomentsTable.id, sharedMomentIds));
           maxStreak = Math.max(0, ...sharedMoments.map(m => m.currentStreak ?? 0));
+
+          // Bloom windows = shared practice sessions done together
+          const bloomRows = await db
+            .select({ count: sql<number>`cast(count(*) as int)` })
+            .from(momentWindowsTable)
+            .where(and(
+              inArray(momentWindowsTable.momentId, sharedMomentIds),
+              eq(momentWindowsTable.status, "bloom")
+            ));
+          score += bloomRows[0]?.count ?? 0;
         }
       }
+
       return {
-        ...p,
+        name: p.name,
+        email: p.email,
+        sharedCircleCount: p.sharedCircleCount,
         firstCircleDate: p.firstCircleDate.toISOString(),
         maxSharedStreak: maxStreak,
+        score,
       };
     })
   );
 
-  res.json(peopleWithStreaks);
+  res.json(peopleEnriched);
 });
 
 // GET /api/people/:email?ownerId=N
@@ -113,27 +149,29 @@ router.get("/people/:email", async (req, res): Promise<void> => {
   });
 
   // Find shared practices (moments) where both owner and person are members
-  const ownerTokenRows = await db.select({ momentId: momentUserTokensTable.momentId, name: momentUserTokensTable.name })
+  const ownerTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
     .from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.email, ownerEmail));
   const ownerMomentIds = ownerTokenRows.map(t => t.momentId);
 
   let sharedPractices: Array<{
-    id: number; name: string; currentStreak: number; totalBlooms: number;
-    frequency: string; templateType: string | null; createdAt: string;
+    id: number; name: string; currentStreak: number; longestStreak: number;
+    totalBlooms: number; frequency: string; templateType: string | null; createdAt: string;
   }> = [];
+  let sharedMomentIds: number[] = [];
 
   if (ownerMomentIds.length > 0) {
     const personTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
       .from(momentUserTokensTable)
       .where(eq(momentUserTokensTable.email, email));
     const personMomentIdSet = new Set(personTokenRows.map(t => t.momentId));
-    const sharedMomentIds = ownerMomentIds.filter(id => personMomentIdSet.has(id));
+    sharedMomentIds = ownerMomentIds.filter(id => personMomentIdSet.has(id));
     if (sharedMomentIds.length > 0) {
       const moments = await db.select({
         id: sharedMomentsTable.id,
         name: sharedMomentsTable.name,
         currentStreak: sharedMomentsTable.currentStreak,
+        longestStreak: sharedMomentsTable.longestStreak,
         totalBlooms: sharedMomentsTable.totalBlooms,
         frequency: sharedMomentsTable.frequency,
         templateType: sharedMomentsTable.templateType,
@@ -148,7 +186,7 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     return;
   }
 
-  // Resolve display name from rituals or moment_user_tokens
+  // Resolve display name
   let personName = email;
   for (const ritual of sharedRituals) {
     const match = (ritual.participants as Participant[]).find(p => p.email === email);
@@ -200,9 +238,37 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     })
   );
 
+  // Aggregate stats
   const totalGatherings = enriched.reduce(
     (sum, { meetups }) => sum + meetups.filter(m => m.status === "completed").length,
     0
+  );
+
+  let totalBloomWindows = 0;
+  if (sharedMomentIds.length > 0) {
+    const bloomRows = await db
+      .select({ count: sql<number>`cast(count(*) as int)` })
+      .from(momentWindowsTable)
+      .where(and(
+        inArray(momentWindowsTable.momentId, sharedMomentIds),
+        eq(momentWindowsTable.status, "bloom")
+      ));
+    totalBloomWindows = bloomRows[0]?.count ?? 0;
+  }
+
+  const score = totalGatherings + totalBloomWindows;
+
+  // Best current streak across all shared traditions + practices
+  const currentBestStreak = Math.max(
+    0,
+    ...enriched.map(e => e.ritual.streak),
+    ...sharedPractices.map(p => p.currentStreak)
+  );
+  // Best all-time streak (traditions only have current; practices have longestStreak)
+  const longestEverStreak = Math.max(
+    0,
+    ...enriched.map(e => e.ritual.streak),
+    ...sharedPractices.map(p => p.longestStreak)
   );
 
   const firstCircleDate = sharedRituals.length > 0
@@ -214,7 +280,12 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     email,
     stats: {
       sharedCircleCount: sharedRituals.length,
+      sharedPracticesCount: sharedPractices.length,
       totalGatherings,
+      totalBloomWindows,
+      score,
+      currentBestStreak,
+      longestEverStreak,
       firstCircleDate,
     },
     sharedRituals: enriched,

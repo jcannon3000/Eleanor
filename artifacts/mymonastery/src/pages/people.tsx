@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Sprout, ArrowRight } from "lucide-react";
-import { formatDistanceToNow, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeople } from "@/hooks/usePeople";
 import { Layout } from "@/components/layout";
@@ -140,13 +139,13 @@ export default function People() {
                             : `${person.sharedCircleCount} shared traditions`}
                         </p>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
                             <Sprout size={11} />
-                            Together {formatDistanceToNow(parseISO(person.firstCircleDate), { addSuffix: false })}
-                          </p>
-                          {(person as { maxSharedStreak?: number }).maxSharedStreak ? (
+                            <span className="font-semibold text-foreground/70">{person.score ?? 0}</span> together
+                          </span>
+                          {person.maxSharedStreak ? (
                             <span className="text-xs text-[#6B8F71] font-medium">
-                              🔥 {(person as { maxSharedStreak?: number }).maxSharedStreak} streak
+                              🔥 {person.maxSharedStreak} streak
                             </span>
                           ) : null}
                         </div>

@@ -117,6 +117,11 @@ export default function PersonProfile() {
               <h1 className="font-serif text-3xl text-foreground mb-1">{person.name}</h1>
               <p className="text-sm text-muted-foreground mb-4">{person.email}</p>
 
+              <p className="text-xs text-muted-foreground mb-2">
+                {person.stats.sharedCircleCount > 0 && `${person.stats.sharedCircleCount} tradition${person.stats.sharedCircleCount === 1 ? "" : "s"}`}
+                {person.stats.sharedCircleCount > 0 && person.stats.sharedPracticesCount > 0 && " · "}
+                {person.stats.sharedPracticesCount > 0 && `${person.stats.sharedPracticesCount} practice${person.stats.sharedPracticesCount === 1 ? "" : "s"}`}
+              </p>
               {person.stats.firstCircleDate && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                   <Sprout size={13} />
@@ -133,21 +138,24 @@ export default function PersonProfile() {
           <div className="mt-8 grid grid-cols-3 gap-4">
             {[
               {
-                value: person.stats.sharedCircleCount,
-                label: person.stats.sharedCircleCount === 1 ? "shared tradition" : "shared traditions",
+                value: person.stats.score,
+                label: "done together",
+                emoji: "🌿",
               },
               {
-                value: person.stats.totalGatherings,
-                label: person.stats.totalGatherings === 1 ? "gathering together" : "gatherings together",
+                value: person.stats.currentBestStreak > 0 ? person.stats.currentBestStreak : "—",
+                label: "current streak",
+                emoji: "🔥",
               },
               {
-                value: weeksTogetherCount > 0 ? `${weeksTogetherCount}w` : "—",
-                label: "growing together",
+                value: person.stats.longestEverStreak > 0 ? person.stats.longestEverStreak : "—",
+                label: "best ever",
+                emoji: "⭐",
               },
             ].map(stat => (
               <div key={stat.label} className="text-center px-3 py-4 rounded-2xl bg-background border border-border/60">
                 <p className="font-serif text-2xl text-foreground">{stat.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                <p className="text-xs text-muted-foreground mt-1">{stat.emoji} {stat.label}</p>
               </div>
             ))}
           </div>
