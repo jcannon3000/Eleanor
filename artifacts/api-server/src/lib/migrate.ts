@@ -1,9 +1,19 @@
 import { pool } from "@workspace/db";
 import { logger } from "./logger";
 
+async function run(client: Awaited<ReturnType<typeof pool.connect>>, sql: string) {
+  try {
+    await client.query(sql);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ msg }, `Migration statement warning: ${sql.slice(0, 80).trim()}`);
+  }
+}
+
 export async function migrate() {
   const client = await pool.connect();
   try {
+    // ── Core tables ──────────────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_sessions (
         sid VARCHAR NOT NULL COLLATE "default",
@@ -88,7 +98,10 @@ export async function migrate() {
         responded_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
 
+    // ── shared_moments: create with all columns ───────────────────────────────
+    await client.query(`
       CREATE TABLE IF NOT EXISTS shared_moments (
         id SERIAL PRIMARY KEY,
         ritual_id INTEGER REFERENCES rituals(id) ON DELETE CASCADE,
@@ -127,29 +140,32 @@ export async function migrate() {
         commitment_end_date TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
 
-      -- Add missing columns to shared_moments if they exist in schema but not table
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS template_type TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_topic TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_source TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_full_text TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS timer_duration_minutes INTEGER NOT NULL DEFAULT 10;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS day_of_week TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC';
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS time_of_day TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS frequency_type TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS frequency_days_per_week INTEGER;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS practice_days TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS contemplative_duration_minutes INTEGER;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_from TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_intention TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_frequency TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_date TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_day TEXT;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_day_of_month INTEGER;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_duration INTEGER;
-      ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_end_date TEXT;
+    // ── shared_moments: add missing columns one-by-one (safe if already exist) ─
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS template_type TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_topic TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_source TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS intercession_full_text TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS timer_duration_minutes INTEGER NOT NULL DEFAULT 10`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS day_of_week TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC'`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS time_of_day TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS frequency_type TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS frequency_days_per_week INTEGER`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS practice_days TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS contemplative_duration_minutes INTEGER`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_from TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_intention TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_frequency TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_date TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_day TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS fasting_day_of_month INTEGER`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_duration INTEGER`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_end_date TEXT`);
 
+    // ── Dependent tables ─────────────────────────────────────────────────────
+    await client.query(`
       CREATE TABLE IF NOT EXISTS moment_renewals (
         id SERIAL PRIMARY KEY,
         moment_id INTEGER NOT NULL REFERENCES shared_moments(id) ON DELETE CASCADE,
@@ -182,12 +198,14 @@ export async function migrate() {
         calendar_connected BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
 
-      -- Add missing columns to moment_user_tokens if table already existed
-      ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS personal_time TEXT;
-      ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS personal_timezone TEXT;
-      ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS calendar_connected BOOLEAN NOT NULL DEFAULT false;
+    // ── moment_user_tokens: add missing columns ───────────────────────────────
+    await run(client, `ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS personal_time TEXT`);
+    await run(client, `ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS personal_timezone TEXT`);
+    await run(client, `ALTER TABLE moment_user_tokens ADD COLUMN IF NOT EXISTS calendar_connected BOOLEAN NOT NULL DEFAULT false`);
 
+    await client.query(`
       CREATE TABLE IF NOT EXISTS moment_calendar_events (
         id SERIAL PRIMARY KEY,
         shared_moment_id INTEGER NOT NULL REFERENCES shared_moments(id) ON DELETE CASCADE,
@@ -223,6 +241,7 @@ export async function migrate() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
     logger.info("Database migration completed successfully");
   } catch (err) {
     logger.error({ err }, "Database migration failed");
