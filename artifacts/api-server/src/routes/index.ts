@@ -8,6 +8,7 @@ import contactsRouter from "./contacts";
 import scheduleRouter from "./schedule";
 import inviteRouter from "./invite";
 import momentsRouter from "./moments";
+import prayerRouter from "./prayer";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(contactsRouter);
 router.use(scheduleRouter);
 router.use(inviteRouter);
 router.use(momentsRouter);
+router.use(prayerRouter);
 
 export default router;

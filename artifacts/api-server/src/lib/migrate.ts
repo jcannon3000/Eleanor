@@ -248,6 +248,28 @@ export async function migrate() {
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET DEFAULT 30`);
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET NOT NULL`);
 
+    // ── Prayer tables ────────────────────────────────────────────────────────
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS prayer_requests (
+        id SERIAL PRIMARY KEY,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        is_answered BOOLEAN NOT NULL DEFAULT false,
+        answered_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS prayer_responses (
+        id SERIAL PRIMARY KEY,
+        request_id INTEGER NOT NULL REFERENCES prayer_requests(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        note TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(request_id, user_id)
+      )
+    `);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns

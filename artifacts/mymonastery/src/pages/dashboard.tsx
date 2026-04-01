@@ -6,6 +6,7 @@ import { useListRituals } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
+import { PrayerSection } from "@/components/prayer-section";
 import { apiRequest } from "@/lib/queryClient";
 import { milestoneLabel, milestoneProgress } from "@/lib/utils";
 import { format, isToday, isTomorrow, isThisWeek, isPast, parseISO, addDays, startOfDay } from "date-fns";
@@ -558,6 +559,9 @@ export default function Dashboard() {
 
           </motion.div>
         )}
+
+        {/* Prayer Requests */}
+        <PrayerSection />
 
         {/* FAB */}
         <FAB />
