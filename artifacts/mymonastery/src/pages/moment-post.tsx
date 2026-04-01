@@ -706,10 +706,13 @@ export default function MomentPostPage() {
     }
     return true;
   })();
-  // BCP offices (Morning/Evening Prayer) are gated by practice day — liturgy is tied to the office cycle.
-  // All other spiritual practices (contemplative, intercession, fasting, custom) are always open:
-  // the calendar reminder is a nudge, not a gate — users log when they actually practice.
-  const effectiveWindowOpen = isBcp ? isPracticeDay : (isSpiritual ? true : windowOpen);
+  // BCP offices: gated by practice day.
+  // Intercession: gated by time-of-day window (server returns accurate windowOpen).
+  // Other spiritual practices (contemplative, fasting, custom): always open — nudge, not gate.
+  const effectiveWindowOpen = isBcp ? isPracticeDay
+    : moment.templateType === "intercession" ? windowOpen
+    : isSpiritual ? true
+    : windowOpen;
 
   // BCP only — show "rests today" when it's not a scheduled practice day
   if (isBcp && !isPracticeDay && !alreadyPosted) {

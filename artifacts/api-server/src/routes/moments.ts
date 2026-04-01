@@ -97,6 +97,21 @@ function computeWindowOpen(moment: { scheduledTime: string; windowMinutes: numbe
   return isWindowOpen(moment);
 }
 
+// ─── Intercession window: open during a generous band around time-of-day ─────
+// Intercession stores scheduledTime="00:00"/windowMinutes=1440 so we gate by
+// a real-world time-of-day band instead of the raw window.
+const TOD_WINDOW_RANGES: Record<string, [number, number]> = {
+  "early-morning": [5, 9], "morning": [6, 11], "midday": [10, 14],
+  "afternoon": [12, 18], "late-afternoon": [14, 20], "evening": [17, 23], "night": [20, 24],
+};
+function isIntercessionWindowOpen(timeOfDay: string | null | undefined, timezone: string): boolean {
+  if (!timeOfDay) return true; // no time set → always accessible
+  const range = TOD_WINDOW_RANGES[timeOfDay];
+  if (!range) return true;
+  const { hour } = getCurrentTimeInTz(timezone);
+  return hour >= range[0] && hour < range[1];
+}
+
 // ─── Minutes remaining in window (timezone-aware) ────────────────────────────
 function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): number {
   const tz = moment.timezone || "UTC";
@@ -504,9 +519,18 @@ router.post("/moments", async (req, res): Promise<void> => {
 
   const tz = timezone || "UTC";
   const [hh, mm] = scheduledTime.split(":").map(Number);
-  // Spiritual practices have scheduledTime="00:00"; use 8 AM as default for calendar
-  const hhEff = (hh === 0 && mm === 0 && isSpiritual) ? 8 : hh;
-  const mmEff = (hh === 0 && mm === 0 && isSpiritual) ? 0 : mm;
+  // Map time-of-day label to a representative clock hour for calendar events
+  const TOD_CLOCK_HOURS: Record<string, [number, number]> = {
+    "early-morning": [6, 0], "morning": [8, 0], "midday": [12, 0],
+    "afternoon": [14, 0], "late-afternoon": [16, 0], "evening": [19, 0], "night": [21, 0],
+  };
+  // Spiritual practices store scheduledTime="00:00"; derive actual hour from timeOfDay
+  const hhEff = (hh === 0 && mm === 0 && isSpiritual)
+    ? (TOD_CLOCK_HOURS[timeOfDay ?? ""] ?? TOD_CLOCK_HOURS["morning"])[0]
+    : hh;
+  const mmEff = (hh === 0 && mm === 0 && isSpiritual)
+    ? (TOD_CLOCK_HOURS[timeOfDay ?? ""] ?? TOD_CLOCK_HOURS["morning"])[1]
+    : mm;
   const { startLocalStr, endLocalStr } = buildLocalEventTimes(hhEff, mmEff, tz, practiceEventDurationMins(templateType));
   const startDate = new Date(); // fallback
 
@@ -1088,7 +1112,10 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
   const allMembers = await db.select().from(momentUserTokensTable)
     .where(eq(momentUserTokensTable.momentId, moment.id));
 
-  const windowOpen = computeWindowOpen(moment);
+  // Intercession uses a time-of-day band instead of raw window minutes
+  const windowOpen = moment.templateType === "intercession"
+    ? isPracticeDayInTz(moment) && isIntercessionWindowOpen(moment.timeOfDay, moment.timezone || "UTC")
+    : computeWindowOpen(moment);
   const minsLeft = minutesRemaining(moment);
 
   // Build member presence: who has prayed today
