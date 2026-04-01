@@ -166,7 +166,11 @@ async function evaluateWindow(momentId: number, windowDate: string) {
     .where(and(eq(momentPostsTable.momentId, momentId), eq(momentPostsTable.windowDate, windowDate)));
 
   const postCount = posts.length;
-  const status = postCount >= 2 ? "bloom" : postCount === 1 ? "solo" : "wither";
+  const allMembersForMoment = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+  const groupSize = allMembersForMoment.length;
+  const bloomThreshold = Math.max(2, Math.ceil(groupSize / 2));
+  const status = postCount >= bloomThreshold ? "bloom" : postCount === 1 ? "solo" : "wither";
 
   // Upsert window record
   const existing = await db.select().from(momentWindowsTable)
@@ -864,6 +868,24 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     : null;
   const isCreator = myTokenRow[0]?.email.toLowerCase() === creatorToken?.email.toLowerCase();
 
+  // Personal streak: consecutive closed windows (newest first) where current user posted
+  const myUserTokenValue = myTokenRow[0]?.userToken ?? null;
+  const myPostDates = new Set(
+    allPosts.filter(p => p.userToken === myUserTokenValue).map(p => p.windowDate)
+  );
+  // Include today if I've already logged
+  const todayILogged = myPostDates.has(windowDate);
+  let myStreak = todayILogged ? 1 : 0;
+  // Walk through past closed windows in order
+  for (const w of sortedWindows) {
+    if (w.windowDate === windowDate) continue; // skip today (counted above)
+    if (myPostDates.has(w.windowDate)) {
+      myStreak++;
+    } else {
+      break;
+    }
+  }
+
   res.json({
     moment,
     members: allMembers.map(t => ({ name: t.name, email: t.email })),
@@ -884,6 +906,7 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     minutesLeft: minsLeft,
     todayLogs,
     isCreator,
+    myStreak,
   });
 });
 
@@ -1244,10 +1267,11 @@ router.post("/moment/:momentToken/:userToken/post", async (req, res): Promise<vo
       memberCount,
     });
 
-    // Evaluate window: either the window has closed, OR all members have logged (bloom condition met)
+    // Evaluate window: either the window has closed, OR 50% of group has logged (bloom condition met)
     const windowIsStillOpen = isWindowOpen(moment);
-    const allLogged = allTodayPosts.length >= memberCount && memberCount >= 2;
-    if (!windowIsStillOpen || allLogged) {
+    const bloomThreshold50 = Math.max(2, Math.ceil(memberCount / 2));
+    const halfLogged = allTodayPosts.length >= bloomThreshold50 && memberCount >= 2;
+    if (!windowIsStillOpen || halfLogged) {
       evaluateWindow(moment.id, windowDate).catch(err =>
         console.warn("Window evaluation failed:", err?.message ?? err)
       );

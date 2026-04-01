@@ -68,6 +68,7 @@ interface MomentDetail {
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
+  myStreak: number;
   myUserToken: string | null;
   myPersonalTime: string | null;
   myPersonalTimezone: string | null;
@@ -531,26 +532,28 @@ export default function MomentDetail() {
           </motion.div>
         )}
 
-        {/* Stats — optimistic: bump streak/blooms immediately when all members have logged today */}
+        {/* Stats: Your streak / Group streak / Group best */}
         {(() => {
-          const todayBloomed = todayPostCount >= memberCount && memberCount >= 2;
-          const displayStreak = todayBloomed && moment.currentStreak === 0 ? 1 : moment.currentStreak;
-          const displayLongest = Math.max(displayStreak, moment.longestStreak);
-          const goalHit = todayBloomed && moment.goalDays > 0 && displayStreak >= moment.goalDays;
-          const displayBlooms = goalHit ? moment.totalBlooms + 1 : moment.totalBlooms;
+          const bloomThreshold = Math.max(2, Math.ceil(memberCount / 2));
+          const todayBloomed = todayPostCount >= bloomThreshold && memberCount >= 2;
+          const groupStreak = todayBloomed && moment.currentStreak === 0 ? 1 : moment.currentStreak;
+          const groupBest = Math.max(groupStreak, moment.longestStreak);
+          // Personal: if I've logged today and myStreak is 0, show optimistic 1
+          const iLoggedToday = todayPostCount >= 1; // approximate — server sets myStreak accurately
+          const displayMyStreak = myStreak > 0 ? myStreak : (iLoggedToday ? 1 : 0);
           return (
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">{displayStreak}</p>
-                <p className="text-xs text-muted-foreground mt-1">🔥 Current streak</p>
+                <p className="text-2xl font-bold text-foreground">{displayMyStreak}</p>
+                <p className="text-xs text-muted-foreground mt-1">🙏 Your streak</p>
               </div>
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">{displayLongest}</p>
-                <p className="text-xs text-muted-foreground mt-1">⭐ Best streak</p>
+                <p className="text-2xl font-bold text-foreground">{groupStreak}</p>
+                <p className="text-xs text-muted-foreground mt-1">🔥 Group streak</p>
               </div>
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">{displayBlooms}</p>
-                <p className="text-xs text-muted-foreground mt-1">🌸 Blooms</p>
+                <p className="text-2xl font-bold text-foreground">{groupBest}</p>
+                <p className="text-xs text-muted-foreground mt-1">⭐ Group best</p>
               </div>
             </div>
           );

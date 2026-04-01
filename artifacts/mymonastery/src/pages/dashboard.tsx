@@ -164,7 +164,8 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
   const memberNames = moment.members.slice(0, 3).map(m => (m.name ?? m.email).split(" ")[0]).join(", ");
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
   const templateEmoji = TEMPLATE_EMOJI[moment.templateType ?? "custom"] ?? "✨";
-  const todayBloomed = moment.todayPostCount >= moment.memberCount && moment.memberCount >= 2;
+  const bloomThreshold = Math.max(2, Math.ceil(moment.memberCount / 2));
+  const todayBloomed = moment.todayPostCount >= bloomThreshold && moment.memberCount >= 2;
   const effectiveStreak = moment.currentStreak + (todayBloomed && moment.currentStreak === 0 ? 1 : 0);
   const goalDays = moment.goalDays ?? 0;
   const hasGoal = goalDays > 0;
