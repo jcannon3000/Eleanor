@@ -576,7 +576,12 @@ export default function MomentDetail() {
             ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000))
             : null;
           const totalDays = dur;
-          const daysDone = daysLeft !== null ? Math.max(0, totalDays - daysLeft) : moment.totalBlooms;
+          // Use actual streak (optimistic) as days-done — calendar-time approach undercounts
+          const todayBloomed2 = todayPostCount >= memberCount && memberCount >= 2;
+          const daysDone = Math.min(
+            moment.currentStreak + (todayBloomed2 ? 1 : 0),
+            totalDays
+          );
           const progressPct = totalDays > 0 ? Math.min(100, (daysDone / totalDays) * 100) : 0;
           const progressLabel =
             progressPct === 0   ? "Just planted" :
