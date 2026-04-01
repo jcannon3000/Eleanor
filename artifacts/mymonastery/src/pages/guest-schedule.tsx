@@ -35,6 +35,7 @@ export default function GuestSchedule() {
   const [guestEmail, setGuestEmail] = useState(emailFromUrl);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [suggestedTime, setSuggestedTime] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -78,6 +79,7 @@ export default function GuestSchedule() {
           guestEmail: guestEmail.trim() || undefined,
           chosenTime: unavailable ? undefined : selectedTime,
           unavailable,
+          suggestedTime: unavailable && suggestedTime.trim() ? suggestedTime.trim() : undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -134,7 +136,9 @@ export default function GuestSchedule() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               {unavailable
-                ? "Your response has been noted. Hopefully next time works."
+                ? suggestedTime.trim()
+                  ? "Your suggestion has been passed along. Hopefully a new time works."
+                  : "Your response has been noted. Hopefully next time works."
                 : "This is how traditions begin."}
             </p>
           </div>
@@ -241,7 +245,7 @@ export default function GuestSchedule() {
           {/* Can't make it toggle */}
           <button
             type="button"
-            onClick={() => { setUnavailable(!unavailable); setSelectedTime(null); }}
+            onClick={() => { setUnavailable(!unavailable); setSelectedTime(null); setSuggestedTime(""); }}
             className={`w-full py-3 px-4 rounded-xl border text-sm font-medium transition-all ${
               unavailable
                 ? "border-destructive/40 bg-destructive/5 text-destructive"
@@ -250,6 +254,31 @@ export default function GuestSchedule() {
           >
             {unavailable ? "✓ Marked as unavailable — click to undo" : "I can't make any of these"}
           </button>
+
+          {/* Suggest another time */}
+          {unavailable && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-card rounded-2xl p-5 border border-card-border space-y-2"
+            >
+              <label className="block text-sm font-medium text-foreground">
+                Suggest a time that works for you{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={suggestedTime}
+                onChange={e => setSuggestedTime(e.target.value)}
+                placeholder="e.g. Saturdays after 4pm, weekday mornings…"
+                className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                {scheduleData?.organizerName} will see your suggestion.
+              </p>
+            </motion.div>
+          )}
 
           {/* Submit */}
           <button

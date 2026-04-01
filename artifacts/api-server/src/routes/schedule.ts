@@ -139,6 +139,7 @@ const RespondBody = z.object({
   guestEmail: z.string().optional(),
   chosenTime: ISOTimestamp.optional(),
   unavailable: z.boolean().optional(),
+  suggestedTime: z.string().optional(),
 });
 
 router.post("/schedule/:token/respond", async (req, res): Promise<void> => {
@@ -164,11 +165,17 @@ router.post("/schedule/:token/respond", async (req, res): Promise<void> => {
     return;
   }
 
+  // If unavailable but a suggestion was provided, store it in chosenTime prefixed
+  const chosenTime = parsed.data.chosenTime
+    ?? (parsed.data.unavailable && parsed.data.suggestedTime?.trim()
+        ? `suggest: ${parsed.data.suggestedTime.trim()}`
+        : null);
+
   await db.insert(scheduleResponsesTable).values({
     ritualId: ritual.id,
     guestName: parsed.data.guestName.trim(),
     guestEmail: parsed.data.guestEmail?.trim() ?? null,
-    chosenTime: parsed.data.chosenTime ?? null,
+    chosenTime,
     unavailable: parsed.data.unavailable ? 1 : 0,
   });
 
