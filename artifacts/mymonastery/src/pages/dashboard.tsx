@@ -353,6 +353,8 @@ export default function Dashboard() {
   const isLoading = ritualsLoading || momentsLoading;
   const moments: MomentData[] = momentsData?.moments ?? [];
   const gatherings = rituals ?? [];
+  const myCircles = gatherings.filter(r => r.ownerId === user?.id);
+  const invitedCircles = gatherings.filter(r => r.ownerId !== user?.id);
 
   const today = new Date();
   const todayStr = format(today, "EEEE, d MMMM");
@@ -509,6 +511,40 @@ export default function Dashboard() {
                   {unscheduledGatherings.map(r => (
                     <GatheringCard key={`ug-${r.id}`} ritual={r} dim={false} />
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* ── INVITED CIRCLES ── */}
+            {invitedCircles.length > 0 && (
+              <>
+                <TimeAnchor label="Circles you've joined" />
+                <div className="space-y-3">
+                  {invitedCircles.map(r => {
+                    const organizer = (r.participants as Array<{ name: string; email: string }>)?.[0];
+                    return (
+                      <Link key={`ic-${r.id}`} href={`/ritual/${r.id}`}>
+                        <div className="relative flex rounded-2xl overflow-hidden border border-border/60 bg-[#EEF3EF] hover:shadow-md transition-all duration-200">
+                          <div className="w-1 flex-shrink-0 bg-[#6B8F71]" />
+                          <div className="flex-1 p-4">
+                            <div className="flex items-start justify-between mb-1">
+                              <span className="text-base font-semibold text-foreground leading-tight">{r.name}</span>
+                              <span className="text-[11px] font-medium text-muted-foreground/70 bg-white/60 rounded-full px-2 py-0.5 border border-border/40 ml-2 shrink-0">Invited</span>
+                            </div>
+                            {organizer && (
+                              <p className="text-sm text-muted-foreground mb-1">Organized by {organizer.name.split(" ")[0]}</p>
+                            )}
+                            {r.nextMeetupDate && (
+                              <p className="text-sm text-foreground/80">
+                                {dayLabel(parseISO(r.nextMeetupDate))} · {format(parseISO(r.nextMeetupDate), "h:mm a")}
+                                {r.location && <> · {r.location}</>}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </>
             )}

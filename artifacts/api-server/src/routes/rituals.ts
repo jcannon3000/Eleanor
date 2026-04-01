@@ -1,6 +1,6 @@
 import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
 import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent, deleteCalendarEvent, getCalendarEventAttendees, addAttendeesToCalendarEvent } from "../lib/calendar";
@@ -45,11 +45,27 @@ async function enrichRitual(ritual: typeof ritualsTable.$inferSelect, meetups: t
 router.get("/rituals", async (req, res): Promise<void> => {
   const rawOwnerId = req.query.ownerId;
   const ownerId = rawOwnerId !== undefined ? parseInt(String(rawOwnerId), 10) : null;
-  
+
+  // Also fetch rituals where the user appears as a participant (by email)
+  let userEmail: string | null = null;
+  if (ownerId !== null && !isNaN(ownerId)) {
+    const [u] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, ownerId));
+    userEmail = u?.email ?? null;
+  }
+
+  const whereClause = ownerId !== null && !isNaN(ownerId)
+    ? userEmail
+      ? or(
+          eq(ritualsTable.ownerId, ownerId),
+          sql`${ritualsTable.participants} @> ${JSON.stringify([{ email: userEmail }])}::jsonb`
+        )
+      : eq(ritualsTable.ownerId, ownerId)
+    : undefined;
+
   const rituals = await db
     .select()
     .from(ritualsTable)
-    .where(ownerId !== null && !isNaN(ownerId) ? eq(ritualsTable.ownerId, ownerId) : undefined)
+    .where(whereClause)
     .orderBy(desc(ritualsTable.createdAt));
     
   const enriched = await Promise.all(
