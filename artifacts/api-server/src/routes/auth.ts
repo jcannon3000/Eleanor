@@ -1,3 +1,4 @@
+import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import passport from "passport";
 import { Strategy as GoogleStrategy, type Profile } from "passport-google-oauth20";
@@ -9,10 +10,8 @@ const router: IRouter = Router();
 const GOOGLE_CONFIGURED =
   !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
 
-const devDomain = process.env["REPLIT_DEV_DOMAIN"];
-const callbackURL = devDomain
-  ? `https://${devDomain}/api/auth/google/callback`
-  : process.env["GOOGLE_REDIRECT_URI"] ?? "http://localhost:8080/api/auth/google/callback";
+const callbackURL = process.env["GOOGLE_REDIRECT_URI"] ?? "http://localhost:3001/api/auth/google/callback";
+const frontendURL = getFrontendUrl();
 
 if (GOOGLE_CONFIGURED) {
   passport.use(
@@ -99,12 +98,12 @@ router.get(
   "/auth/google/callback",
   (req, res, next) => {
     if (!GOOGLE_CONFIGURED) { res.redirect("/?error=auth_failed"); return; }
-    passport.authenticate("google", { failureRedirect: "/?error=auth_failed" })(req, res, next);
+    passport.authenticate("google", { failureRedirect: `${frontendURL}/?error=auth_failed` })(req, res, next);
   },
   (req, res) => {
     // Explicitly save session before redirect to avoid race condition
     req.session.save(() => {
-      res.redirect("/dashboard");
+      res.redirect(`${frontendURL}/dashboard`);
     });
   }
 );

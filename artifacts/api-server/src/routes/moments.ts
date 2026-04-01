@@ -1,3 +1,4 @@
+import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -280,9 +281,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   });
 
   // Create moment_user_tokens for each member
-  const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
-    ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
-    : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+  const baseUrl = `${getFrontendUrl()}/moment`;
 
   const memberTokenRows = uniqueMembers.map(m => ({
     momentId: moment.id,
@@ -464,9 +463,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     return true;
   });
 
-  const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
-    ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
-    : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+  const baseUrl = `${getFrontendUrl()}/moment`;
 
   const memberTokenRows = uniqueMembers.map(m => ({
     momentId: moment.id,
@@ -654,9 +651,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   }
 
   function buildFastingDescription(memberToken: string, inviterName: string): string {
-    const baseUrl2 = process.env["REPLIT_DEV_DOMAIN"]
-      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
-      : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+    const baseUrl2 = `${getFrontendUrl()}/moment`;
     const personalLink = `${baseUrl2}/${momentToken}/${memberToken}`;
     return [
       `${inviterName} invited you to fast together.`,
@@ -942,9 +937,7 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
         .where(eq(usersTable.email, organizerToken.email));
 
       if (organizer?.googleAccessToken) {
-        const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
-          ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
-          : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+        const baseUrl = `${getFrontendUrl()}/moment`;
 
         const [hh, mm] = moment.scheduledTime.split(":").map(Number);
         const startDate = new Date();
@@ -1504,9 +1497,7 @@ router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
       }
     }
 
-    const baseUrl = process.env["REPLIT_DEV_DOMAIN"]
-      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}/moment`
-      : `http://localhost:${process.env["PORT"] ?? 3001}/moment`;
+    const baseUrl = `${getFrontendUrl()}/moment`;
 
     res.status(201).json({
       userToken: tokenRow.userToken,

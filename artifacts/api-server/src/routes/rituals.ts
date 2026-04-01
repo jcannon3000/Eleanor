@@ -1,3 +1,4 @@
+import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -652,9 +653,7 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
   const existingPlanned = existingMeetups.find((m) => m.status === "planned" && m.googleCalendarEventId);
 
   const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
-  const appBase = process.env["REPLIT_DEV_DOMAIN"]
-    ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
-    : "http://localhost:23896";
+  const appBase = getFrontendUrl();
 
   // Upsert invite tokens for each participant (idempotent — keeps existing tokens)
   const inviteLinks: Array<{ email: string; name: string; token: string; url: string }> = [];
@@ -1124,9 +1123,7 @@ router.post("/rituals/:id/invite", async (req, res): Promise<void> => {
     await db.update(ritualsTable).set({ participants: merged }).where(eq(ritualsTable.id, ritualId));
 
     // Add invite tokens for new participants
-    const appBase = process.env["REPLIT_DEV_DOMAIN"]
-      ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
-      : "http://localhost:23896";
+    const appBase = getFrontendUrl();
     for (const p of newParts) {
       const existingToken = await db.select().from(inviteTokensTable)
         .where(eq(inviteTokensTable.ritualId, ritualId));
