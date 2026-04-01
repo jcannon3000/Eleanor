@@ -242,6 +242,12 @@ export async function migrate() {
       );
     `);
 
+    // Fix constraints that differ from old migration to current schema
+    await run(client, `ALTER TABLE shared_moments ALTER COLUMN ritual_id DROP NOT NULL`);
+    await run(client, `ALTER TABLE shared_moments ALTER COLUMN intention SET DEFAULT ''`);
+    await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET DEFAULT 30`);
+    await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET NOT NULL`);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
