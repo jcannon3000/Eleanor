@@ -2184,7 +2184,9 @@ export default function MomentNew() {
                       : "Continue →"}
               </button>
               {plantMutation.isError && (
-                <p className="text-xs text-destructive text-center mt-2">Something went wrong. Please try again.</p>
+                <p className="text-xs text-destructive text-center mt-2">
+                  {plantMutation.error instanceof Error ? plantMutation.error.message : "Something went wrong. Please try again."}
+                </p>
               )}
             </div>
           )}

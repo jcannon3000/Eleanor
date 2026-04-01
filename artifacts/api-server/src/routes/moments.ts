@@ -726,8 +726,9 @@ router.post("/moments", async (req, res): Promise<void> => {
     gcalCreated: !!gcalEventId,
   });
   } catch (err) {
-    console.error("POST /api/moments error:", err);
-    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("POST /api/moments error:", msg);
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 
