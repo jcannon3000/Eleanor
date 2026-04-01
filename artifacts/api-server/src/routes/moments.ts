@@ -1078,7 +1078,7 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
   const ritual = moment.ritualId
     ? (await db.select().from(ritualsTable).where(eq(ritualsTable.id, moment.ritualId)))[0] ?? null
     : null;
-  const windowDate = todayDate();
+  const windowDate = todayDateInTz(moment.timezone || "UTC");
 
   const allTodayPosts = await db.select().from(momentPostsTable)
     .where(and(eq(momentPostsTable.momentId, moment.id), eq(momentPostsTable.windowDate, windowDate)));
@@ -1174,7 +1174,7 @@ router.post("/moment/:momentToken/:userToken/post", async (req, res): Promise<vo
       return;
     }
 
-    const windowDate = todayDate();
+    const windowDate = todayDateInTz(moment.timezone || "UTC");
 
     // Check for existing post today from this user
     const existingPosts = await db.select().from(momentPostsTable)
