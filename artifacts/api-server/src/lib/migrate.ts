@@ -242,7 +242,13 @@ export async function migrate() {
       );
     `);
 
-    logger.info("Database migration completed successfully");
+    // Verify shared_moments columns exist
+    const colCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'shared_moments' ORDER BY ordinal_position
+    `);
+    const cols = colCheck.rows.map((r: { column_name: string }) => r.column_name);
+    logger.info({ cols }, "Database migration completed — shared_moments columns");
   } catch (err) {
     logger.error({ err }, "Database migration failed");
     throw err;
