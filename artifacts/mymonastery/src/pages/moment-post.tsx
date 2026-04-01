@@ -476,6 +476,12 @@ export default function MomentPostPage() {
       setPosted(true);
       setTodayCount(res.todayPostCount);
       setMemberCount(res.memberCount);
+      // Redirect back to the practice detail page after showing the success animation
+      setTimeout(() => {
+        if (data?.moment?.id) {
+          setLocation(`/moments/${data.moment.id}`);
+        }
+      }, 2500);
     },
     onError: () => {
       // Reset amenPulse so the button returns to its normal state for retry
