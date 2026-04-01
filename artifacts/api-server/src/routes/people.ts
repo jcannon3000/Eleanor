@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, sql } from "drizzle-orm";
 import { db, ritualsTable, meetupsTable, usersTable } from "@workspace/db";
 import { computeStreak } from "../lib/streak";
 
@@ -7,8 +7,21 @@ const router: IRouter = Router();
 
 type Participant = { name: string; email: string };
 
+// Helper: get all rituals where the user is owner OR participant
+async function getUserRituals(userId: number) {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) return { user: null, rituals: [] };
+  const rituals = await db.select().from(ritualsTable).where(
+    or(
+      eq(ritualsTable.ownerId, userId),
+      sql`${ritualsTable.participants} @> ${JSON.stringify([{ email: user.email }])}::jsonb`
+    )
+  );
+  return { user, rituals };
+}
+
 // GET /api/people?ownerId=N
-// Returns all unique people from the owner's rituals (excluding themselves)
+// Returns all unique people from the user's rituals (owned + participant)
 router.get("/people", async (req, res): Promise<void> => {
   const ownerId = parseInt(String(req.query.ownerId ?? ""), 10);
   if (isNaN(ownerId)) {
@@ -16,10 +29,7 @@ router.get("/people", async (req, res): Promise<void> => {
     return;
   }
 
-  const [owner, rituals] = await Promise.all([
-    db.select().from(usersTable).where(eq(usersTable.id, ownerId)).then(r => r[0]),
-    db.select().from(ritualsTable).where(eq(ritualsTable.ownerId, ownerId)),
-  ]);
+  const { user: owner, rituals } = await getUserRituals(ownerId);
 
   const ownerEmail = owner?.email ?? "";
 
@@ -71,7 +81,7 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     return;
   }
 
-  const allRituals = await db.select().from(ritualsTable).where(eq(ritualsTable.ownerId, ownerId));
+  const { rituals: allRituals } = await getUserRituals(ownerId);
 
   const sharedRituals = allRituals.filter(r => {
     const participants = (r.participants as Participant[]) ?? [];
