@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mymonastery",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "mymonastery", "dev"],
+      "port": 5173
+    }
+  ]
+}

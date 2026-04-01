@@ -931,6 +931,14 @@ export default function MomentPostPage() {
     <div className="min-h-screen bg-[#F5EDD8]">
       <div className="max-w-md mx-auto px-4 py-8 pb-24">
 
+        {/* Back */}
+        <button
+          onClick={() => setLocation(`/moments/${moment.id}`)}
+          className="text-sm text-[#6b5c4a] hover:text-[#2C1A0E] inline-flex items-center gap-1 mb-6 transition-colors"
+        >
+          ← Back
+        </button>
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-[#2C1A0E]">{moment.name}</h1>

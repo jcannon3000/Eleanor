@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, or, sql, inArray } from "drizzle-orm";
-import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable } from "@workspace/db";
+import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable, momentPostsTable } from "@workspace/db";
 import { computeStreak } from "../lib/streak";
 
 const router: IRouter = Router();
@@ -104,23 +104,62 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     return;
   }
 
-  const { rituals: allRituals } = await getUserRituals(ownerId);
+  const { user: owner, rituals: allRituals } = await getUserRituals(ownerId);
+  const ownerEmail = owner?.email ?? "";
 
   const sharedRituals = allRituals.filter(r => {
     const participants = (r.participants as Participant[]) ?? [];
     return participants.some(p => p.email === email);
   });
 
-  if (sharedRituals.length === 0) {
-    res.status(404).json({ error: "Person not found in any of your circles" });
+  // Find shared practices (moments) where both owner and person are members
+  const ownerTokenRows = await db.select({ momentId: momentUserTokensTable.momentId, name: momentUserTokensTable.name })
+    .from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.email, ownerEmail));
+  const ownerMomentIds = ownerTokenRows.map(t => t.momentId);
+
+  let sharedPractices: Array<{
+    id: number; name: string; currentStreak: number; totalBlooms: number;
+    frequency: string; templateType: string | null; createdAt: string;
+  }> = [];
+
+  if (ownerMomentIds.length > 0) {
+    const personTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
+      .from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.email, email));
+    const personMomentIdSet = new Set(personTokenRows.map(t => t.momentId));
+    const sharedMomentIds = ownerMomentIds.filter(id => personMomentIdSet.has(id));
+    if (sharedMomentIds.length > 0) {
+      const moments = await db.select({
+        id: sharedMomentsTable.id,
+        name: sharedMomentsTable.name,
+        currentStreak: sharedMomentsTable.currentStreak,
+        totalBlooms: sharedMomentsTable.totalBlooms,
+        frequency: sharedMomentsTable.frequency,
+        templateType: sharedMomentsTable.templateType,
+        createdAt: sharedMomentsTable.createdAt,
+      }).from(sharedMomentsTable).where(inArray(sharedMomentsTable.id, sharedMomentIds));
+      sharedPractices = moments.map(m => ({ ...m, createdAt: m.createdAt.toISOString() }));
+    }
+  }
+
+  if (sharedRituals.length === 0 && sharedPractices.length === 0) {
+    res.status(404).json({ error: "Person not found in any of your traditions or practices" });
     return;
   }
 
-  // Resolve display name from rituals
+  // Resolve display name from rituals or moment_user_tokens
   let personName = email;
   for (const ritual of sharedRituals) {
     const match = (ritual.participants as Participant[]).find(p => p.email === email);
     if (match?.name) { personName = match.name; break; }
+  }
+  if (personName === email && ownerMomentIds.length > 0) {
+    const nameRow = await db.select({ name: momentUserTokensTable.name })
+      .from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.email, email))
+      .limit(1);
+    if (nameRow[0]?.name) personName = nameRow[0].name;
   }
 
   // Enrich each shared ritual with its meetups
@@ -179,6 +218,7 @@ router.get("/people/:email", async (req, res): Promise<void> => {
       firstCircleDate,
     },
     sharedRituals: enriched,
+    sharedPractices,
   });
 });
 

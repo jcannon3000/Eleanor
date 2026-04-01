@@ -34,6 +34,16 @@ export interface SharedRitual {
   meetups: SharedMeetup[];
 }
 
+export interface SharedPractice {
+  id: number;
+  name: string;
+  currentStreak: number;
+  totalBlooms: number;
+  frequency: string;
+  templateType: string | null;
+  createdAt: string;
+}
+
 export interface PersonProfile {
   name: string;
   email: string;
@@ -43,6 +53,7 @@ export interface PersonProfile {
     firstCircleDate: string | null;
   };
   sharedRituals: SharedRitual[];
+  sharedPractices: SharedPractice[];
 }
 
 export function usePeople(ownerId: number | undefined) {

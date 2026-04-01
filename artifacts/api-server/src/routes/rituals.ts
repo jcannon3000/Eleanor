@@ -2,7 +2,7 @@ import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
 import { createCalendarEvent, updateCalendarEvent, getFreeBusy, getCalendarEvent, deleteCalendarEvent, getCalendarEventAttendees, addAttendeesToCalendarEvent } from "../lib/calendar";
 import { deriveStartDate } from "../lib/scheduleDate";
 import {
@@ -290,6 +290,7 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
   await db.delete(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
   await db.delete(ritualMessagesTable).where(eq(ritualMessagesTable.ritualId, params.data.id));
   await db.delete(schedulingResponsesTable).where(eq(schedulingResponsesTable.ritualId, params.data.id));
+  await db.delete(scheduleResponsesTable).where(eq(scheduleResponsesTable.ritualId, params.data.id));
   await db.delete(inviteTokensTable).where(eq(inviteTokensTable.ritualId, params.data.id));
 
   await db.delete(ritualsTable).where(eq(ritualsTable.id, params.data.id));

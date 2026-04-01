@@ -190,6 +190,47 @@ export default function PersonProfile() {
           </div>
         </motion.div>
 
+        {/* Shared Practices */}
+        {person.sharedPractices && person.sharedPractices.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="bg-card rounded-3xl p-6 md:p-8 border border-card-border shadow-[var(--shadow-warm-sm)]"
+          >
+            <h2 className="font-serif text-xl text-foreground mb-5">Shared Practices</h2>
+            <div className="space-y-3">
+              {person.sharedPractices.map(practice => (
+                <Link key={practice.id} href={`/moments/${practice.id}`} className="block group">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-background border border-border/60 hover:border-primary/40 hover:shadow-[var(--shadow-warm-sm)] transition-all group-hover:-translate-y-0.5 duration-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center flex-shrink-0">
+                        <span className="text-base">🌸</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground group-hover:text-primary transition-colors truncate">{practice.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{practice.frequency}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      {practice.currentStreak >= 1 && (
+                        <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium">
+                          🔥 {practice.currentStreak} streak
+                        </span>
+                      )}
+                      {practice.totalBlooms >= 1 && (
+                        <span className="text-xs text-pink-700 bg-pink-50 border border-pink-200 px-2.5 py-1 rounded-full font-medium">
+                          🌸 {practice.totalBlooms}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* Shared gathering history */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
