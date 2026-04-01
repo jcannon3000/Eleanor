@@ -536,7 +536,8 @@ export default function MomentDetail() {
           const todayBloomed = todayPostCount >= memberCount && memberCount >= 2;
           const displayStreak = todayBloomed && moment.currentStreak === 0 ? 1 : moment.currentStreak;
           const displayLongest = Math.max(displayStreak, moment.longestStreak);
-          const displayBlooms = todayBloomed && moment.totalBlooms === 0 ? 1 : moment.totalBlooms;
+          const goalHit = todayBloomed && moment.goalDays > 0 && displayStreak >= moment.goalDays;
+          const displayBlooms = goalHit ? moment.totalBlooms + 1 : moment.totalBlooms;
           return (
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">

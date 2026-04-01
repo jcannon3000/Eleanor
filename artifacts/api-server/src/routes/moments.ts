@@ -189,8 +189,13 @@ async function evaluateWindow(momentId: number, windowDate: string) {
       const newStreak = moment.currentStreak + 1;
       const newLongest = Math.max(newStreak, moment.longestStreak);
       const newState = (moment.state === "needs_water" || moment.state === "dormant") ? "active" : moment.state;
+      const goalHit = moment.goalDays > 0 && newStreak >= moment.goalDays;
+      const newBlooms = goalHit ? moment.totalBlooms + 1 : moment.totalBlooms;
+      // Reset streak after goal completion so the next cycle starts fresh
+      const nextStreak = goalHit ? 0 : newStreak;
+      const nextState = goalHit ? "active" : newState;
       await db.update(sharedMomentsTable)
-        .set({ currentStreak: newStreak, longestStreak: newLongest, totalBlooms: moment.totalBlooms + 1, state: newState })
+        .set({ currentStreak: nextStreak, longestStreak: newLongest, totalBlooms: newBlooms, state: nextState })
         .where(eq(sharedMomentsTable.id, momentId));
     }
   } else if (status === "wither") {
