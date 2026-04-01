@@ -57,7 +57,7 @@ artifacts-monorepo/
 - `ritual_messages` — id, ritual_id, role (user/assistant), content, created_at
 - `schedule_responses` — id, ritual_id, guest_name, guest_email, chosen_time, unavailable (int), created_at
 - `invite_tokens` — id, ritual_id, email, name, token (uuid), responded_at, created_at
-- `shared_moments` — id, ritual_id, name, intention (140 char), logging_type (photo|reflection|both|checkin), reflection_prompt, frequency, scheduled_time (HH:MM), window_minutes (60), goal_days, moment_token (unique), current_streak, longest_streak, total_blooms, state (active|needs_water|dormant), created_at
+- `shared_moments` — id, ritual_id, name, intention (140 char), logging_type (photo|reflection|both|checkin), reflection_prompt, frequency, scheduled_time (HH:MM), window_minutes (60), goal_days, commitment_duration (nullable, days), commitment_end_date (nullable, YYYY-MM-DD), moment_token (unique), current_streak, longest_streak, total_blooms, state (active|needs_water|dormant), template_type, time_of_day, contemplative_duration_minutes, fasting_from/intention/frequency/date/day/day_of_month, created_at
 - `moment_user_tokens` — id, moment_id, email, name, user_token (unique), google_calendar_event_id, created_at
 - `moment_posts` — id, moment_id, window_date (YYYY-MM-DD), user_token, guest_name, photo_url, reflection_text, is_checkin (int), created_at
 - `moment_windows` — id, moment_id, window_date, status (bloom|solo|wither), post_count, closed_at, created_at

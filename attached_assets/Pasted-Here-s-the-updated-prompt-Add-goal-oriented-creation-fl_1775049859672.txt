@@ -1,0 +1,176 @@
+Here’s the updated prompt:
+
+Add goal-oriented creation flow to both Practices and Traditions
+Do not change any existing functionality outside the creation flows. Apply the changes below to both Plant a Practice and Plant a Tradition.
+
+The core shift
+Currently Eleanor asks people to set a milestone (3 days, 7 days, 14 days) as an afterthought near the end of the creation flow. This undersells the product. The research shows that what people need is not a reminder system — it is a commitment device. Eleanor should position itself from the first step as the thing that makes a specific intention actually happen.
+The creation flow should lead with the goal — what you want to do together and how consistently — and then work backwards to the logistics. The specific day and time are details Eleanor handles. The intention is what the user owns.
+
+THE NEW OPENING SCREEN — both Practices and Traditions
+After the template selection screen and before the name step, add a single new screen. This is the first screen of the creation flow proper.
+For Practices, cream background, soil text, centered:
+
+🌿
+
+"Most recurring practices fail not because
+people stop caring — but because coordination,
+scheduling, and life get in the way.
+
+Set your intention.
+Eleanor removes everything standing between
+you and it."
+
+
+CTA: “Set my intention →”
+For Traditions, same design with amber accent:
+
+🌱
+
+"Most recurring gatherings happen once
+and never again — not because people
+don't want them to continue, but because
+no one wants to carry the coordination.
+
+Set your intention.
+Eleanor carries it for you."
+
+
+CTA: “Set my intention →”
+
+NEW STEP — Commitment first, logistics second
+After the name step, add a new screen. This is the commitment step. It comes before time, before day selection, before any scheduling detail.
+Header: “What is your intention? 🌿”
+Muted subtitle:
+“Start with what you want to achieve. Eleanor will work out the rest.”
+Two inputs presented as large cards:
+Card 1 — How often
+Label: “How often do you want to gather?”
+For Practices:
+
+Every day
+Every week
+Twice a week
+Three times a week
+
+
+For Traditions:
+
+Every week
+Every two weeks
+Once a month
+
+
+Card 2 — For how long
+Label: “How long do you want to commit?”
+
+One month
+Three months
+Six months
+Ongoing — no end date
+
+
+When both are selected, show a confirmation line in sage italic beneath the cards:
+For Practices:
+“You want to pray together [frequency] for [duration]. Eleanor will make sure it happens.”
+For Traditions:
+“You want to gather [frequency] for [duration]. Eleanor will handle everything standing in the way.”
+This language is deliberate. It is about the goal — praying together, gathering together — not about which Tuesday morning works. The scheduling comes later and is Eleanor’s job, not the user’s.
+
+REFRAME the time and day selection step
+The time and day selection screen currently feels like the primary act of creation. It should feel like a detail Eleanor is handling on the user’s behalf — a practical necessity, not the point.
+Update the header from:
+“When does this practice happen?”
+To:
+“When works for you? Eleanor will handle the rest.”
+Update the subtitle from:
+“Choose the time of day. Each person will set their own specific time.”
+To:
+“Give Eleanor a rough window. Every member sets their own time, and Eleanor coordinates from there.”
+The framing throughout should be: the user has already made the meaningful decision — the commitment. This step is just giving Eleanor the information it needs to execute.
+
+REMOVE the existing milestone goal screen
+The current goal screen — showing 3 days, 7 days, 14 days as milestone options — is replaced by this new commitment step. Remove it from both Practice and Tradition creation flows entirely.
+The streak and milestone tracking logic underneath continues to work as before. The 3/7/14 milestone display on the detail screen remains. Only the creation-time goal selection screen is removed. Users no longer choose a milestone — Eleanor tracks progress against the commitment they set (frequency × duration) instead.
+
+Store the commitment
+
+commitment_frequency text (daily | weekly | biweekly | twice_weekly | three_weekly | monthly)
+commitment_duration text (one_month | three_months | six_months | ongoing)
+commitment_end_date date (calculated from start date + duration, null if ongoing)
+
+
+UPDATE the detail screen goal section
+Replace the milestone display with the commitment the user set at creation.
+New format:
+
+🌿 YOUR INTENTION
+
+[Frequency] [Practice/Tradition name]
+for [duration]
+
+[Progress bar]
+[X of Y planned · Z weeks remaining]
+
+
+Progress states:
+	∙	On track: sage bar, “On track 🌿”
+	∙	Behind: blush bar, “Needs tending 💧”
+	∙	Fulfilled: amber bar, “Intention fulfilled 🌾”
+	∙	Ongoing: sage bar, total count only
+
+UPDATE the confirmation screen
+After planting, the confirmation screen should make clear that Eleanor is now responsible for the execution of the user’s stated goal.
+For Traditions:
+
+🌱
+
+"[Tradition name] is planted."
+
+Your intention:
+[Frequency] for [duration]
+
+Eleanor is coordinating [X] calendars.
+You just have to show up.
+
+"Most gatherings happen once.
+ Yours will keep happening."
+
+[Done 🌱]
+
+
+For Practices:
+
+🌿
+
+"[Practice name] is planted."
+
+Your intention:
+[Frequency] for [duration]
+
+Eleanor will hold this rhythm.
+Your only job is to show up.
+
+[Done 🌿]
+
+
+UPDATE nudge language
+When a member is falling behind their stated intention, Eleanor’s nudge should bring them back to the goal — not the logistics.
+For Practices:
+
+💧 You set an intention to pray together [frequency] for [duration].
+
+Eleanor is still holding that intention.
+Come back and tend it. 🌿
+
+
+For Traditions:
+
+💧 You set an intention to gather [frequency] for [duration].
+
+That intention hasn't changed.
+Eleanor has found times that work for everyone — want to pick one? 🌱
+
+
+The distinction this creates
+The user’s job is to set the intention. Eleanor’s job is everything else. The specific day, the calendar coordination, the scheduling friction, the follow-up when life gets in the way — all of that belongs to Eleanor. What belongs to the user is the commitment: we want to gather biweekly for three months. Not: we are going to meet on Tuesday mornings. That is a detail. Eleanor handles details. The user owns the goal.​​​​​​​​​​​​​​​​

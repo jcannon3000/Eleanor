@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { InviteStep } from "@/components/InviteStep";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "goal" | "invite"
+type StepId = "template" | "intercession" | "name" | "intention" | "logging" | "schedule" | "commitment" | "invite"
   | "bcp-commitment" | "bcp-frequency" | "bcp-time" | "bcp-invite" | "intercession-frequency"
   | "contemplative-duration" | "fasting-what" | "fasting-why" | "fasting-when";
 type LoggingType = "photo" | "reflection" | "both" | "checkin";
@@ -580,7 +580,7 @@ export default function MomentNew() {
   const [scheduledMinute, setScheduledMinute] = useState(0);
   const [scheduledAmPm, setScheduledAmPm] = useState<"AM" | "PM">("AM");
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
-  const [goalDays, setGoalDays] = useState(7);
+  const [commitmentDays, setCommitmentDays] = useState(30);
   const [invitedPeople, setInvitedPeople] = useState<{ name: string; email: string }[]>([]);
   const [showInviteDisabledMsg, setShowInviteDisabledMsg] = useState(false);
 
@@ -655,18 +655,11 @@ export default function MomentNew() {
   const dayOfWeek = frequency === "weekly" && scheduledDays.length === 1
     ? (TO_RRULE[scheduledDays[0]] ?? scheduledDays[0])
     : undefined;
-  const GOAL_OPTIONS = frequency === "weekly" ? GOAL_OPTIONS_WEEKLY : GOAL_OPTIONS_DAILY;
   const isSpiritual = SPIRITUAL_TEMPLATES.has(templateId ?? "");
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
-
-  // Reset goalDays when frequency changes to a value not in the new option set
-  useEffect(() => {
-    const validDays = GOAL_OPTIONS.map(g => g.days);
-    if (!validDays.includes(goalDays)) setGoalDays(7);
-  }, [frequency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── When personal time prompt opens, constrain hour/ampm to the selected time-of-day ──
   useEffect(() => {
@@ -762,13 +755,13 @@ export default function MomentNew() {
     ? BCP_STEP_ORDER
     : templateId === "intercession"
       ? selectedBcpPrayer !== null
-        ? ["template", "intercession", "intention", "schedule", "goal", "invite"]
-        : ["template", "intercession", "name", "intention", "logging", "schedule", "goal", "invite"]
+        ? ["template", "intercession", "intention", "schedule", "commitment", "invite"]
+        : ["template", "intercession", "name", "intention", "logging", "schedule", "commitment", "invite"]
     : templateId === "contemplative"
-      ? ["template", "contemplative-duration", "name", "intention", "logging", "schedule", "goal", "invite"]
+      ? ["template", "contemplative-duration", "name", "intention", "logging", "schedule", "commitment", "invite"]
     : templateId === "fasting"
-      ? ["template", "fasting-what", "fasting-why", "fasting-when", "goal", "invite"]
-      : ["template", "name", "intention", "logging", "schedule", "goal", "invite"];
+      ? ["template", "fasting-what", "fasting-why", "fasting-when", "commitment", "invite"]
+      : ["template", "name", "intention", "logging", "schedule", "commitment", "invite"];
 
   function goNext() {
     const idx = STEP_ORDER.indexOf(step);
@@ -838,7 +831,7 @@ export default function MomentNew() {
       if (frequency === "weekly" && scheduledDays.length === 0) return false;
       return true;
     }
-    if (step === "goal") return true;
+    if (step === "commitment") return true;
     if (step === "invite") return invitedPeople.length > 0;
     return false;
   };
@@ -957,7 +950,8 @@ export default function MomentNew() {
       practiceDays: isSpiritual && frequency === "weekly" && scheduledDays.length > 0
         ? JSON.stringify(scheduledDays)
         : undefined,
-      goalDays,
+      goalDays: commitmentDays,
+      commitmentDuration: commitmentDays,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timeOfDay: isSpiritual ? timeOfDay : undefined,
       participants: validParticipants,
@@ -991,7 +985,12 @@ export default function MomentNew() {
     const templateInfo = TEMPLATES.find(t => t.id === templateId);
     const [h, m] = scheduledTime.split(":").map(Number);
     const timeLabel = new Date(0, 0, 0, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    const goalLabel = GOAL_OPTIONS.find(g => g.days === goalDays);
+    const commitmentLabel =
+      commitmentDays === 7  ? { emoji: "🌱", label: "1 week together" } :
+      commitmentDays === 14 ? { emoji: "🌿", label: "2 weeks together" } :
+      commitmentDays === 30 ? { emoji: "🌸", label: "1 month together" } :
+      commitmentDays === 90 ? { emoji: "🌳", label: "3 months together" } :
+      null;
     const todEmoji = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.emoji ?? "🌿";
     const todLabel = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.label?.toLowerCase() ?? "morning";
 
@@ -1104,8 +1103,8 @@ export default function MomentNew() {
           ) : (
             <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : frequency === "weekly" ? `Weekly` : "Monthly"} at {timeLabel}</p>
           )}
-          {goalDays > 0 && goalLabel && (
-            <p className="text-[#c9b99a] mb-6">{goalLabel.emoji} {goalLabel.label}</p>
+          {commitmentLabel && (
+            <p className="text-[#c9b99a] mb-6">{commitmentLabel.emoji} {commitmentLabel.label}</p>
           )}
           <p className="text-[#c9b99a] mb-8 text-sm leading-relaxed">
             Invites are on their way.<br />
@@ -1142,10 +1141,10 @@ export default function MomentNew() {
             <p className="text-sm font-medium text-[#F7F0E6] mb-1">
               Open your BCP to page {isMorning ? "75" : "115"}.
             </p>
-            <a href={isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html"}
+            <a href={isMorning ? "https://bcponline.org/DailyOffice/mp2.html" : "https://bcponline.org/DailyOffice/ep2.html"}
               target="_blank" rel="noopener noreferrer"
               className="text-sm text-[#6B8F71] underline underline-offset-2">
-              Or pray online: {isMorning ? "bcponline.org/MP2.html" : "bcponline.org/EP2.html"}
+              Or pray online: {isMorning ? "bcponline.org/DailyOffice/mp2.html" : "bcponline.org/DailyOffice/ep2.html"}
             </a>
           </div>
           <p className="text-[#F7F0E6]/50 font-serif italic text-sm leading-relaxed mb-8">
@@ -1598,10 +1597,10 @@ export default function MomentNew() {
                         {isMorning ? "Morning Prayer Rite II takes 15–20 minutes." : "Evening Prayer Rite II takes 15–20 minutes."}<br />
                         It begins on page {isMorning ? "75" : "115"} of the Book of Common Prayer.
                       </p>
-                      <a href={isMorning ? "https://bcponline.org/MP2.html" : "https://bcponline.org/EP2.html"}
+                      <a href={isMorning ? "https://bcponline.org/DailyOffice/mp2.html" : "https://bcponline.org/DailyOffice/ep2.html"}
                         target="_blank" rel="noopener noreferrer"
                         className="text-sm text-[#6B8F71] underline underline-offset-2 block">
-                        No BCP? Pray online: {isMorning ? "bcponline.org/MP2.html" : "bcponline.org/EP2.html"}
+                        No BCP? Pray online: {isMorning ? "bcponline.org/DailyOffice/mp2.html" : "bcponline.org/DailyOffice/ep2.html"}
                       </a>
                       <p className="text-xs text-[#6b5c4a]/70 italic mt-1">Everyone chooses their own time. You are together in spirit.</p>
                     </div>
@@ -1896,129 +1895,81 @@ export default function MomentNew() {
                 </div>
               )}
 
-              {/* ── Goal ───────────────────────────────────────────── */}
-              {step === "goal" && (
-                <div className="flex-1 flex flex-col gap-4">
-                  {/* Header */}
-                  <div>
-                    <h2 className="text-[1.6rem] font-bold text-[#2C1A0E] leading-tight mb-1">
-                      How far will you grow together? 🌱
-                    </h2>
-                    <p className="text-sm text-muted-foreground italic">Pick a goal. Eleanor will tend it with you.</p>
-                  </div>
-
-                  {/* Goal cards */}
-                  <div className="space-y-3">
-                    {GOAL_OPTIONS.map(g => {
-                      const selected = goalDays === g.days;
-                      const isJustBegin = g.days === 0;
-                      return (
-                        <motion.button
-                          key={g.days}
-                          onClick={() => setGoalDays(g.days)}
-                          animate={{ y: selected ? -2 : 0 }}
-                          transition={{ duration: 0.15 }}
-                          className="relative w-full text-left rounded-2xl overflow-hidden transition-colors duration-200"
-                          style={{
-                            background: selected ? "#6B8F71" : g.bg,
-                            border: `1px solid ${selected ? "#6B8F71" : g.borderColor}`,
-                            boxShadow: selected ? "0 4px 14px rgba(107,143,113,0.25)" : undefined,
-                          }}
-                        >
-                          {/* Left accent bar for Two weeks */}
-                          {"accentBar" in g && g.accentBar && !selected && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#6B8F71]/40 rounded-l-2xl" />
-                          )}
-
-                          {/* Badge — top right */}
-                          {g.badge && !selected && (
-                            <div className="absolute top-3 right-3 bg-[#C17F24] text-[#F5EDD8] text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-tight">
-                              {g.badge}
+              {/* ── Commitment ─────────────────────────────────────── */}
+              {step === "commitment" && (() => {
+                const COMMITMENT_OPTIONS = [
+                  { days: 7,  emoji: "🌱", label: "One week",      sub: "A first tender step",       message: "One week together. Enough to find out what this practice asks of you." },
+                  { days: 14, emoji: "🌿", label: "Two weeks",     sub: "Finding your rhythm",        message: "Two weeks. Enough to feel the rhythm take hold." },
+                  { days: 30, emoji: "🌸", label: "One month",     sub: "A real season together",     message: "A month. This is where something real begins to grow.", badge: "Most chosen 🌿" },
+                  { days: 90, emoji: "🌳", label: "Three months",  sub: "A lasting commitment",       message: "Three months. A genuine season of shared practice." },
+                  { days: 0,  emoji: "✨", label: "No end date",   sub: "Tend it as long as you like", message: "Open-ended. The practice stays alive as long as you tend it." },
+                ];
+                return (
+                  <div className="flex-1 flex flex-col gap-4">
+                    <div>
+                      <h2 className="text-[1.6rem] font-bold text-[#2C1A0E] leading-tight mb-1">
+                        How long will you commit together? 🌿
+                      </h2>
+                      <p className="text-sm text-muted-foreground italic">Choose a season. You can always renew.</p>
+                    </div>
+                    <div className="space-y-2.5">
+                      {COMMITMENT_OPTIONS.map(opt => {
+                        const sel = commitmentDays === opt.days;
+                        return (
+                          <motion.button
+                            key={opt.days}
+                            onClick={() => setCommitmentDays(opt.days)}
+                            animate={{ y: sel ? -2 : 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="relative w-full text-left rounded-2xl overflow-hidden transition-all duration-200"
+                            style={{
+                              background: sel ? "#6B8F71" : opt.days === 0 ? "#FAF6F0" : "#EEF3EF",
+                              border: `1.5px solid ${sel ? "#6B8F71" : opt.days === 0 ? "rgba(0,0,0,0.06)" : "#c8dac9"}`,
+                              boxShadow: sel ? "0 4px 14px rgba(107,143,113,0.22)" : undefined,
+                            }}
+                          >
+                            {"badge" in opt && opt.badge && !sel && (
+                              <div className="absolute top-3 right-3 bg-[#C17F24] text-[#F5EDD8] text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-tight">
+                                {opt.badge}
+                              </div>
+                            )}
+                            {sel && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.6 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="absolute top-3 right-3 text-[#F5EDD8] font-bold text-base"
+                              >✓</motion.div>
+                            )}
+                            <div className="flex items-center gap-4 px-5 py-4">
+                              <span className="text-3xl leading-none shrink-0">{opt.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className={`font-bold text-[15px] leading-snug ${sel ? "text-[#F5EDD8]" : opt.days === 0 ? "text-muted-foreground" : "text-[#2C1A0E]"}`}>
+                                  {opt.label}
+                                </p>
+                                <p className={`text-xs mt-0.5 ${sel ? "text-[#F5EDD8]/75" : "text-muted-foreground"}`}>
+                                  {opt.sub}
+                                </p>
+                              </div>
                             </div>
-                          )}
-
-                          {/* Checkmark when selected */}
-                          {selected && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.6 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              className="absolute top-3 right-3 text-[#F5EDD8] font-bold text-base leading-none"
-                            >
-                              ✓
-                            </motion.div>
-                          )}
-
-                          <div className={`flex items-start gap-4 p-5 ${!selected && "accentBar" in g && g.accentBar ? "pl-6" : ""}`}>
-                            {/* Emoji */}
-                            <span className="text-[40px] leading-none shrink-0 mt-0.5">{g.emoji}</span>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                              <p className={`font-bold text-[15px] leading-snug ${selected ? "text-[#F5EDD8]" : isJustBegin ? "text-muted-foreground font-normal" : "text-[#2C1A0E]"}`}>
-                                {g.label}
-                              </p>
-                              <p className={`text-xs mt-0.5 ${selected ? "text-[#F5EDD8]/70" : "text-muted-foreground"}`}>
-                                {g.sub}
-                              </p>
-
-                              {/* Progress dots — key forces remount & re-fires stagger on selection */}
-                              {g.dots.length > 0 && (
-                                <div key={`dots-${g.days}-${selected}`} className="mt-2.5">
-                                  {/* Row 1 — up to 7 */}
-                                  <div className="flex gap-1">
-                                    {g.dots.slice(0, 7).map((_, i) => (
-                                      <motion.div
-                                        key={i}
-                                        initial={selected ? { scale: 0.3, opacity: 0 } : false}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        transition={{ delay: selected ? i * 0.05 : 0, duration: 0.18, ease: "easeOut" }}
-                                        className="w-2.5 h-2.5 rounded-full"
-                                        style={{ background: selected ? "rgba(247,240,230,0.85)" : "rgba(107,143,113,0.28)" }}
-                                      />
-                                    ))}
-                                  </div>
-                                  {/* Row 2 — for 14 */}
-                                  {g.dots.length > 7 && (
-                                    <div className="flex gap-1 mt-1">
-                                      {g.dots.slice(7).map((_, i) => (
-                                        <motion.div
-                                          key={i}
-                                          initial={selected ? { scale: 0.3, opacity: 0 } : false}
-                                          animate={{ scale: 1, opacity: 1 }}
-                                          transition={{ delay: selected ? (i + 7) * 0.05 : 0, duration: 0.18, ease: "easeOut" }}
-                                          className="w-2.5 h-2.5 rounded-full"
-                                          style={{ background: selected ? "rgba(247,240,230,0.85)" : "rgba(107,143,113,0.28)" }}
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
-                                  <p className={`text-[10px] mt-1.5 ${selected ? "text-[#F5EDD8]/55" : "text-muted-foreground/55"}`}>
-                                    {g.dotLabel}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={commitmentDays}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.2 }}
+                        className="text-sm text-center text-muted-foreground italic px-2 pb-1"
+                      >
+                        {COMMITMENT_OPTIONS.find(o => o.days === commitmentDays)?.message}
+                      </motion.p>
+                    </AnimatePresence>
                   </div>
-
-                  {/* Dynamic message beneath cards */}
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={goalDays}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      transition={{ duration: 0.2 }}
-                      className="text-sm text-center text-muted-foreground italic px-2 pb-1"
-                    >
-                      {GOAL_OPTIONS.find(g => g.days === goalDays)?.message}
-                    </motion.p>
-                  </AnimatePresence>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ── Invite ─────────────────────────────────────────── */}
               {step === "invite" && (

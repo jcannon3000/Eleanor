@@ -38,6 +38,9 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   fastingDate: text("fasting_date"),
   fastingDay: text("fasting_day"),
   fastingDayOfMonth: integer("fasting_day_of_month"),
+  // Commitment fields
+  commitmentDuration: integer("commitment_duration"),
+  commitmentEndDate: text("commitment_end_date"),
 });
 
 export type SharedMoment = typeof sharedMomentsTable.$inferSelect;

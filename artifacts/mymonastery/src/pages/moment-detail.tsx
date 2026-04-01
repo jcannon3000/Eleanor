@@ -63,6 +63,8 @@ interface MomentDetail {
     fastingDate?: string | null;
     fastingDay?: string | null;
     fastingDayOfMonth?: number | null;
+    commitmentDuration?: number | null;
+    commitmentEndDate?: string | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -278,7 +280,6 @@ export default function MomentDetail() {
   if (!data) return null;
 
   const { moment, members, memberCount, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
-  const progress = goalProgress(moment.createdAt, moment.goalDays);
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
   const isIntercession = moment.templateType === "intercession";
@@ -536,36 +537,56 @@ export default function MomentDetail() {
           </div>
         </div>
 
-        {/* Goal Progress */}
-        {moment.goalDays > 0 && (() => {
-          const goalLabel =
-            moment.goalDays === 3  ? "🌱 Three days together" :
-            moment.goalDays === 7  ? "🌿 One week together" :
-            moment.goalDays === 14 ? "🌸 Two weeks together" :
-            `${moment.goalDays}-day goal`;
+        {/* Commitment Display */}
+        {(() => {
+          const dur = moment.commitmentDuration ?? moment.goalDays ?? 0;
+          const endDate = moment.commitmentEndDate ?? null;
+          if (dur === 0 && !endDate) return null;
+
+          const commitmentLabel =
+            dur === 7  ? "🌱 One week together" :
+            dur === 14 ? "🌿 Two weeks together" :
+            dur === 30 ? "🌸 One month together" :
+            dur === 90 ? "🌳 Three months together" :
+            dur > 0    ? `${dur}-day commitment` :
+            null;
+
+          if (!commitmentLabel) return null;
+
+          const daysLeft = endDate
+            ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000))
+            : null;
+          const totalDays = dur;
+          const daysDone = daysLeft !== null ? Math.max(0, totalDays - daysLeft) : moment.totalBlooms;
+          const progressPct = totalDays > 0 ? Math.min(100, (daysDone / totalDays) * 100) : 0;
           const progressLabel =
-            progress === 0   ? "Just planted" :
-            progress < 50    ? "Taking root" :
-            progress < 100   ? "Growing" :
-            "🌾 Harvested";
+            progressPct === 0   ? "Just planted" :
+            progressPct < 50    ? "Taking root" :
+            progressPct < 100   ? "Growing" :
+            "🌾 Complete";
+
           return (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-                  {goalLabel}
+                  {commitmentLabel}
                 </span>
-                <span className="text-xs text-muted-foreground">{progressLabel}</span>
+                <span className="text-xs text-muted-foreground">
+                  {daysLeft !== null && daysLeft > 0
+                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
+                    : progressLabel}
+                </span>
               </div>
               <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-[#6B8F71] rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
+                  animate={{ width: `${progressPct}%` }}
                   transition={{ duration: 0.6, ease: "easeOut" }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {moment.totalBlooms} practices together so far
+                {moment.totalBlooms} practice{moment.totalBlooms === 1 ? "" : "s"} together so far
               </p>
             </div>
           );

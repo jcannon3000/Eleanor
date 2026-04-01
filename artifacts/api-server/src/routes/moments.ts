@@ -372,6 +372,8 @@ const StandalonePlantSchema = z.object({
   fastingDate: z.string().optional(),
   fastingDay: z.string().optional(),
   fastingDayOfMonth: z.number().int().min(1).max(31).optional(),
+  // Commitment fields
+  commitmentDuration: z.number().int().min(0).max(365).optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -385,7 +387,16 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth, commitmentDuration } = parsed.data;
+
+  // Compute commitment end date if a duration was provided
+  const commitmentEndDate = (commitmentDuration && commitmentDuration > 0)
+    ? (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + commitmentDuration);
+        return d.toISOString().slice(0, 10);
+      })()
+    : null;
   const isFasting = templateType === "fasting";
 
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(templateType ?? "");
@@ -420,6 +431,8 @@ router.post("/moments", async (req, res): Promise<void> => {
     ...(fastingDate !== undefined ? { fastingDate } : {}),
     ...(fastingDay !== undefined ? { fastingDay } : {}),
     ...(fastingDayOfMonth !== undefined ? { fastingDayOfMonth } : {}),
+    ...(commitmentDuration !== undefined ? { commitmentDuration } : {}),
+    ...(commitmentEndDate ? { commitmentEndDate } : {}),
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
