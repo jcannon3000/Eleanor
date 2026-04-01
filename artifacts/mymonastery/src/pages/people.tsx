@@ -84,7 +84,7 @@ export default function People() {
             </div>
             <h3 className="font-serif text-2xl text-foreground mb-3">No connections yet</h3>
             <p className="text-muted-foreground mb-8 leading-relaxed text-sm">
-              People will appear here once you add them to a circle. Plant your first ritual to start growing community.
+              People will appear here once you add them to a tradition. Plant your first ritual to start growing community.
             </p>
             <Link
               href="/create"
@@ -124,8 +124,8 @@ export default function People() {
                       <div className="mt-1.5 space-y-1">
                         <p className="text-sm text-muted-foreground">
                           {person.sharedCircleCount === 1
-                            ? "1 shared circle"
-                            : `${person.sharedCircleCount} shared circles`}
+                            ? "1 shared tradition"
+                            : `${person.sharedCircleCount} shared traditions`}
                         </p>
                         <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
                           <Sprout size={11} />

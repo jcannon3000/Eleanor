@@ -136,13 +136,13 @@ export default function MomentPlant() {
               <span className="font-medium text-foreground">{name}</span>
             </p>
             <p className="text-sm text-muted-foreground mb-8">
-              Eleanor will send calendar invites to your circle. When the window opens, each member taps their personal link and shows up.
+              Eleanor will send calendar invites to your tradition. When the window opens, each member taps their personal link and shows up.
             </p>
             <button
               onClick={() => setLocation(`/ritual/${ritualId}`)}
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
             >
-              Back to circle
+              Back to tradition
             </button>
           </motion.div>
         </div>
@@ -163,7 +163,7 @@ export default function MomentPlant() {
           </button>
           <div className="flex-1">
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">
-              {ritual?.name ?? "Your circle"}
+              {ritual?.name ?? "Your tradition"}
             </p>
             <h1 className="text-lg font-semibold text-foreground">Plant a Shared Moment</h1>
           </div>
@@ -187,7 +187,7 @@ export default function MomentPlant() {
           {step === 0 && (
             <motion.div key="step-name" variants={stepVariants} initial="initial" animate="animate" exit="exit">
               <h2 className="text-xl font-semibold text-foreground mb-2">What is this moment called?</h2>
-              <p className="text-sm text-muted-foreground mb-6">Give your ritual a name your circle will recognize.</p>
+              <p className="text-sm text-muted-foreground mb-6">Give your ritual a name your tradition will recognize.</p>
               <input
                 type="text"
                 value={name}
@@ -206,7 +206,7 @@ export default function MomentPlant() {
             <motion.div key="step-intention" variants={stepVariants} initial="initial" animate="animate" exit="exit">
               <h2 className="text-xl font-semibold text-foreground mb-2">What is this moment about? 🌿</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                This will appear for your circle when the window opens. It sets the intention.
+                This will appear for your tradition when the window opens. It sets the intention.
               </p>
               <textarea
                 value={intention}
@@ -227,7 +227,7 @@ export default function MomentPlant() {
           {/* Step 2: Logging type */}
           {step === 2 && (
             <motion.div key="step-logging" variants={stepVariants} initial="initial" animate="animate" exit="exit">
-              <h2 className="text-xl font-semibold text-foreground mb-2">How will your circle practice? 📷</h2>
+              <h2 className="text-xl font-semibold text-foreground mb-2">How will your tradition practice? 📷</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 Choose how members log their moment. Everyone uses the same format.
               </p>
@@ -303,7 +303,7 @@ export default function MomentPlant() {
           {/* Step 3: Time */}
           {step === 3 && (
             <motion.div key="step-time" variants={stepVariants} initial="initial" animate="animate" exit="exit">
-              <h2 className="text-xl font-semibold text-foreground mb-2">When does your circle gather? 🗓️</h2>
+              <h2 className="text-xl font-semibold text-foreground mb-2">When does your tradition gather? 🗓️</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 A one-hour window opens at this time. Members practice and log whenever they can.
               </p>
@@ -345,7 +345,7 @@ export default function MomentPlant() {
           {/* Step 4: Goal */}
           {step === 4 && (
             <motion.div key="step-goal" variants={stepVariants} initial="initial" animate="animate" exit="exit">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Set a goal for your circle 🌱</h2>
+              <h2 className="text-xl font-semibold text-foreground mb-2">Set a goal for your tradition 🌱</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 How many days do you want to tend this moment together?
               </p>

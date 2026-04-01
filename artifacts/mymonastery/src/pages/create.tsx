@@ -9,7 +9,7 @@ import { InviteStep } from "@/components/InviteStep";
 
 const STEPS = [
   { id: 1, title: "Name" },
-  { id: 2, title: "Circle" },
+  { id: 2, title: "Tradition" },
   { id: 3, title: "Rhythm" },
 ];
 
@@ -184,7 +184,7 @@ export default function CreateRitual() {
   // If URL has ?type=circle or sessionStorage has tradition prefill, skip chooser
   const [createType, setCreateType] = useState<"circle" | null>(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("type") === "circle") return "circle";
+    if (params.get("type") === "circle" || params.get("type") === "tradition") return "circle";
     if (sessionStorage.getItem("eleanor_tradition_prefill")) return "circle";
     return null;
   });
@@ -309,7 +309,7 @@ export default function CreateRitual() {
               <div className="flex items-start gap-4">
                 <div className="text-3xl mt-0.5">🌿</div>
                 <div className="flex-1">
-                  <p className="text-lg font-semibold text-foreground mb-1">Start a Circle</p>
+                  <p className="text-lg font-semibold text-foreground mb-1">Start a Tradition</p>
                   <p className="text-sm text-muted-foreground">
                     Recurring gatherings with your people. Eleanor coordinates schedules and sends Google Calendar invites.
                   </p>
@@ -329,7 +329,7 @@ export default function CreateRitual() {
                 <div className="flex-1">
                   <p className="text-lg font-semibold text-foreground mb-1">Plant a Shared Moment</p>
                   <p className="text-sm text-muted-foreground">
-                    A recurring micro-ritual your whole circle shows up to together — in a one-hour window each day or week. No login needed to participate.
+                    A recurring micro-ritual your whole tradition shows up to together — in a one-hour window each day or week. No login needed to participate.
                   </p>
                   <p className="text-xs text-primary font-medium mt-3 group-hover:translate-x-1 transition-transform">
                     Morning coffee, meditation, gratitude, walks →
@@ -358,7 +358,7 @@ export default function CreateRitual() {
           </button>
 
           <div className="mb-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Start a Circle</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Start a Tradition</p>
             <p className="text-sm text-muted-foreground">Step {step} of {STEPS.length} — {STEPS[step - 1].title}</p>
           </div>
 

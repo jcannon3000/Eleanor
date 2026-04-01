@@ -118,7 +118,7 @@ export default function TraditionNew() {
     } else {
       sessionStorage.removeItem("eleanor_tradition_prefill");
     }
-    setLocation("/create?type=circle");
+    setLocation("/create?type=tradition");
   }
 
   // ── Intro splash ────────────────────────────────────────────────────────────

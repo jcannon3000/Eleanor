@@ -95,7 +95,7 @@ export default function Onboarding() {
             </button>
 
             <p className="mt-4 text-xs text-muted-foreground max-w-sm mx-auto md:mx-0">
-              Eleanor asks for Google Calendar access so your circles always have a home in your schedule.
+              Eleanor asks for Google Calendar access so your traditions always have a home in your schedule.
             </p>
           </motion.div>
 

@@ -199,7 +199,7 @@ export default function InvitePage() {
             {/* Ritual header */}
             <div className="text-center pb-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
-                {data?.organizerName}'s circle
+                {data?.organizerName}'s tradition
               </p>
               <h1 className="font-serif text-3xl text-foreground mb-2">{data?.ritualName}</h1>
               {data?.ritualIntention && (
@@ -382,7 +382,7 @@ export default function InvitePage() {
 
             {/* Ritual detail card */}
             <div className="bg-card border border-card-border rounded-2xl p-5 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">The circle</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">The tradition</p>
               <p className="font-semibold text-foreground">{data?.ritualName}</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {data?.ritualIntention || `A recurring ${data?.frequency ?? ""} gathering organized by ${data?.organizerName ?? "your host"}.`}
@@ -410,7 +410,7 @@ export default function InvitePage() {
             <div className="bg-card border border-card-border rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <Sprout size={14} className="text-primary" />
-                <p className="text-sm font-semibold text-foreground">Want to host your own circles?</p>
+                <p className="text-sm font-semibold text-foreground">Want to host your own traditions?</p>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Eleanor coordinates recurring gatherings — so the people and traditions you love keep showing up.
@@ -575,7 +575,7 @@ export default function InvitePage() {
         )}
 
         <div className="mt-10 pt-8 border-t border-border text-center space-y-3">
-          <p className="text-xs text-muted-foreground">Want to start your own circles?</p>
+          <p className="text-xs text-muted-foreground">Want to start your own traditions?</p>
           <button
             onClick={handleGoogleSignIn}
             className="inline-flex items-center gap-2 px-5 py-2.5 border border-border rounded-full text-sm font-medium text-foreground hover:bg-secondary transition-colors"

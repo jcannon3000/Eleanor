@@ -348,7 +348,7 @@ const GOAL_OPTIONS_DAILY = [
   {
     days: 14, emoji: "🌸", label: "2 weeks", sub: "In bloom — then renew",
     bg: "#F7F0E6", borderColor: "#b0cdb3",
-    dots: Array(14).fill(0), dotLabel: "14 practices — then your circle renews the commitment",
+    dots: Array(14).fill(0), dotLabel: "14 practices — then your tradition renews the commitment",
     badge: null, accentBar: true,
     message: "Two weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.",
   },
@@ -372,7 +372,7 @@ const GOAL_OPTIONS_WEEKLY = [
   {
     days: 21, emoji: "🌸", label: "3 weeks", sub: "In bloom — then renew",
     bg: "#F7F0E6", borderColor: "#b0cdb3",
-    dots: Array(3).fill(0), dotLabel: "3 practices — then your circle renews the commitment",
+    dots: Array(3).fill(0), dotLabel: "3 practices — then your tradition renews the commitment",
     badge: null, accentBar: true,
     message: "Three weeks. If you reach it, Eleanor will ask you to renew. The practice stays alive.",
   },

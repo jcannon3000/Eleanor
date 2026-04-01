@@ -173,7 +173,7 @@ export default function RitualDetail() {
       });
       if (!res.ok) throw new Error("Failed to log");
       const msg = status === "completed"
-        ? "Gathering logged. Your circle grows stronger. 🌱"
+        ? "Gathering logged. Your tradition grows stronger. 🌱"
         : "Noted — it happens. Eleanor will keep watch.";
       toast({ title: msg });
       await fetchTimeline();
@@ -305,7 +305,7 @@ export default function RitualDetail() {
     );
   }
 
-  if (!ritual) return <Layout><div className="pt-20 text-center text-muted-foreground">Circle not found.</div></Layout>;
+  if (!ritual) return <Layout><div className="pt-20 text-center text-muted-foreground">Tradition not found.</div></Layout>;
 
   const statusMeta = getStatusMeta(ritual.status);
   const upcomingDate = timeline?.upcoming ? new Date(timeline.upcoming.scheduledDate) : null;
@@ -576,7 +576,7 @@ export default function RitualDetail() {
                     /* Flexible pending event */
                     <div className="pt-2 border-t border-border/50 flex items-center justify-between">
                       <p className="text-xs text-muted-foreground italic">
-                        Waiting for circle responses via invite links
+                        Waiting for tradition responses via invite links
                       </p>
                       <Link
                         href={`/ritual/${ritualId}/schedule`}
@@ -595,7 +595,7 @@ export default function RitualDetail() {
                   </div>
                   <p className="font-medium text-foreground mb-1">No gathering scheduled yet</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Set a time and Eleanor will send calendar invites to your circle.
+                    Set a time and Eleanor will send calendar invites to your tradition.
                   </p>
                   <Link
                     href={`/ritual/${ritualId}/schedule`}
@@ -674,7 +674,7 @@ export default function RitualDetail() {
                 <div>
                   <p className="font-semibold text-foreground">Plant a Shared Moment</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    A recurring micro-ritual your whole circle shows up for together.
+                    A recurring micro-ritual your whole tradition shows up for together.
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 ml-4 group-hover:bg-primary/20 transition-colors">
@@ -766,7 +766,7 @@ export default function RitualDetail() {
               className="bg-card rounded-2xl border border-card-border p-6 space-y-6"
             >
               <div>
-                <label className="block text-sm font-medium mb-2 text-foreground">Circle Name</label>
+                <label className="block text-sm font-medium mb-2 text-foreground">Tradition Name</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -816,27 +816,29 @@ export default function RitualDetail() {
                 )}
               </div>
 
-              <div className="pt-8 border-t border-destructive/20">
-                <h3 className="text-destructive font-medium mb-2">Archive this circle</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  This will permanently remove all history and cannot be undone.
-                </p>
-                <button
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to archive this circle?")) {
-                      deleteMutation.mutate({ id: ritualId }, {
-                        onSuccess: () => {
-                          queryClient.invalidateQueries({ queryKey: [`/api/rituals`] });
-                          setLocation("/dashboard");
-                        }
-                      });
-                    }
-                  }}
-                  className="px-4 py-2 bg-destructive/10 text-destructive rounded-xl font-medium hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                >
-                  Archive circle
-                </button>
-              </div>
+              {user?.id === ritual.ownerId && (
+                <div className="pt-8 border-t border-destructive/20">
+                  <h3 className="text-destructive font-medium mb-2">Delete this tradition</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    This will permanently remove all history and cannot be undone.
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this tradition? This cannot be undone.")) {
+                        deleteMutation.mutate({ id: ritualId }, {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: [`/api/rituals`] });
+                            setLocation("/dashboard");
+                          }
+                        });
+                      }
+                    }}
+                    className="px-4 py-2 bg-destructive/10 text-destructive rounded-xl font-medium hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  >
+                    Delete tradition
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

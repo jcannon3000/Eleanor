@@ -1229,15 +1229,20 @@ router.post("/moment/:momentToken/:userToken/post", async (req, res): Promise<vo
     const allTodayPosts = await db.select().from(momentPostsTable)
       .where(and(eq(momentPostsTable.momentId, moment.id), eq(momentPostsTable.windowDate, windowDate)));
 
+    const allMembers = await db.select().from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.momentId, moment.id));
+    const memberCount = allMembers.length;
+
     res.status(201).json({
       success: true,
       todayPostCount: allTodayPosts.length,
-      memberCount: (await db.select().from(momentUserTokensTable).where(eq(momentUserTokensTable.momentId, moment.id))).length,
+      memberCount,
     });
 
-    // Async: close and evaluate window if it's past the window end time
+    // Evaluate window: either the window has closed, OR all members have logged (bloom condition met)
     const windowIsStillOpen = isWindowOpen(moment);
-    if (!windowIsStillOpen) {
+    const allLogged = allTodayPosts.length >= memberCount && memberCount >= 2;
+    if (!windowIsStillOpen || allLogged) {
       evaluateWindow(moment.id, windowDate).catch(err =>
         console.warn("Window evaluation failed:", err?.message ?? err)
       );

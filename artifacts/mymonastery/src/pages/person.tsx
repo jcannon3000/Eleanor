@@ -73,7 +73,7 @@ export default function PersonProfile() {
         <div className="max-w-3xl mx-auto w-full pt-16 text-center">
           <Sprout size={36} className="text-muted-foreground/30 mx-auto mb-4" strokeWidth={1} />
           <h2 className="font-serif text-2xl mb-2">Person not found</h2>
-          <p className="text-muted-foreground mb-6 text-sm">This person isn't in any of your circles.</p>
+          <p className="text-muted-foreground mb-6 text-sm">This person isn't in any of your traditions.</p>
           <Link href="/people" className="text-primary hover:underline text-sm">← Back to Your People</Link>
         </div>
       </Layout>
@@ -134,7 +134,7 @@ export default function PersonProfile() {
             {[
               {
                 value: person.stats.sharedCircleCount,
-                label: person.stats.sharedCircleCount === 1 ? "shared circle" : "shared circles",
+                label: person.stats.sharedCircleCount === 1 ? "shared tradition" : "shared traditions",
               },
               {
                 value: person.stats.totalGatherings,
@@ -153,14 +153,14 @@ export default function PersonProfile() {
           </div>
         </motion.div>
 
-        {/* Shared Circles */}
+        {/* Shared Traditions */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
           className="bg-card rounded-3xl p-6 md:p-8 border border-card-border shadow-[var(--shadow-warm-sm)]"
         >
-          <h2 className="font-serif text-xl text-foreground mb-5">Shared Circles</h2>
+          <h2 className="font-serif text-xl text-foreground mb-5">Shared Traditions</h2>
           <div className="space-y-3">
             {person.sharedRituals.map(({ ritual }) => (
               <Link key={ritual.id} href={`/ritual/${ritual.id}`} className="block group">

@@ -142,6 +142,7 @@ interface MomentData {
   dayOfWeek?: string | null;
   currentStreak: number;
   longestStreak: number;
+  totalBlooms: number;
   state: string;
   memberCount: number;
   members: { name: string | null; email: string }[];
@@ -163,9 +164,14 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
   const memberNames = moment.members.slice(0, 3).map(m => (m.name ?? m.email).split(" ")[0]).join(", ");
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
   const templateEmoji = TEMPLATE_EMOJI[moment.templateType ?? "custom"] ?? "✨";
-  const mLabel = milestoneLabel(moment.currentStreak);
-  const mProgress = milestoneProgress(moment.currentStreak);
-  const hasGoal = (moment.goalDays ?? 0) > 0;
+  const todayBloomed = moment.todayPostCount >= moment.memberCount && moment.memberCount >= 2;
+  const effectiveStreak = moment.currentStreak + (todayBloomed && moment.currentStreak === 0 ? 1 : 0);
+  const goalDays = moment.goalDays ?? 0;
+  const hasGoal = goalDays > 0;
+  const goalProgress = hasGoal ? Math.min(effectiveStreak, goalDays) / goalDays : 0;
+  const goalLabel = hasGoal ? `🌿 Day ${effectiveStreak} of ${goalDays}` : "";
+  const mLabel = hasGoal ? goalLabel : milestoneLabel(moment.currentStreak);
+  const mProgress = hasGoal ? goalProgress : milestoneProgress(moment.currentStreak);
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS_MAIN.has(moment.templateType ?? "");
 
   return (
@@ -354,7 +360,7 @@ export default function Dashboard() {
   const moments: MomentData[] = momentsData?.moments ?? [];
   const gatherings = rituals ?? [];
   const myCircles = gatherings.filter(r => r.ownerId === user?.id);
-  const invitedCircles = gatherings.filter(r => r.ownerId !== user?.id);
+  const invitedTraditions = gatherings.filter(r => r.ownerId !== user?.id);
 
   const today = new Date();
   const todayStr = format(today, "EEEE, d MMMM");
@@ -515,12 +521,12 @@ export default function Dashboard() {
               </>
             )}
 
-            {/* ── INVITED CIRCLES ── */}
-            {invitedCircles.length > 0 && (
+            {/* ── INVITED TRADITIONS ── */}
+            {invitedTraditions.length > 0 && (
               <>
-                <TimeAnchor label="Circles you've joined" />
+                <TimeAnchor label="Traditions you've joined" />
                 <div className="space-y-3">
-                  {invitedCircles.map(r => {
+                  {invitedTraditions.map(r => {
                     const organizer = (r.participants as Array<{ name: string; email: string }>)?.[0];
                     return (
                       <Link key={`ic-${r.id}`} href={`/ritual/${r.id}`}>

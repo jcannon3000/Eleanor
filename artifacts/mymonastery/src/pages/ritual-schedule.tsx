@@ -106,7 +106,7 @@ export default function RitualSchedule() {
       });
       toast({
         title: "Gathering confirmed 🌱",
-        description: "Eleanor will send calendar invites to your circle.",
+        description: "Eleanor will send calendar invites to your tradition.",
       });
       setLocation(`/ritual/${ritualId}`);
     } catch {
@@ -135,7 +135,7 @@ export default function RitualSchedule() {
       });
       toast({
         title: "Options saved 🌿",
-        description: "Eleanor will share these times with your circle.",
+        description: "Eleanor will share these times with your tradition.",
       });
       setLocation(`/ritual/${ritualId}`);
     } catch {
@@ -163,14 +163,14 @@ export default function RitualSchedule() {
           onClick={() => setLocation(`/ritual/${ritualId}`)}
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-8 transition-colors"
         >
-          ← Back to {ritualName || "circle"}
+          ← Back to {ritualName || "tradition"}
         </button>
 
         <div className="mb-8">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Set gathering times</p>
           <h1 className="text-3xl font-semibold text-foreground mb-3">When can you gather?</h1>
           <p className="text-muted-foreground leading-relaxed">
-            A fixed time is perfect when everyone can make it. Flexible lets your circle vote — more options means more people can bloom. 🌸
+            A fixed time is perfect when everyone can make it. Flexible lets your tradition vote — more options means more people can bloom. 🌸
           </p>
         </div>
 
@@ -327,8 +327,8 @@ export default function RitualSchedule() {
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           {mode === "fixed"
-            ? "Eleanor will send calendar invites to everyone in your circle."
-            : "Eleanor will reach out to your circle with these options."}
+            ? "Eleanor will send calendar invites to everyone in your tradition."
+            : "Eleanor will reach out to your tradition with these options."}
         </p>
       </div>
     </Layout>
