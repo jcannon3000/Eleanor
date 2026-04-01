@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sprout, CheckCircle2, XCircle, Calendar } from "lucide-react";
+import { ArrowLeft, Sprout, CheckCircle2, XCircle, Calendar, Plus } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, differenceInWeeks } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonProfile } from "@/hooks/usePeople";
@@ -249,6 +249,26 @@ export default function PersonProfile() {
               ))}
             </div>
           )}
+        </motion.div>
+
+        {/* Invite to something new */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <Link
+            href={`/create`}
+            className="flex items-center justify-between w-full p-5 bg-card rounded-3xl border border-card-border shadow-[var(--shadow-warm-sm)] hover:border-primary/40 hover:shadow-[var(--shadow-warm-md)] transition-all group"
+          >
+            <div>
+              <p className="font-medium text-foreground group-hover:text-primary transition-colors">Invite to something new</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Start a practice or tradition with {person.name.split(" ")[0]}</p>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              <Plus size={16} className="text-primary group-hover:text-primary-foreground" />
+            </div>
+          </Link>
         </motion.div>
 
       </div>

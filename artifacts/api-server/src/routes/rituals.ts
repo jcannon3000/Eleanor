@@ -269,19 +269,28 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
 
   const sessionUserId = req.user ? (req.user as { id: number }).id : null;
 
-  // Delete any Google Calendar events attached to this ritual's meetups
-  if (sessionUserId) {
-    const meetups = await db
-      .select({ googleCalendarEventId: meetupsTable.googleCalendarEventId })
-      .from(meetupsTable)
-      .where(eq(meetupsTable.ritualId, params.data.id));
+  // Verify ownership
+  const [ritual] = await db.select({ ownerId: ritualsTable.ownerId }).from(ritualsTable).where(eq(ritualsTable.id, params.data.id));
+  if (!ritual) { res.status(404).json({ error: "Tradition not found" }); return; }
+  if (!sessionUserId || ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Only the owner can delete this tradition" }); return; }
 
-    await Promise.allSettled(
-      meetups
-        .filter((m) => m.googleCalendarEventId)
-        .map((m) => deleteCalendarEvent(sessionUserId, m.googleCalendarEventId!))
-    );
-  }
+  // Delete calendar events for all meetups
+  const meetups = await db
+    .select({ googleCalendarEventId: meetupsTable.googleCalendarEventId })
+    .from(meetupsTable)
+    .where(eq(meetupsTable.ritualId, params.data.id));
+
+  await Promise.allSettled(
+    meetups
+      .filter((m) => m.googleCalendarEventId)
+      .map((m) => deleteCalendarEvent(sessionUserId, m.googleCalendarEventId!))
+  );
+
+  // Delete all dependent records (tables without ON DELETE CASCADE in the actual DB)
+  await db.delete(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
+  await db.delete(ritualMessagesTable).where(eq(ritualMessagesTable.ritualId, params.data.id));
+  await db.delete(schedulingResponsesTable).where(eq(schedulingResponsesTable.ritualId, params.data.id));
+  await db.delete(inviteTokensTable).where(eq(inviteTokensTable.ritualId, params.data.id));
 
   await db.delete(ritualsTable).where(eq(ritualsTable.id, params.data.id));
   res.sendStatus(204);

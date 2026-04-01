@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Sprout, ArrowRight } from "lucide-react";
@@ -31,13 +31,21 @@ function colorFor(email: string) {
 }
 
 export default function People() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const { data: people, isLoading } = usePeople(user?.id);
+  const highlightEmail = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "").get("highlight") ?? null;
+  const highlightRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
+
+  useEffect(() => {
+    if (highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [people, highlightEmail]);
 
   if (authLoading) return null;
   if (!user) return null;
@@ -57,10 +65,10 @@ export default function People() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-4xl md:text-5xl font-serif text-foreground tracking-tight">
-              Your People
+              Your garden 🌿
             </h1>
             <p className="mt-3 text-base text-muted-foreground italic">
-              "The ones who keep showing up."
+              People tending things alongside you.
             </p>
           </div>
         </div>
@@ -101,10 +109,14 @@ export default function People() {
             animate="show"
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
           >
-            {people.map(person => (
-              <motion.div key={person.email} variants={item}>
+            {people.map(person => {
+              const isHighlighted = highlightEmail === person.email;
+              return (
+              <motion.div key={person.email} variants={item} ref={isHighlighted ? highlightRef : null}>
                 <Link href={`/people/${encodeURIComponent(person.email)}`} className="block group focus:outline-none">
-                  <div className="h-full bg-card rounded-2xl p-5 border border-card-border shadow-[var(--shadow-warm-sm)] hover:shadow-[var(--shadow-warm-md)] hover:-translate-y-0.5 transition-all duration-300 flex items-start gap-4 group-focus-visible:ring-2 group-focus-visible:ring-primary">
+                  <div className={`h-full bg-card rounded-2xl p-5 border shadow-[var(--shadow-warm-sm)] hover:shadow-[var(--shadow-warm-md)] hover:-translate-y-0.5 transition-all duration-300 flex items-start gap-4 group-focus-visible:ring-2 group-focus-visible:ring-primary ${
+                    isHighlighted ? "border-primary/50 ring-2 ring-primary/20" : "border-card-border"
+                  }`}>
 
                     {/* Avatar */}
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-semibold flex-shrink-0 ${colorFor(person.email)}`}>
@@ -127,16 +139,23 @@ export default function People() {
                             ? "1 shared tradition"
                             : `${person.sharedCircleCount} shared traditions`}
                         </p>
-                        <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
-                          <Sprout size={11} />
-                          Together {formatDistanceToNow(parseISO(person.firstCircleDate), { addSuffix: false })}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                            <Sprout size={11} />
+                            Together {formatDistanceToNow(parseISO(person.firstCircleDate), { addSuffix: false })}
+                          </p>
+                          {(person as { maxSharedStreak?: number }).maxSharedStreak ? (
+                            <span className="text-xs text-[#6B8F71] font-medium">
+                              🔥 {(person as { maxSharedStreak?: number }).maxSharedStreak} streak
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </Link>
               </motion.div>
-            ))}
+            );})}
           </motion.div>
         )}
       </div>

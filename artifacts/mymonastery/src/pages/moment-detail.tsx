@@ -230,7 +230,7 @@ export default function MomentDetail() {
     mutationFn: () => apiRequest("PATCH", `/api/moments/${id}/archive`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/moments"] });
-      setLocation("/moments");
+      setLocation("/dashboard");
     },
   });
 
@@ -238,7 +238,7 @@ export default function MomentDetail() {
     mutationFn: () => apiRequest("DELETE", `/api/moments/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/moments"] });
-      setLocation("/moments");
+      setLocation("/dashboard");
     },
   });
 
@@ -311,7 +311,7 @@ export default function MomentDetail() {
 
         {/* Back */}
         <button
-          onClick={() => setLocation("/moments")}
+          onClick={() => setLocation("/dashboard")}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-5 transition-colors"
         >
           ← Your practices
@@ -394,21 +394,31 @@ export default function MomentDetail() {
             </div>
           )}
 
-          {/* Member names as plain dot-separated text + together count */}
+          {/* Member names as tappable links + together count */}
           {members.length > 0 && (() => {
-            const firstNames = members.map(m => (m.name ?? m.email).split(" ")[0]);
             const togetherCount = windows.filter(w => w.postCount >= 2).length;
             const isPrayer = ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "");
             const togetherVerb = isPrayer ? "prayed" : "practiced";
             const MAX = 4;
-            const shown = firstNames.length <= MAX ? firstNames : firstNames.slice(0, MAX - 1);
-            const extra = firstNames.length > MAX ? firstNames.length - (MAX - 1) : 0;
-            const nameStr = extra > 0
-              ? [...shown, `+${extra} more`].join(" · ")
-              : shown.join(" · ");
+            const shown = members.length <= MAX ? members : members.slice(0, MAX - 1);
+            const extra = members.length > MAX ? members.length - (MAX - 1) : 0;
             return (
               <div className="mt-2 space-y-0.5">
-                <p className="text-sm text-muted-foreground/70">{nameStr}</p>
+                <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                  {shown.map((m, i) => (
+                    <span key={m.email}>
+                      <Link
+                        href={`/people/${encodeURIComponent(m.email)}`}
+                        className="text-sm text-muted-foreground/70 hover:text-primary transition-colors"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
+                        {(m.name ?? m.email).split(" ")[0]}
+                      </Link>
+                      {(i < shown.length - 1 || extra > 0) && <span className="text-muted-foreground/40"> ·</span>}
+                    </span>
+                  ))}
+                  {extra > 0 && <span className="text-sm text-muted-foreground/50">+{extra} more</span>}
+                </div>
                 <p className="text-xs text-muted-foreground/50">
                   🤝 {togetherCount} {togetherCount === 1 ? "time" : "times"} {togetherVerb} together
                 </p>
@@ -521,21 +531,29 @@ export default function MomentDetail() {
           </motion.div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-bold text-foreground">{moment.currentStreak}</p>
-            <p className="text-xs text-muted-foreground mt-1">🔥 Current streak</p>
-          </div>
-          <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-bold text-foreground">{moment.longestStreak}</p>
-            <p className="text-xs text-muted-foreground mt-1">⭐ Best streak</p>
-          </div>
-          <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-bold text-foreground">{moment.totalBlooms}</p>
-            <p className="text-xs text-muted-foreground mt-1">🌸 Blooms</p>
-          </div>
-        </div>
+        {/* Stats — optimistic: bump streak/blooms immediately when all members have logged today */}
+        {(() => {
+          const todayBloomed = todayPostCount >= memberCount && memberCount >= 2;
+          const displayStreak = todayBloomed && moment.currentStreak === 0 ? 1 : moment.currentStreak;
+          const displayLongest = Math.max(displayStreak, moment.longestStreak);
+          const displayBlooms = todayBloomed && moment.totalBlooms === 0 ? 1 : moment.totalBlooms;
+          return (
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">{displayStreak}</p>
+                <p className="text-xs text-muted-foreground mt-1">🔥 Current streak</p>
+              </div>
+              <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">{displayLongest}</p>
+                <p className="text-xs text-muted-foreground mt-1">⭐ Best streak</p>
+              </div>
+              <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">{displayBlooms}</p>
+                <p className="text-xs text-muted-foreground mt-1">🌸 Blooms</p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Commitment Display */}
         {(() => {

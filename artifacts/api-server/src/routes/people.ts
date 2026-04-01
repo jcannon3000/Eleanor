@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, or, sql } from "drizzle-orm";
-import { db, ritualsTable, meetupsTable, usersTable } from "@workspace/db";
+import { eq, desc, or, sql, inArray } from "drizzle-orm";
+import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable } from "@workspace/db";
 import { computeStreak } from "../lib/streak";
 
 const router: IRouter = Router();
@@ -62,12 +62,35 @@ router.get("/people", async (req, res): Promise<void> => {
     }
   }
 
-  const people = Array.from(map.values()).map(p => ({
-    ...p,
-    firstCircleDate: p.firstCircleDate.toISOString(),
-  }));
+  // Enrich each person with max current streak from shared practices
+  const ownerTokenRows = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.email, ownerEmail));
+  const ownerMomentIds = ownerTokenRows.map(t => t.momentId);
 
-  res.json(people);
+  const peopleWithStreaks = await Promise.all(
+    Array.from(map.values()).map(async (p) => {
+      let maxStreak = 0;
+      if (ownerMomentIds.length > 0) {
+        const personTokenRows = await db.select().from(momentUserTokensTable)
+          .where(eq(momentUserTokensTable.email, p.email));
+        const personMomentIds = new Set(personTokenRows.map(t => t.momentId));
+        const sharedMomentIds = ownerMomentIds.filter(id => personMomentIds.has(id));
+        if (sharedMomentIds.length > 0) {
+          const sharedMoments = await db.select({ currentStreak: sharedMomentsTable.currentStreak })
+            .from(sharedMomentsTable)
+            .where(inArray(sharedMomentsTable.id, sharedMomentIds));
+          maxStreak = Math.max(0, ...sharedMoments.map(m => m.currentStreak ?? 0));
+        }
+      }
+      return {
+        ...p,
+        firstCircleDate: p.firstCircleDate.toISOString(),
+        maxSharedStreak: maxStreak,
+      };
+    })
+  );
+
+  res.json(peopleWithStreaks);
 });
 
 // GET /api/people/:email?ownerId=N
