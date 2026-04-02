@@ -31,7 +31,20 @@ import { z } from "zod/v4";
 const router: IRouter = Router();
 
 async function enrichRitual(ritual: typeof ritualsTable.$inferSelect, meetups: typeof meetupsTable.$inferSelect[]) {
-  const { streak, lastMeetupDate, nextMeetupDate, status } = computeStreak(meetups, ritual.frequency);
+  const { streak, lastMeetupDate, nextMeetupDate: computedNext, status } = computeStreak(meetups, ritual.frequency);
+
+  // If no history yet, fall back to the earliest future planned meetup date
+  let nextMeetupDate = computedNext;
+  if (!nextMeetupDate) {
+    const now = new Date();
+    const planned = meetups
+      .filter((m) => m.status === "planned" && new Date(m.scheduledDate) > now)
+      .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
+    if (planned.length > 0) {
+      nextMeetupDate = new Date(planned[0].scheduledDate).toISOString();
+    }
+  }
+
   return {
     ...ritual,
     participants: (ritual.participants as Array<{ name: string; email: string }>) ?? [],
