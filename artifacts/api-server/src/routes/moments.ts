@@ -51,8 +51,20 @@ function isWindowOpen(moment: { scheduledTime: string; windowMinutes: number; ti
   const { hour, minute } = getCurrentTimeInTz(tz);
   const currentMins = hour * 60 + minute;
   const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const startMins = h * 60 + m;
-  const endMins = startMins + moment.windowMinutes;
+  const scheduledMins = h * 60 + m;
+  // Window is centered: ±half of windowMinutes around the scheduled time
+  // Minimum 240 min (±2 hours) for non-all-day practices
+  const effectiveWindow = moment.windowMinutes >= 1440 ? moment.windowMinutes : Math.max(240, moment.windowMinutes);
+  const halfWindow = Math.floor(effectiveWindow / 2);
+  const startMins = scheduledMins - halfWindow;
+  const endMins = scheduledMins + halfWindow;
+  // Handle day wrap (e.g. scheduled at 1:00 AM with 4-hour window)
+  if (startMins < 0) {
+    return currentMins >= (startMins + 1440) || currentMins < endMins;
+  }
+  if (endMins > 1440) {
+    return currentMins >= startMins || currentMins < (endMins - 1440);
+  }
   return currentMins >= startMins && currentMins < endMins;
 }
 
@@ -119,7 +131,15 @@ function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number
   const { hour, minute } = getCurrentTimeInTz(tz);
   const currentMins = hour * 60 + minute;
   const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const endMins = h * 60 + m + moment.windowMinutes;
+  const scheduledMins = h * 60 + m;
+  const effectiveWindow = moment.windowMinutes >= 1440 ? moment.windowMinutes : Math.max(240, moment.windowMinutes);
+  const halfWindow = Math.floor(effectiveWindow / 2);
+  const endMins = scheduledMins + halfWindow;
+  if (endMins > 1440) {
+    return currentMins >= scheduledMins
+      ? Math.max(0, endMins - currentMins)
+      : Math.max(0, (endMins - 1440) - currentMins);
+  }
   return Math.max(0, endMins - currentMins);
 }
 
@@ -266,7 +286,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
     scheduledTime,
     goalDays,
     momentToken,
-    windowMinutes: 60,
+    windowMinutes: 240,
   }).returning();
 
   // Get the organizer's info
@@ -440,7 +460,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     timezone,
     timeOfDay: isSpiritual ? (timeOfDay ?? null) : null,
     momentToken,
-    windowMinutes: isBcp ? 1440 : (isSpiritual ? 1440 : 60),
+    windowMinutes: isBcp ? 1440 : (isSpiritual ? 1440 : 240),
     ...(frequencyType !== undefined ? { frequencyType } : {}),
     ...(frequencyDaysPerWeek !== undefined ? { frequencyDaysPerWeek } : {}),
     ...(practiceDays !== undefined ? { practiceDays } : {}),
@@ -692,52 +712,70 @@ router.post("/moments", async (req, res): Promise<void> => {
     ].join("\n");
   }
 
-  // ─── Calendar invite events for NON-organizer members only ─────────────────
-  // The organizer gets their own bell event via the personal-time handler.
-  // Members receive a Google Calendar invite so they know about the practice.
+  // ─── Create ONE group calendar event with all members ──────────────────────
   const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
-  const inviteTokens = insertedTokens.filter(t => t.email !== organizer.email);
+  const attendeeEmails = insertedTokens
+    .map(t => t.email)
+    .filter(e => e !== organizer.email);
   let gcalCreated = false;
 
-  if (isFasting) {
-    const fastingDateStr = getFastingStartDateStr();
-    const fastingRec = getFastingRecurrence();
-    const fastingTitle = buildEventTitle();
-    for (const t of inviteTokens) {
+  try {
+    const eventTitle = buildEventTitle();
+    const description = [
+      `${name} practice on Eleanor.`,
+      ...(intention ? [`"${intention}"`] : []),
+      "",
+      `${insertedTokens.length} ${insertedTokens.length === 1 ? "person" : "people"} practicing together.`,
+      "",
+      `Open Eleanor → ${getFrontendUrl()}/moments/${moment.id}`,
+    ].join("\n");
+
+    if (isFasting) {
+      const fastingDateStr = getFastingStartDateStr();
+      const fastingRec = getFastingRecurrence();
+      const fastingTitle = buildEventTitle();
       const eventId = await createAllDayCalendarEvent(sessionUserId, {
         summary: fastingTitle,
-        description: buildFastingDescription(t.userToken, organizerName, false),
+        description,
         dateStr: fastingDateStr,
-        attendees: [t.email],
+        attendees: attendeeEmails,
         recurrence: fastingRec,
       }).catch(() => null);
+
       if (eventId) {
-        await db.update(momentUserTokensTable)
-          .set({ googleCalendarEventId: eventId })
-          .where(eq(momentUserTokensTable.id, t.id));
+        // Store event ID on the organizer's token
+        const orgToken = insertedTokens.find(t => t.email === organizer.email);
+        if (orgToken) {
+          await db.update(momentUserTokensTable)
+            .set({ googleCalendarEventId: eventId })
+            .where(eq(momentUserTokensTable.id, orgToken.id));
+        }
         gcalCreated = true;
       }
-    }
-  } else {
-    const eventTitle = buildEventTitle();
-    for (const t of inviteTokens) {
+    } else {
       const eventId = await createCalendarEvent(sessionUserId, {
         summary: eventTitle,
-        description: buildDescription(t.userToken, t.name ?? t.email, organizerName, false),
+        description,
         startDate,
         startLocalStr,
         endLocalStr,
         timeZone: tz,
-        attendees: [t.email],
+        attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
         recurrence: recurrenceRule,
       }).catch(() => null);
+
       if (eventId) {
-        await db.update(momentUserTokensTable)
-          .set({ googleCalendarEventId: eventId })
-          .where(eq(momentUserTokensTable.id, t.id));
+        const orgToken = insertedTokens.find(t => t.email === organizer.email);
+        if (orgToken) {
+          await db.update(momentUserTokensTable)
+            .set({ googleCalendarEventId: eventId })
+            .where(eq(momentUserTokensTable.id, orgToken.id));
+        }
         gcalCreated = true;
       }
     }
+  } catch (calErr) {
+    console.error("Practice calendar event creation failed (non-fatal):", calErr);
   }
 
   res.status(201).json({
@@ -1405,30 +1443,21 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
 
     const { personalTime, personalTimezone } = parsed.data;
 
-    const [myTokenRow] = await db.select().from(momentUserTokensTable)
-      .where(and(eq(momentUserTokensTable.momentId, momentId), eq(momentUserTokensTable.email, user.email)));
+    // Verify the user is a member
+    const allMembers = await db.select().from(momentUserTokensTable)
+      .where(eq(momentUserTokensTable.momentId, momentId));
+    const myTokenRow = allMembers.find(t => t.email === user.email);
     if (!myTokenRow) { res.status(403).json({ error: "Not a member" }); return; }
 
-    await db.update(momentUserTokensTable)
-      .set({ personalTime, personalTimezone })
-      .where(eq(momentUserTokensTable.id, myTokenRow.id));
+    // Update the practice's shared scheduled time (applies to everyone)
+    await db.update(sharedMomentsTable)
+      .set({ scheduledTime: personalTime, timezone: personalTimezone })
+      .where(eq(sharedMomentsTable.id, momentId));
 
-    // Compute next occurrences for DB tracking
-    const occurrences = nextOccurrences(personalTime, personalTimezone, moment.frequency, moment.dayOfWeek ?? null, 2);
-    for (let i = 0; i < occurrences.length; i++) {
-      await db.insert(momentCalendarEventsTable).values({
-        sharedMomentId: momentId,
-        momentMemberId: myTokenRow.id,
-        scheduledFor: occurrences[i],
-        isFirstEvent: i === 0,
-      });
-    }
-
-    // Create or update a Google Calendar event on the USER'S OWN calendar
+    // Build calendar event parameters
     const [hh2, mm2] = personalTime.split(":").map(Number);
     const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone, practiceEventDurationMins(moment.templateType));
 
-    // Build recurrence rule matching the practice frequency
     const recurrence: string[] = [];
     if (moment.frequency === "daily") {
       recurrence.push("RRULE:FREQ=DAILY");
@@ -1438,54 +1467,54 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       recurrence.push("RRULE:FREQ=WEEKLY");
     }
 
-    const oldCalEventId = myTokenRow.googleCalendarEventId;
-
-    try {
-      // Step 1: Delete the old calendar event if one exists
-      if (oldCalEventId) {
+    // Delete ALL old calendar events for every member
+    for (const member of allMembers) {
+      if (member.googleCalendarEventId) {
         try {
-          await deleteCalendarEvent(sessionUserId, oldCalEventId);
-          console.info(`Bell deleted old GCal event ${oldCalEventId} for user ${user.email}`);
-        } catch {
-          console.info(`Bell could not delete old GCal event ${oldCalEventId} for ${user.email} — may be on organizer's calendar`);
-        }
+          await deleteCalendarEvent(sessionUserId, member.googleCalendarEventId);
+        } catch { /* best effort */ }
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: null, calendarConnected: false })
+          .where(eq(momentUserTokensTable.id, member.id));
       }
+    }
 
-      // Step 2: Always create a fresh recurring event on the user's own calendar
-      const shortLink = `${getFrontendUrl()}/m/${myTokenRow.userToken}`;
+    // Create ONE new group calendar event on the organizer's calendar with all members
+    try {
+      const attendeeEmails = allMembers
+        .map(m => m.email)
+        .filter(e => e !== user.email);
+
       const newId = await createCalendarEvent(sessionUserId, {
         summary: `🔔 ${moment.name}`,
         description: [
-          `Your ${moment.name} practice on Eleanor.`,
+          `${moment.name} practice on Eleanor.`,
           ...(moment.intention ? [`"${moment.intention}"`] : []),
           "",
-          "Tap to log:",
-          shortLink,
+          `${allMembers.length} ${allMembers.length === 1 ? "person" : "people"} practicing together.`,
+          "",
+          `Open Eleanor → ${getFrontendUrl()}/moments/${momentId}`,
         ].join("\n"),
         startDate: new Date(),
         startLocalStr,
         endLocalStr,
         timeZone: personalTimezone,
+        attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
         recurrence: recurrence.length > 0 ? recurrence : undefined,
       });
 
-      // Step 3: Save the new event ID
-      await db.update(momentUserTokensTable)
-        .set({
-          googleCalendarEventId: newId ?? null,
-          calendarConnected: !!newId,
-        })
-        .where(eq(momentUserTokensTable.id, myTokenRow.id));
-
       if (newId) {
-        console.info(`Bell created new GCal event ${newId} for moment ${momentId}, user ${user.email} at ${startLocalStr} ${personalTimezone}`);
+        // Store the event ID on the organizer's token row
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: newId, calendarConnected: true })
+          .where(eq(momentUserTokensTable.id, myTokenRow.id));
+        console.info(`Bell: created group GCal event ${newId} for moment ${momentId} at ${startLocalStr} ${personalTimezone}`);
       }
     } catch (gcalErr) {
       console.error("Bell GCal sync error:", gcalErr);
-      // Non-fatal — the personal time was still saved to the DB
     }
 
-    res.json({ ok: true, calendarEventsCreated: occurrences.length });
+    res.json({ ok: true });
   } catch (err) {
     console.error("POST /moments/:id/personal-time error:", err);
     if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
@@ -1651,6 +1680,7 @@ const EditMomentSchema = z.object({
   dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).nullable().optional(),
   practiceDays: z.string().optional(),
   goalDays: z.number().int().min(0).max(365).optional(),
+  scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   intercessionTopic: z.string().max(300).nullable().optional(),
   contemplativeDurationMinutes: z.number().int().min(1).max(60).nullable().optional(),
 });
@@ -1685,6 +1715,7 @@ router.patch("/moments/:id", async (req, res): Promise<void> => {
   if (d.dayOfWeek !== undefined) updates.dayOfWeek = d.dayOfWeek;
   if (d.practiceDays !== undefined) updates.practiceDays = d.practiceDays;
   if (d.goalDays !== undefined) updates.goalDays = d.goalDays;
+  if (d.scheduledTime !== undefined) updates.scheduledTime = d.scheduledTime;
   if (d.intercessionTopic !== undefined) updates.intercessionTopic = d.intercessionTopic;
   if (d.contemplativeDurationMinutes !== undefined) updates.contemplativeDurationMinutes = d.contemplativeDurationMinutes;
 

@@ -206,12 +206,12 @@ export default function MomentDetail() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
-  const [editingReminder, setEditingReminder] = useState(false);
-  const [reminderTimeValue, setReminderTimeValue] = useState("");
+  // Bell editing removed — shared time, editable via Settings > Edit practice
   const [editingPractice, setEditingPractice] = useState(false);
   const [editName, setEditName] = useState("");
   const [editIntention, setEditIntention] = useState("");
   const [editGoalDays, setEditGoalDays] = useState(7);
+  const [editScheduledTime, setEditScheduledTime] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
@@ -261,14 +261,7 @@ export default function MomentDetail() {
     },
   });
 
-  const reminderMutation = useMutation({
-    mutationFn: (payload: { personalTime: string; personalTimezone: string }) =>
-      apiRequest("POST", `/api/moments/${id}/personal-time`, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
-      setEditingReminder(false);
-    },
-  });
+  // Bell mutation removed — time is edited via the practice edit form
 
   const editMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -361,71 +354,7 @@ export default function MomentDetail() {
             {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
 
-          {/* Monastery bell */}
-          {!isFasting && (
-            <div className="mt-4 rounded-2xl border border-amber-200/70 bg-amber-50/60 px-4 py-3">
-              {editingReminder ? (
-                <div>
-                  <p className="text-xs font-semibold text-amber-800/70 uppercase tracking-widest mb-2">When does your bell ring?</p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="time"
-                      value={reminderTimeValue}
-                      onChange={e => setReminderTimeValue(e.target.value)}
-                      autoFocus
-                      className="border border-amber-300 rounded-xl px-3 py-2 bg-white text-foreground text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                    />
-                    <button
-                      onClick={() => {
-                        if (reminderTimeValue) {
-                          reminderMutation.mutate({
-                            personalTime: reminderTimeValue,
-                            personalTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                          });
-                        }
-                      }}
-                      disabled={reminderMutation.isPending || !reminderTimeValue}
-                      className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-40"
-                    >
-                      {reminderMutation.isPending ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      onClick={() => setEditingReminder(false)}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <p className="text-xs text-amber-700/60 mt-2">
-                    Your bell — the time you set aside to show up, wherever you are.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl leading-none">🔔</span>
-                    <div>
-                      <p className="text-xs font-semibold text-amber-800/60 uppercase tracking-widest mb-0.5">Your bell</p>
-                      <p className="text-base font-semibold text-amber-900">
-                        {myPersonalTime
-                          ? formatTime(myPersonalTime)
-                          : formatTime(moment.scheduledTime)}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setReminderTimeValue(myPersonalTime ?? moment.scheduledTime);
-                      setEditingReminder(true);
-                    }}
-                    className="text-xs font-medium text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-400 rounded-lg px-3 py-1.5 transition-colors bg-white/60"
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Bell removed — logging window is ±2 hours around scheduled time */}
 
           {/* Member names as tappable links + together count */}
           {members.length > 0 && (() => {
@@ -805,6 +734,7 @@ export default function MomentDetail() {
                       setEditName(moment.name);
                       setEditIntention(moment.intention ?? "");
                       setEditGoalDays(moment.goalDays);
+                      setEditScheduledTime(moment.scheduledTime);
                       setEditingPractice(true);
                     }}
                     className="shrink-0 ml-4 text-xs font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-4 py-2 hover:bg-[#6B8F71]/8 transition-colors min-h-[36px]"
@@ -849,6 +779,18 @@ export default function MomentDetail() {
                       className="w-24 border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20"
                     />
                   </div>
+                  {!isFasting && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Scheduled time</label>
+                      <input
+                        type="time"
+                        value={editScheduledTime}
+                        onChange={e => setEditScheduledTime(e.target.value)}
+                        className="border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Everyone can log ±2 hours around this time.</p>
+                    </div>
+                  )}
                   <div className="flex gap-3">
                     <button
                       onClick={() => {
@@ -856,6 +798,7 @@ export default function MomentDetail() {
                         if (editName.trim() && editName !== moment.name) payload.name = editName.trim();
                         if (editIntention !== (moment.intention ?? "")) payload.intention = editIntention;
                         if (editGoalDays !== moment.goalDays) payload.goalDays = editGoalDays;
+                        if (editScheduledTime && editScheduledTime !== moment.scheduledTime) payload.scheduledTime = editScheduledTime;
                         if (Object.keys(payload).length > 0) {
                           editMutation.mutate(payload);
                         } else {
