@@ -573,6 +573,201 @@ async function generateCalendarAwareTimes(
   return result.slice(0, 3).map((d) => d.toISOString());
 }
 
+// POST /api/rituals/suggest-times-for-group — auth-required
+// Finds 3 candidate 1-hour windows over the next 21 days where ALL readable calendars are free.
+// Must be placed BEFORE the /:id route to avoid the :id pattern matching "suggest-times-for-group".
+router.post("/rituals/suggest-times-for-group", async (req, res): Promise<void> => {
+  const sessionUser = req.user as { id: number; email?: string } | undefined;
+  if (!sessionUser) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { memberEmails = [], frequency = "weekly", type = "custom", tzOffset = 0 } = req.body as {
+    memberEmails?: string[];
+    frequency?: string;
+    type?: string;
+    tzOffset?: number;
+  };
+
+  // Derive dayPreference from type + frequency
+  let dayPreference: string;
+  if ((type === "coffee" || type === "walk" || type === "run") && frequency === "weekly") {
+    dayPreference = "weekend";
+  } else if (type === "meal") {
+    dayPreference = "weekend";
+  } else {
+    dayPreference = "weekday";
+  }
+
+  const apiFrequency =
+    frequency === "fortnightly" ? "biweekly" :
+    frequency === "monthly"    ? "monthly"  :
+    frequency === "open"       ? "weekly"   : "weekly";
+
+  const now = new Date();
+  const endDate = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+
+  // --- Build busy arrays for all readable users ---
+  type BusySlot = { start: string; end: string };
+  type CalendarEntry = { busySlots: BusySlot[] };
+
+  const calendarEntries: CalendarEntry[] = [];
+  const unreadableMembers: string[] = [];
+
+  // Session user's calendar
+  try {
+    const sessionBusy = await getFreeBusy(sessionUser.id, now, endDate);
+    calendarEntries.push({ busySlots: sessionBusy });
+  } catch {
+    // If we can't read the session user's calendar, we continue without it
+  }
+
+  // Member calendars — look up Eleanor users by email
+  for (const email of memberEmails) {
+    try {
+      const [member] = await db
+        .select({ id: usersTable.id, googleAccessToken: usersTable.googleAccessToken })
+        .from(usersTable)
+        .where(eq(usersTable.email, email));
+
+      if (member && member.googleAccessToken) {
+        const memberBusy = await getFreeBusy(member.id, now, endDate);
+        calendarEntries.push({ busySlots: memberBusy });
+      } else {
+        unreadableMembers.push(email);
+      }
+    } catch {
+      unreadableMembers.push(email);
+    }
+  }
+
+  // --- Generate candidate slots: iterate day by day for 21 days ---
+  const tzOffsetMinutes = isNaN(tzOffset) ? 0 : tzOffset;
+
+  // Hours to try in local time
+  const candidateLocalHours = [8, 9, 10, 11, 14, 15, 16, 17, 18];
+
+  interface ScoredSlot {
+    startUTC: Date;
+    score: number;
+    label: string;
+    worksForAll: boolean;
+  }
+
+  function slotIsBusyForEntry(slotUTC: Date, entry: CalendarEntry): boolean {
+    const slotEndUTC = new Date(slotUTC.getTime() + 60 * 60 * 1000);
+    return entry.busySlots.some((b) => {
+      const bs = new Date(b.start);
+      const be = new Date(b.end);
+      return slotUTC < be && slotEndUTC > bs;
+    });
+  }
+
+  const scoredSlots: ScoredSlot[] = [];
+
+  for (let dayOffset = 1; dayOffset <= 21 && scoredSlots.length < 10; dayOffset++) {
+    const dayDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+    // Determine local day of week: adjust UTC date by tzOffset
+    const localMs = dayDate.getTime() - tzOffsetMinutes * 60 * 1000;
+    const localDate = new Date(localMs);
+    const localDow = localDate.getUTCDay(); // 0=Sun, 6=Sat
+    const isWeekend = localDow === 0 || localDow === 6;
+
+    for (const localHour of candidateLocalHours) {
+      // Convert local hour to UTC
+      const utcHour = localHour + Math.round(tzOffsetMinutes / 60);
+      // Build UTC datetime for this slot
+      const slotUTC = new Date(
+        Date.UTC(
+          localDate.getUTCFullYear(),
+          localDate.getUTCMonth(),
+          localDate.getUTCDate(),
+          utcHour,
+          0, 0, 0
+        )
+      );
+
+      // Skip slots in the past
+      if (slotUTC <= now) continue;
+
+      // Skip slots beyond endDate
+      if (slotUTC >= endDate) continue;
+
+      // Check if free across all readable calendars
+      const freePct = calendarEntries.length === 0 || calendarEntries.every((e) => !slotIsBusyForEntry(slotUTC, e));
+
+      if (!freePct) continue;
+
+      // Score the slot
+      let score = 0;
+      if (isWeekend && (type === "coffee" || type === "walk" || type === "run")) {
+        score += 2;
+        if (localHour >= 8 && localHour <= 11) score += 1; // morning bonus
+      }
+      if (type === "meal" && isWeekend) {
+        score += 2;
+        if (localHour >= 14 && localHour <= 16) score += 1; // afternoon bonus
+      }
+      if (!isWeekend && localHour >= 17 && localHour <= 19) {
+        score += 1; // weekday evening
+      }
+      // Weekend preference from dayPreference
+      if (dayPreference === "weekend" && isWeekend) score += 1;
+      if (dayPreference === "weekday" && !isWeekend) score += 1;
+
+      // Build label
+      let label: string;
+      if (isWeekend && localHour < 12) label = "Weekend morning 🌅";
+      else if (isWeekend && localHour < 17) label = "Weekend afternoon 🌿";
+      else if (isWeekend) label = "Weekend evening 🌿";
+      else if (!isWeekend && localHour < 12) label = "Weekday morning 🌅";
+      else if (!isWeekend && localHour < 17) label = "Weekday afternoon 🌿";
+      else label = "Weekday evening 🌿";
+
+      scoredSlots.push({
+        startUTC: slotUTC,
+        score,
+        label,
+        worksForAll: calendarEntries.length > 0,
+      });
+    }
+  }
+
+  // Sort by score desc, then chronologically, take top 3
+  scoredSlots.sort((a, b) => b.score - a.score || a.startUTC.getTime() - b.startUTC.getTime());
+  const top3 = scoredSlots.slice(0, 3);
+
+  // If we found fewer than 3 (or none), pad with fallback weekend slots
+  if (top3.length < 3) {
+    // Fallback: next 3 weekends at 10am UTC
+    const fallbacks: ScoredSlot[] = [];
+    let d = new Date(now);
+    while (fallbacks.length < 3) {
+      d = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+      const dow = d.getUTCDay();
+      if (dow === 6) { // Saturday
+        const fb = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 10, 0, 0, 0));
+        if (fb > now && !top3.some((s) => s.startUTC.getTime() === fb.getTime())) {
+          fallbacks.push({ startUTC: fb, score: 0, label: "Weekend morning 🌅", worksForAll: false });
+        }
+      }
+    }
+    for (const fb of fallbacks) {
+      if (top3.length >= 3) break;
+      top3.push(fb);
+    }
+  }
+
+  const suggestions = top3.map((s) => ({
+    startISO: s.startUTC.toISOString(),
+    label: s.label,
+    worksForAll: s.worksForAll,
+  }));
+
+  res.json({ suggestions, unreadableMembers });
+});
+
 // GET /api/rituals/:id/suggested-times — auth-required
 // Always generates fresh suggestions based on day preference + calendar free/busy.
 // Does NOT use proposedTimes cache — that is only set via PATCH when the user confirms.
