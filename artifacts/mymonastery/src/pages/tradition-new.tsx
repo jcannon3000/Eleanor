@@ -257,9 +257,15 @@ export default function TraditionNew() {
       const ritual = await createRes.json();
       const ritualId = ritual.id;
 
+      // Send all 3 suggestions as proposed times (selectedTime first), no confirmedTime yet —
+      // participants respond via their invite link to pick which works for them.
+      const orderedTimes = [
+        selectedTime.toISOString(),
+        ...suggestions.filter((s) => s !== selectedTime.toISOString()),
+      ];
+
       await apiRequest("PATCH", `/api/rituals/${ritualId}/proposed-times`, {
-        proposedTimes: [selectedTime.toISOString()],
-        confirmedTime: selectedTime.toISOString(),
+        proposedTimes: orderedTimes,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/rituals"] });
@@ -625,10 +631,13 @@ export default function TraditionNew() {
               {/* Suggestion cards */}
               {suggestionsLoaded && !suggestionsError && (
                 <div className="flex flex-col gap-3">
-                  {suggestions.map((iso) => {
+                  <p className="text-sm text-[#2C1810]/50 mb-1">
+                    Pick your first choice. Eleanor will send all three to your group so they can say which works.
+                  </p>
+                  {suggestions.map((iso, i) => {
                     const d = new Date(iso);
                     const isSelected = selectedTime?.toISOString() === d.toISOString();
-                    const dayType = slotDayType(iso);
+                    const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
                     const worksForAll = allMembersReadable();
                     return (
                       <button
@@ -640,18 +649,19 @@ export default function TraditionNew() {
                             : "border border-[#e8d5b8] hover:border-[#C17F24]/30"
                         }`}
                       >
-                        <div className="font-medium text-[#2C1810]">
-                          {format(d, "EEEE, MMMM d")}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium text-[#2C1810]">
+                            {format(d, "EEEE, MMMM d")}
+                          </div>
+                          {isSelected && <span className="text-[#C17F24] font-semibold text-sm">✓</span>}
                         </div>
                         <div className="text-sm text-[#2C1810]/70 mt-0.5">
                           {format(d, "h:mm a")} – {format(addHours(d, 1), "h:mm a")}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-[#2C1810]/40">{dayType}</span>
-                          {worksForAll ? (
-                            <span className="text-xs text-[#6B8F71]">Works for everyone 🌿</span>
-                          ) : (
-                            <span className="text-xs text-[#2C1810]/30">Based on available calendars</span>
+                          <span className="text-xs font-medium text-[#C17F24]/70">{label}</span>
+                          {worksForAll && (
+                            <span className="text-xs text-[#6B8F71]">· Works for everyone 🌿</span>
                           )}
                         </div>
                       </button>

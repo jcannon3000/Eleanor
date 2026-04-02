@@ -912,13 +912,18 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
       lines.push(`📅 ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
       lines.push("");
     } else if (proposedTimes.length > 0) {
-      const d = new Date(proposedTimes[0]);
-      lines.push(`📅 Proposed: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`);
+      lines.push("We're finding a time that works for everyone.");
+      lines.push("Proposed options:");
+      for (let i = 0; i < proposedTimes.length; i++) {
+        const d = new Date(proposedTimes[i]);
+        const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
+        lines.push(`  ${label}: ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      }
       lines.push("");
     }
 
     if (personalUrl) {
-      lines.push("Your personal link:");
+      lines.push("👉 Choose which time works for you:");
       lines.push(personalUrl);
       lines.push("");
     }
