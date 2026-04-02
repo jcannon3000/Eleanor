@@ -1,8 +1,8 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Component, type ReactNode, type ErrorInfo } from "react";
+import { Component, type ReactNode, type ErrorInfo, useEffect } from "react";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -64,6 +64,23 @@ const queryClient = new QueryClient({
   },
 });
 
+function ShortLinkRedirect({ userToken }: { userToken: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    fetch(`/api/m/${userToken}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.momentToken && data.userToken) {
+          setLocation(`/moment/${data.momentToken}/${data.userToken}`, { replace: true });
+        } else {
+          setLocation("/", { replace: true });
+        }
+      })
+      .catch(() => setLocation("/", { replace: true }));
+  }, [userToken, setLocation]);
+  return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+}
+
 function Router() {
   return (
     <Switch>
@@ -78,6 +95,7 @@ function Router() {
       <Route path="/ritual/:id" component={RitualDetail} />
       <Route path="/schedule/:token" component={GuestSchedule} />
       <Route path="/invite/:token" component={InvitePage} />
+      <Route path="/m/:userToken">{(params: { userToken: string }) => <ShortLinkRedirect userToken={params.userToken} />}</Route>
       <Route path="/moment/join/:momentToken" component={MomentJoin} />
       <Route path="/moment/:momentToken/:userToken" component={MomentPostPage} />
       <Route path="/people" component={People} />

@@ -208,6 +208,10 @@ export default function MomentDetail() {
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
   const [editingReminder, setEditingReminder] = useState(false);
   const [reminderTimeValue, setReminderTimeValue] = useState("");
+  const [editingPractice, setEditingPractice] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editIntention, setEditIntention] = useState("");
+  const [editGoalDays, setEditGoalDays] = useState(7);
 
   const { data, isLoading } = useQuery({
     queryKey: [`/api/moments/${id}`],
@@ -263,6 +267,16 @@ export default function MomentDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
       setEditingReminder(false);
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      apiRequest("PATCH", `/api/moments/${id}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/moments"] });
+      setEditingPractice(false);
     },
   });
 
@@ -779,6 +793,90 @@ export default function MomentDetail() {
               transition={{ duration: 0.18 }}
               className="mt-4 space-y-3"
             >
+              {/* Edit practice */}
+              {!editingPractice ? (
+                <div className="flex items-start justify-between bg-card border border-border/60 rounded-2xl px-5 py-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Edit practice</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Change name, intention, or goal.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditName(moment.name);
+                      setEditIntention(moment.intention ?? "");
+                      setEditGoalDays(moment.goalDays);
+                      setEditingPractice(true);
+                    }}
+                    className="shrink-0 ml-4 text-xs font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-4 py-2 hover:bg-[#6B8F71]/8 transition-colors min-h-[36px]"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-card border border-[#6B8F71]/30 rounded-2xl px-5 py-4 space-y-4"
+                >
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      maxLength={100}
+                      className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">Intention</label>
+                    <textarea
+                      value={editIntention}
+                      onChange={e => setEditIntention(e.target.value)}
+                      maxLength={500}
+                      rows={2}
+                      className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20 resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">Goal (days)</label>
+                    <input
+                      type="number"
+                      value={editGoalDays}
+                      onChange={e => setEditGoalDays(Math.max(0, Math.min(365, parseInt(e.target.value) || 0)))}
+                      min={0}
+                      max={365}
+                      className="w-24 border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        const payload: Record<string, unknown> = {};
+                        if (editName.trim() && editName !== moment.name) payload.name = editName.trim();
+                        if (editIntention !== (moment.intention ?? "")) payload.intention = editIntention;
+                        if (editGoalDays !== moment.goalDays) payload.goalDays = editGoalDays;
+                        if (Object.keys(payload).length > 0) {
+                          editMutation.mutate(payload);
+                        } else {
+                          setEditingPractice(false);
+                        }
+                      }}
+                      disabled={editMutation.isPending || !editName.trim()}
+                      className="text-sm font-semibold text-white bg-[#6B8F71] rounded-full px-5 py-2.5 hover:bg-[#5a7d60] transition-colors disabled:opacity-50"
+                    >
+                      {editMutation.isPending ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      onClick={() => setEditingPractice(false)}
+                      className="text-sm text-muted-foreground px-3 py-2.5 hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Non-creator: Leave only */}
               {!isCreator && (
                 <>

@@ -557,8 +557,20 @@ router.post("/moments", async (req, res): Promise<void> => {
   }
 
   // ─── Build a personalised calendar description for each member ────────────
-  function buildDescription(memberToken: string, _memberName: string, inviterName: string): string {
-    const personalLink = `${baseUrl}/${momentToken}/${memberToken}`;
+  function buildDescription(memberToken: string, _memberName: string, inviterName: string, isOrganizer: boolean): string {
+    const shortLink = `${getFrontendUrl()}/m/${memberToken}`;
+
+    if (isOrganizer) {
+      // Organizer gets a simpler, personal description
+      const lines = [
+        `Your ${name} practice on Eleanor.`,
+        ...(intention ? [`"${intention}"`] : []),
+        "",
+        "Tap to log:",
+        shortLink,
+      ];
+      return lines.join("\n");
+    }
 
     if (templateType === "morning-prayer") {
       return [
@@ -566,7 +578,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         "Morning Prayer Rite II · Book of Common Prayer · Page 75",
         "",
         "Tap when you have prayed:",
-        personalLink,
+        shortLink,
         "",
         "No login needed. 🌿",
       ].join("\n");
@@ -578,7 +590,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         "Evening Prayer Rite II · Book of Common Prayer · Page 115",
         "",
         "Tap when you have prayed:",
-        personalLink,
+        shortLink,
         "",
         "No login needed. 🌿",
       ].join("\n");
@@ -592,7 +604,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         ...(showIntention ? [`Praying for: ${topic}`] : []),
         "",
         "Tap to pray:",
-        personalLink,
+        shortLink,
         "",
         "No login needed. 🌿",
       ].join("\n");
@@ -607,7 +619,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         durLine,
         "",
         "Tap when you have sat:",
-        personalLink,
+        shortLink,
         "",
         "No login needed. 🌿",
       ].join("\n");
@@ -619,7 +631,7 @@ router.post("/moments", async (req, res): Promise<void> => {
       scheduleLabel,
       "",
       "Tap to log:",
-      personalLink,
+      shortLink,
       "",
       "No login needed. 🌿",
     ].join("\n");
@@ -659,15 +671,25 @@ router.post("/moments", async (req, res): Promise<void> => {
     return [];
   }
 
-  function buildFastingDescription(memberToken: string, inviterName: string): string {
-    const baseUrl2 = `${getFrontendUrl()}/moment`;
-    const personalLink = `${baseUrl2}/${momentToken}/${memberToken}`;
+  function buildFastingDescription(memberToken: string, inviterName: string, isOrganizer: boolean): string {
+    const shortLink = `${getFrontendUrl()}/m/${memberToken}`;
+
+    if (isOrganizer) {
+      return [
+        `Your fasting practice on Eleanor.`,
+        ...(fastingIntention ? [`"${fastingIntention}"`] : []),
+        "",
+        "Tap to log:",
+        shortLink,
+      ].join("\n");
+    }
+
     return [
       `${inviterName} invited you to fast together.`,
       ...(fastingIntention ? [`Why we fast: ${fastingIntention}`] : []),
       "",
       "Tap to mark that you are fasting:",
-      personalLink,
+      shortLink,
       "",
       "No login needed. 🌿",
     ].join("\n");
@@ -686,7 +708,7 @@ router.post("/moments", async (req, res): Promise<void> => {
       insertedTokens.map(t =>
         createAllDayCalendarEvent(sessionUserId, {
           summary: fastingTitle,
-          description: buildFastingDescription(t.userToken, organizerName),
+          description: buildFastingDescription(t.userToken, organizerName, t.email === organizer.email),
           dateStr: fastingDateStr,
           attendees: [t.email],
           recurrence: fastingRec,
@@ -708,7 +730,7 @@ router.post("/moments", async (req, res): Promise<void> => {
       insertedTokens.map(t =>
         createCalendarEvent(sessionUserId, {
           summary: eventTitle,
-          description: buildDescription(t.userToken, t.name ?? t.email, organizerName),
+          description: buildDescription(t.userToken, t.name ?? t.email, organizerName, t.email === organizer.email),
           startDate,
           startLocalStr,
           endLocalStr,
@@ -983,13 +1005,13 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
         const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
 
         for (const t of insertedNewTokens) {
-          const personalLink = `${baseUrl}/${moment.momentToken}/${t.userToken}`;
+          const shortLink = `${getFrontendUrl()}/m/${t.userToken}`;
           const description = [
             `${organizerName} invited you to practice together.`,
             ...(moment.intention ? [`"${moment.intention}"`] : []),
             "",
             "Tap to log:",
-            personalLink,
+            shortLink,
             "",
             "No login needed. 🌿",
           ].join("\n");
@@ -1104,6 +1126,18 @@ router.get("/rituals/:id/moments", async (req, res): Promise<void> => {
   }));
 
   res.json({ moments: enriched });
+});
+
+// ─── GET /api/m/:userToken — resolve short link to momentToken/userToken ─────
+router.get("/m/:userToken", async (req, res): Promise<void> => {
+  const { userToken } = req.params;
+  const [tokenRow] = await db.select({ momentId: momentUserTokensTable.momentId, userToken: momentUserTokensTable.userToken })
+    .from(momentUserTokensTable).where(eq(momentUserTokensTable.userToken, userToken));
+  if (!tokenRow) { res.status(404).json({ error: "Not found" }); return; }
+  const [moment] = await db.select({ momentToken: sharedMomentsTable.momentToken })
+    .from(sharedMomentsTable).where(eq(sharedMomentsTable.id, tokenRow.momentId));
+  if (!moment) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ momentToken: moment.momentToken, userToken: tokenRow.userToken });
 });
 
 // ─── GET /api/moment/:momentToken/:userToken — public posting page ───────────
@@ -1429,9 +1463,16 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       }
 
       // Step 2: Always create a fresh recurring event on the user's own calendar
+      const shortLink = `${getFrontendUrl()}/m/${myTokenRow.userToken}`;
       const newId = await createCalendarEvent(sessionUserId, {
         summary: `🔔 ${moment.name}`,
-        description: moment.intention ?? `Your ${moment.name} practice — set aside this time, wherever you are.`,
+        description: [
+          `Your ${moment.name} practice on Eleanor.`,
+          ...(moment.intention ? [`"${moment.intention}"`] : []),
+          "",
+          "Tap to log:",
+          shortLink,
+        ].join("\n"),
         startDate: new Date(),
         startLocalStr,
         endLocalStr,
@@ -1571,9 +1612,16 @@ router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
           else if (moment.frequency === "weekly" && moment.dayOfWeek) recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${moment.dayOfWeek}`);
           else if (moment.frequency === "weekly") recurrence.push("RRULE:FREQ=WEEKLY");
 
+          const joinShortLink = `${getFrontendUrl()}/m/${tokenRow.userToken}`;
           const calEventId = await createCalendarEvent(joinSessionUserId, {
             summary: `🔔 ${moment.name}`,
-            description: moment.intention ?? `Your ${moment.name} practice — set aside this time, wherever you are.`,
+            description: [
+              `Your ${moment.name} practice on Eleanor.`,
+              ...(moment.intention ? [`"${moment.intention}"`] : []),
+              "",
+              "Tap to log:",
+              joinShortLink,
+            ].join("\n"),
             startDate: new Date(),
             startLocalStr,
             endLocalStr,
@@ -1604,6 +1652,60 @@ router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
     console.error("POST /moments/:momentToken/join error:", err);
     if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ─── PATCH /api/moments/:id — edit a practice ────────────────────────────────
+const EditMomentSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  intention: z.string().max(500).optional(),
+  frequency: z.enum(["daily", "weekly", "monthly"]).optional(),
+  dayOfWeek: z.enum(["MO","TU","WE","TH","FR","SA","SU"]).nullable().optional(),
+  practiceDays: z.string().optional(),
+  goalDays: z.number().int().min(0).max(365).optional(),
+  intercessionTopic: z.string().max(300).nullable().optional(),
+  contemplativeDurationMinutes: z.number().int().min(1).max(60).nullable().optional(),
+});
+
+router.patch("/moments/:id", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  // Only members can edit
+  const allTokens = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+  const isMember = allTokens.some(t => t.email === user.email);
+  if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const parsed = EditMomentSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return; }
+
+  const updates: Record<string, unknown> = {};
+  const d = parsed.data;
+  if (d.name !== undefined) updates.name = d.name;
+  if (d.intention !== undefined) updates.intention = d.intention;
+  if (d.frequency !== undefined) updates.frequency = d.frequency;
+  if (d.dayOfWeek !== undefined) updates.dayOfWeek = d.dayOfWeek;
+  if (d.practiceDays !== undefined) updates.practiceDays = d.practiceDays;
+  if (d.goalDays !== undefined) updates.goalDays = d.goalDays;
+  if (d.intercessionTopic !== undefined) updates.intercessionTopic = d.intercessionTopic;
+  if (d.contemplativeDurationMinutes !== undefined) updates.contemplativeDurationMinutes = d.contemplativeDurationMinutes;
+
+  if (Object.keys(updates).length === 0) {
+    res.json({ ok: true });
+    return;
+  }
+
+  await db.update(sharedMomentsTable).set(updates).where(eq(sharedMomentsTable.id, momentId));
+  res.json({ ok: true });
 });
 
 // ─── PATCH /api/moments/:id/archive — soft-delete a practice ─────────────────
@@ -1656,6 +1758,29 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
 
   try {
+    // Delete Google Calendar events for all members (best effort, non-blocking)
+    const calDeletePromises = allMemberTokens
+      .filter(t => t.googleCalendarEventId)
+      .map(async (t) => {
+        try {
+          // Look up the user by email to get their userId for calendar API
+          const [memberUser] = await db.select({ id: usersTable.id })
+            .from(usersTable).where(eq(usersTable.email, t.email));
+          if (memberUser) {
+            await deleteCalendarEvent(memberUser.id, t.googleCalendarEventId!);
+            console.info(`Deleted GCal event ${t.googleCalendarEventId} for ${t.email}`);
+          }
+        } catch { /* best effort */ }
+      });
+    await Promise.allSettled(calDeletePromises);
+
+    // Also delete the moment-level calendar event if one exists
+    if (moment.googleCalendarEventId) {
+      try {
+        await deleteCalendarEvent(sessionUserId, moment.googleCalendarEventId);
+      } catch { /* best effort */ }
+    }
+
     // Explicitly delete child rows first (in case DB CASCADE wasn't applied via migration)
     await db.delete(momentCalendarEventsTable).where(eq(momentCalendarEventsTable.sharedMomentId, momentId));
     await db.delete(momentPostsTable).where(eq(momentPostsTable.momentId, momentId));
