@@ -622,7 +622,9 @@ export default function TraditionNew() {
                 When should you first gather? 🌿
               </h1>
               <p className="text-sm text-[#2C1810]/50 mb-6">
-                Eleanor looked at everyone's calendars and found times that work.
+                {suggestionsLoaded && (suggestionsError || suggestions.length === 0)
+                  ? "Propose a time and your group can confirm what works."
+                  : "Eleanor looked at everyone's calendars and found times that work."}
               </p>
 
               {/* Loading state */}
@@ -634,34 +636,36 @@ export default function TraditionNew() {
                 </div>
               )}
 
-              {/* Error: fallback picker */}
-              {suggestionsLoaded && suggestionsError && (
+              {/* Fallback datetime picker — shown on error OR when suggestions is empty */}
+              {suggestionsLoaded && (suggestionsError || suggestions.length === 0) && (
                 <div className="flex flex-col gap-4">
-                  <p className="text-sm text-[#2C1810]/50">
-                    Choose a time to propose to the group.
+                  <p className="text-sm text-[#2C1810]/60 italic">
+                    {suggestionsError
+                      ? "Couldn't reach everyone's calendars."
+                      : "No free slots found automatically."}{" "}
+                    Pick a time to propose to the group.
                   </p>
                   <input
                     type="datetime-local"
                     value={fallbackDatetime}
                     onChange={(e) => {
                       setFallbackDatetime(e.target.value);
-                      if (e.target.value) {
-                        setSelectedTime(new Date(e.target.value));
-                      }
+                      if (e.target.value) setSelectedTime(new Date(e.target.value));
                     }}
                     className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60"
                   />
                 </div>
               )}
 
-              {/* Suggestion cards */}
-              {suggestionsLoaded && !suggestionsError && (
+              {/* Suggestion cards — only when we have results */}
+              {suggestionsLoaded && !suggestionsError && suggestions.length > 0 && (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-[#2C1810]/50 mb-1">
                     Pick your first choice. Eleanor will send all three to your group so they can say which works.
                   </p>
                   {suggestions.map((iso, i) => {
                     const d = new Date(iso);
+                    if (isNaN(d.getTime())) return null;
                     const isSelected = selectedTime?.toISOString() === d.toISOString();
                     const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
                     const worksForAll = allMembersReadable();
