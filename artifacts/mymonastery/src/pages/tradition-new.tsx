@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { format, addHours } from "date-fns";
 
 // ─── Step names ───────────────────────────────────────────────────────────────
 
@@ -86,14 +85,10 @@ export default function TraditionNew() {
   const [newPeople, setNewPeople] = useState<{ name: string; email: string }[]>([{ name: "", email: "" }]);
   const [frequency, setFrequency] = useState<string>("");
   const [goalMonths, setGoalMonths] = useState<number | null>(null);
-  const [selectedTime, setSelectedTime] = useState<Date | null>(null);
-  const [suggestions, setSuggestions] = useState<{ startISO: string; label: string; worksForAll: boolean }[]>([]);
-  const [readableEmails, setReadableEmails] = useState<string[]>([]);
-  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
-  const [suggestionsError, setSuggestionsError] = useState(false);
+  const [firstPick, setFirstPick] = useState("");
+  const [alt1, setAlt1] = useState("");
+  const [alt2, setAlt2] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [showFallbackPicker, setShowFallbackPicker] = useState(false);
-  const [fallbackDatetime, setFallbackDatetime] = useState("");
 
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -226,39 +221,10 @@ export default function TraditionNew() {
     return gatheringsFor(months);
   }
 
-  // ─── Step 6 — First gathering ───────────────────────────────────────────────
-
-  const suggestMutation = useMutation({
-    mutationFn: () =>
-      apiRequest<{ suggestions: { startISO: string; label: string; worksForAll: boolean }[]; unreadableMembers: string[] }>("POST", "/api/rituals/suggest-times-for-group", {
-        memberEmails: selectedPeople.map((p) => p.email),
-        frequency,
-        type,
-        tzOffset: new Date().getTimezoneOffset(),
-      }),
-    onSuccess: (data) => {
-      setSuggestions(data.suggestions ?? []);
-      setReadableEmails([]);
-      setSuggestionsLoaded(true);
-      setSuggestionsError(false);
-    },
-    onError: () => {
-      setSuggestionsLoaded(true);
-      setSuggestionsError(true);
-    },
-  });
-
-  useEffect(() => {
-    if (step === 6 && !suggestionsLoaded && !suggestMutation.isPending) {
-      suggestMutation.mutate();
-    }
-  }, [step]);
-
-
   // ─── Confirmation ────────────────────────────────────────────────────────────
 
   async function handleSendInvites() {
-    if (!user || !selectedTime) return;
+    if (!user || !firstPick) return;
     setIsCreating(true);
     try {
       const ritual = await apiRequest<{ id: number }>("POST", "/api/rituals", {
@@ -271,15 +237,14 @@ export default function TraditionNew() {
       });
       const ritualId = ritual.id;
 
-      // Send all 3 suggestions as proposed times (selectedTime first), no confirmedTime yet —
-      // participants respond via their invite link to pick which works for them.
-      const orderedTimes = [
-        selectedTime.toISOString(),
-        ...suggestions.map((s) => s.startISO).filter((iso) => iso !== selectedTime.toISOString()),
+      const proposedTimes = [
+        new Date(firstPick).toISOString(),
+        ...(alt1 ? [new Date(alt1).toISOString()] : []),
+        ...(alt2 ? [new Date(alt2).toISOString()] : []),
       ];
 
       await apiRequest("PATCH", `/api/rituals/${ritualId}/proposed-times`, {
-        proposedTimes: orderedTimes,
+        proposedTimes,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/rituals"] });
@@ -297,7 +262,7 @@ export default function TraditionNew() {
 
   // Auto-send on step 7
   useEffect(() => {
-    if (step === 7 && !isCreating) {
+    if (step === 7 && !isCreating && firstPick) {
       handleSendInvites();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -610,120 +575,59 @@ export default function TraditionNew() {
                 When should you first gather? 🌿
               </h1>
               <p className="text-sm text-[#2C1810]/50 mb-6">
-                {suggestionsLoaded && (suggestionsError || suggestions.length === 0)
-                  ? "Propose a time and your group can confirm what works."
-                  : "Eleanor looked at everyone's calendars and found times that work."}
+                Propose a time and two alternates — your group can say which works best.
               </p>
 
-              {/* Loading state */}
-              {!suggestionsLoaded && (
-                <div className="flex flex-col items-center py-10 gap-3">
-                  <p className="text-[#2C1810]/60 text-sm animate-pulse">
-                    Eleanor is looking at everyone's calendars… 🌿
-                  </p>
-                </div>
-              )}
-
-              {/* Fallback datetime picker — shown on error OR when suggestions is empty */}
-              {suggestionsLoaded && (suggestionsError || suggestions.length === 0) && (
-                <div className="flex flex-col gap-4">
-                  <p className="text-sm text-[#2C1810]/60 italic">
-                    {suggestionsError
-                      ? "Couldn't reach everyone's calendars."
-                      : "No free slots found automatically."}{" "}
-                    Pick a time to propose to the group.
-                  </p>
+              <div className="flex flex-col gap-5">
+                {/* First pick */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#C17F24] uppercase tracking-widest mb-2">
+                    First pick
+                  </label>
                   <input
                     type="datetime-local"
-                    value={fallbackDatetime}
-                    onChange={(e) => {
-                      setFallbackDatetime(e.target.value);
-                      if (e.target.value) setSelectedTime(new Date(e.target.value));
-                    }}
-                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60"
+                    value={firstPick}
+                    onChange={(e) => setFirstPick(e.target.value)}
+                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
                   />
                 </div>
-              )}
 
-              {/* Suggestion cards — only when we have results */}
-              {suggestionsLoaded && !suggestionsError && suggestions.length > 0 && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-[#2C1810]/50 mb-1">
-                    Pick your first choice. Eleanor will send all three to your group so they can say which works.
-                  </p>
-                  {suggestions.map((slot, i) => {
-                    const d = new Date(slot.startISO);
-                    if (isNaN(d.getTime())) return null;
-                    const isSelected = selectedTime?.toISOString() === d.toISOString();
-                    const pickLabel = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
-                    return (
-                      <button
-                        key={slot.startISO}
-                        onClick={() => setSelectedTime(d)}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                          isSelected
-                            ? "border-2 border-[#C17F24] bg-[#C17F24]/5"
-                            : "border border-[#e8d5b8] hover:border-[#C17F24]/30"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="font-medium text-[#2C1810]">
-                            {format(d, "EEEE, MMMM d")}
-                          </div>
-                          {isSelected && <span className="text-[#C17F24] font-semibold text-sm">✓</span>}
-                        </div>
-                        <div className="text-sm text-[#2C1810]/70 mt-0.5">
-                          {format(d, "h:mm a")} – {format(addHours(d, 1), "h:mm a")}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-medium text-[#C17F24]/70">{pickLabel}</span>
-                          {slot.worksForAll && (
-                            <span className="text-xs text-[#6B8F71]">· Works for everyone 🌿</span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  {/* Fallback link */}
-                  {!showFallbackPicker && (
-                    <button
-                      onClick={() => setShowFallbackPicker(true)}
-                      className="text-sm text-[#2C1810]/40 hover:text-[#2C1810]/60 transition-colors text-left mt-1"
-                    >
-                      None of these work → Choose a different time
-                    </button>
-                  )}
-
-                  {showFallbackPicker && (
-                    <div className="mt-2">
-                      <input
-                        type="datetime-local"
-                        value={fallbackDatetime}
-                        onChange={(e) => {
-                          setFallbackDatetime(e.target.value);
-                          if (e.target.value) {
-                            setSelectedTime(new Date(e.target.value));
-                          }
-                        }}
-                        className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60"
-                      />
-                    </div>
-                  )}
+                {/* Alternative 1 */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#2C1810]/40 uppercase tracking-widest mb-2">
+                    First alternative
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={alt1}
+                    onChange={(e) => setAlt1(e.target.value)}
+                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
+                  />
                 </div>
-              )}
 
-              {(suggestionsLoaded) && (
-                <div className="flex justify-end mt-8">
-                  <button
-                    onClick={goNext}
-                    disabled={!selectedTime}
-                    className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40"
-                  >
-                    Continue →
-                  </button>
+                {/* Alternative 2 */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#2C1810]/40 uppercase tracking-widest mb-2">
+                    Second alternative
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={alt2}
+                    onChange={(e) => setAlt2(e.target.value)}
+                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
+                  />
                 </div>
-              )}
+              </div>
+
+              <div className="flex justify-end mt-8">
+                <button
+                  onClick={goNext}
+                  disabled={!firstPick}
+                  className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40"
+                >
+                  Continue →
+                </button>
+              </div>
             </div>
           )}
 
