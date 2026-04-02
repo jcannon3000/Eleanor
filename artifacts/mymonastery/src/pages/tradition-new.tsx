@@ -393,14 +393,31 @@ export default function TraditionNew() {
           {step === 3 && (
             <div>
               <h1 className="font-serif text-3xl text-[#2C1810] mb-2">
-                Who will tend this with you? 🌱
+                Who do you want to do this with?
               </h1>
               <p className="text-sm text-[#2C1810]/50 mb-5">
-                Add at least one person. Eleanor will coordinate everyone's calendars.
+                Pick the people. Eleanor will find a time that works for everyone.
               </p>
 
+              {/* Selected chips */}
+              {selectedPeople.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {selectedPeople.map((p) => (
+                    <button
+                      key={p.email}
+                      onClick={() => toggleExistingPerson(p)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+                      style={{ backgroundColor: "#C17F24", color: "#F7F0E6" }}
+                    >
+                      {p.name ? p.name.split(" ")[0] : p.email}
+                      <span className="opacity-70 text-xs leading-none">×</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {existingConnections.length > 0 && (
-                <div className="max-h-[280px] overflow-y-auto flex flex-col gap-2 mb-5">
+                <div className="flex flex-col gap-2 mb-5">
                   {existingConnections.map((person) => {
                     const added = selectedPeople.some((p) => p.email === person.email);
                     return (
@@ -410,10 +427,12 @@ export default function TraditionNew() {
                         className={`w-full text-left p-3 rounded-2xl border flex items-center gap-3 transition-all ${
                           added
                             ? "border-[#C17F24] bg-[#C17F24]/5"
-                            : "border-[#e8d5b8] hover:border-[#C17F24]/30"
+                            : "border-[#e8d5b8] hover:border-[#C17F24]/30 bg-white"
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-full bg-[#C17F24]/15 flex items-center justify-center text-[#C17F24] font-semibold flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold flex-shrink-0 text-sm transition-colors ${
+                          added ? "bg-[#C17F24] text-white" : "bg-[#C17F24]/15 text-[#C17F24]"
+                        }`}>
                           {(person.name || person.email).charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -422,9 +441,11 @@ export default function TraditionNew() {
                             <div className="text-xs text-[#2C1810]/50 truncate">{person.email}</div>
                           )}
                         </div>
-                        {added && (
-                          <span className="text-[#C17F24] font-semibold text-sm">✓</span>
-                        )}
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          added ? "border-[#C17F24] bg-[#C17F24]" : "border-[#e8d5b8]"
+                        }`}>
+                          {added && <span className="text-white text-xs leading-none">✓</span>}
+                        </div>
                       </button>
                     );
                   })}
