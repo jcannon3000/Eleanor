@@ -230,12 +230,12 @@ export default function TraditionNew() {
 
   const suggestMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "/api/rituals/suggest-times-for-group", {
+      apiRequest<{ suggestions: string[]; readableEmails: string[] }>("POST", "/api/rituals/suggest-times-for-group", {
         memberEmails: selectedPeople.map((p) => p.email),
         frequency,
         type,
         tzOffset: new Date().getTimezoneOffset(),
-      }).then((r) => r.json()),
+      }),
     onSuccess: (data) => {
       setSuggestions(data.suggestions ?? []);
       setReadableEmails(data.readableEmails ?? []);
@@ -273,7 +273,7 @@ export default function TraditionNew() {
     if (!user || !selectedTime) return;
     setIsCreating(true);
     try {
-      const createRes = await apiRequest("POST", "/api/rituals", {
+      const ritual = await apiRequest<{ id: number }>("POST", "/api/rituals", {
         name,
         frequency,
         participants: selectedPeople,
@@ -281,7 +281,6 @@ export default function TraditionNew() {
         ownerId: user.id,
         dayPreference: "",
       });
-      const ritual = await createRes.json();
       const ritualId = ritual.id;
 
       // Send all 3 suggestions as proposed times (selectedTime first), no confirmedTime yet —
