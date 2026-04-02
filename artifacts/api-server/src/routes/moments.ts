@@ -1851,4 +1851,83 @@ router.get("/connections", async (req, res): Promise<void> => {
   }
 });
 
+// ─── POST /api/moments/cleanup-calendars — delete orphaned GCal events ───────
+// Finds archived practices that still have calendar event IDs on member tokens,
+// deletes those events from Google Calendar, and clears the stored IDs.
+router.post("/moments/cleanup-calendars", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    // Find all archived practices
+    const archivedMoments = await db.select({ id: sharedMomentsTable.id })
+      .from(sharedMomentsTable)
+      .where(eq(sharedMomentsTable.state, "archived"));
+
+    const archivedIds = archivedMoments.map(m => m.id);
+    let cleaned = 0;
+
+    if (archivedIds.length > 0) {
+      // Find all member tokens for archived practices that still have calendar events
+      const tokensWithEvents = await db.select()
+        .from(momentUserTokensTable)
+        .where(inArray(momentUserTokensTable.momentId, archivedIds));
+
+      for (const token of tokensWithEvents) {
+        if (!token.googleCalendarEventId) continue;
+
+        // Look up the user to get their userId for calendar API
+        const [memberUser] = await db.select({ id: usersTable.id })
+          .from(usersTable).where(eq(usersTable.email, token.email));
+
+        if (memberUser) {
+          try {
+            await deleteCalendarEvent(memberUser.id, token.googleCalendarEventId);
+            console.info(`Cleanup: deleted GCal event ${token.googleCalendarEventId} for ${token.email}`);
+            cleaned++;
+          } catch { /* best effort */ }
+        }
+
+        // Clear the event ID regardless (event may be already gone)
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: null, calendarConnected: false })
+          .where(eq(momentUserTokensTable.id, token.id));
+      }
+    }
+
+    // Also check: member tokens pointing to moments that no longer exist at all
+    const allTokens = await db.select({
+      id: momentUserTokensTable.id,
+      momentId: momentUserTokensTable.momentId,
+      email: momentUserTokensTable.email,
+      googleCalendarEventId: momentUserTokensTable.googleCalendarEventId,
+    }).from(momentUserTokensTable);
+
+    const existingMomentIds = new Set(
+      (await db.select({ id: sharedMomentsTable.id }).from(sharedMomentsTable)).map(m => m.id)
+    );
+
+    for (const token of allTokens) {
+      if (existingMomentIds.has(token.momentId)) continue;
+      if (!token.googleCalendarEventId) continue;
+
+      const [memberUser] = await db.select({ id: usersTable.id })
+        .from(usersTable).where(eq(usersTable.email, token.email));
+
+      if (memberUser) {
+        try {
+          await deleteCalendarEvent(memberUser.id, token.googleCalendarEventId);
+          console.info(`Cleanup orphan: deleted GCal event ${token.googleCalendarEventId} for ${token.email}`);
+          cleaned++;
+        } catch { /* best effort */ }
+      }
+    }
+
+    res.json({ ok: true, archivedPractices: archivedIds.length, calendarEventsDeleted: cleaned });
+  } catch (err) {
+    console.error("POST /moments/cleanup-calendars error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
