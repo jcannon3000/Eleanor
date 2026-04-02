@@ -786,7 +786,7 @@ export default function MomentNew() {
   function goBack() {
     const idx = STEP_ORDER.indexOf(step);
     if (idx > 0) setStep(STEP_ORDER[idx - 1]);
-    else setLocation("/create");
+    else setLocation("/tradition/new");
   }
 
   const stepIndex = STEP_ORDER.indexOf(step);

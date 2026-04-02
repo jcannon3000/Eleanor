@@ -94,7 +94,7 @@ export default function People() {
               People will appear here once you add them to a tradition. Plant your first ritual to start growing community.
             </p>
             <Link
-              href="/create"
+              href="/tradition/new"
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] hover:-translate-y-0.5 transition-all"
             >
               <Sprout size={16} />

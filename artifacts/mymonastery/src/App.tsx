@@ -69,7 +69,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Onboarding} />
       <Route path="/dashboard" component={Dashboard} />
-      <Route path="/create" component={CreateRitual} />
+      <Route path="/create">{() => { window.location.href = "/tradition/new"; return null; }}</Route>
       <Route path="/ritual/:id/schedule" component={RitualSchedule} />
       <Route path="/moment/new" component={MomentNew} />
       <Route path="/tradition/new" component={TraditionNew} />

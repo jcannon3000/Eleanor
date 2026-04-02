@@ -116,6 +116,7 @@ export default function TraditionNew() {
   const [alt1, setAlt1] = useState("");
   const [alt2, setAlt2] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +199,8 @@ export default function TraditionNew() {
     } catch (err) {
       console.error("Failed to create tradition", err);
       setSending(false);
+      setSendError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setStep(6); // go back to When step so user can retry
     }
   }
 
@@ -461,7 +464,13 @@ export default function TraditionNew() {
                 </div>
               </div>
 
-              <ContinueButton disabled={!firstPick} onClick={goNext} />
+              {sendError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+                  {sendError}
+                </div>
+              )}
+
+              <ContinueButton disabled={!firstPick} onClick={() => { setSendError(""); goNext(); }} />
             </div>
           )}
 
