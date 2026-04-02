@@ -343,54 +343,68 @@ export default function MomentDetail() {
             {scheduleLabel(moment.frequency, moment.scheduledTime, moment.dayOfWeek, parsedPracticeDays, moment.timeOfDay)}
           </p>
 
-          {/* Personal reminder time editor */}
+          {/* Monastery bell */}
           {!isFasting && (
-            <div className="mt-2">
+            <div className="mt-4 rounded-2xl border border-amber-200/70 bg-amber-50/60 px-4 py-3">
               {editingReminder ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={reminderTimeValue}
-                    onChange={e => setReminderTimeValue(e.target.value)}
-                    className="text-xs border border-border/60 rounded-lg px-2 py-1 bg-background text-foreground focus:outline-none focus:border-[#6B8F71]"
-                  />
-                  <button
-                    onClick={() => {
-                      if (reminderTimeValue) {
-                        reminderMutation.mutate({
-                          personalTime: reminderTimeValue,
-                          personalTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                        });
-                      }
-                    }}
-                    disabled={reminderMutation.isPending}
-                    className="text-xs font-medium text-[#6B8F71] hover:text-[#4a6b50] transition-colors disabled:opacity-40"
-                  >
-                    {reminderMutation.isPending ? "Saving…" : "Save"}
-                  </button>
-                  <button
-                    onClick={() => setEditingReminder(false)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
+                <div>
+                  <p className="text-xs font-semibold text-amber-800/70 uppercase tracking-widest mb-2">When does your bell ring?</p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="time"
+                      value={reminderTimeValue}
+                      onChange={e => setReminderTimeValue(e.target.value)}
+                      autoFocus
+                      className="border border-amber-300 rounded-xl px-3 py-2 bg-white text-foreground text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                    />
+                    <button
+                      onClick={() => {
+                        if (reminderTimeValue) {
+                          reminderMutation.mutate({
+                            personalTime: reminderTimeValue,
+                            personalTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                          });
+                        }
+                      }}
+                      disabled={reminderMutation.isPending || !reminderTimeValue}
+                      className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-40"
+                    >
+                      {reminderMutation.isPending ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingReminder(false)}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-700/60 mt-2">
+                    Your bell — the time you set aside to show up, wherever you are.
+                  </p>
                 </div>
               ) : (
-                <button
-                  onClick={() => {
-                    setReminderTimeValue(myPersonalTime ?? moment.scheduledTime);
-                    setEditingReminder(true);
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors group"
-                >
-                  <span>🔔</span>
-                  <span>
-                    {myPersonalTime
-                      ? `Your reminder: ${formatTime(myPersonalTime)}`
-                      : `Set your reminder time`}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/40 group-hover:text-muted-foreground/60 transition-colors">· Edit</span>
-                </button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl leading-none">🔔</span>
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800/60 uppercase tracking-widest mb-0.5">Your bell</p>
+                      <p className="text-base font-semibold text-amber-900">
+                        {myPersonalTime
+                          ? formatTime(myPersonalTime)
+                          : formatTime(moment.scheduledTime)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setReminderTimeValue(myPersonalTime ?? moment.scheduledTime);
+                      setEditingReminder(true);
+                    }}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-400 rounded-lg px-3 py-1.5 transition-colors bg-white/60"
+                  >
+                    Edit
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -579,8 +593,9 @@ export default function MomentDetail() {
             ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000))
             : null;
           const totalDays = dur;
-          // Use actual streak (optimistic) as days-done — calendar-time approach undercounts
-          const todayBloomed2 = todayPostCount >= memberCount && memberCount >= 2;
+          // Use actual streak (optimistic) as days-done — bloom threshold = half the group
+          const bloomThreshold2 = Math.max(2, Math.ceil(memberCount / 2));
+          const todayBloomed2 = todayPostCount >= bloomThreshold2 && memberCount >= 2;
           const daysDone = Math.min(
             moment.currentStreak + (todayBloomed2 ? 1 : 0),
             totalDays
@@ -608,12 +623,12 @@ export default function MomentDetail() {
                 <motion.div
                   className="h-full bg-[#6B8F71] rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${progressPct}%` }}
+                  animate={{ width: `${daysDone > 0 ? Math.max(progressPct, 3) : 0}%` }}
                   transition={{ duration: 0.6, ease: "easeOut" }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {moment.totalBlooms} practice{moment.totalBlooms === 1 ? "" : "s"} together so far
+                {daysDone} day{daysDone === 1 ? "" : "s"} together so far
               </p>
             </div>
           );

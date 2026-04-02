@@ -429,7 +429,7 @@ export default function Dashboard() {
           </div>
           <Link
             href="/moment/new"
-            className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-medium text-sm shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
+            className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-medium text-sm animate-glow-breathe hover:-translate-y-0.5 active:translate-y-0 transition-transform duration-300"
           >
             + New
           </Link>
@@ -465,7 +465,7 @@ export default function Dashboard() {
               "The rituals you tend now become<br />the traditions you'll remember."
             </p>
             <div className="mt-8 space-y-3 w-full">
-              <Link href="/moment/new" className="block w-full text-left px-5 py-4 bg-primary text-primary-foreground rounded-2xl font-medium shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] transition-all">
+              <Link href="/moment/new" className="block w-full text-left px-5 py-4 bg-primary text-primary-foreground rounded-2xl font-medium animate-glow-breathe transition-transform hover:-translate-y-0.5 active:translate-y-0 duration-200">
                 <p className="font-semibold">🌿 Plant a Practice</p>
                 <p className="text-xs opacity-80 mt-0.5">For when you can't be together</p>
               </Link>

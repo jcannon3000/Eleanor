@@ -42,46 +42,72 @@ export default function Onboarding() {
         <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-accent/5 blur-3xl" />
       </div>
 
-      <header className="absolute top-0 w-full z-10 p-6 md:p-8 flex items-center max-w-7xl mx-auto">
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.05 }}
+        className="absolute top-0 w-full z-10 p-6 md:p-8 flex items-center max-w-7xl mx-auto"
+      >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
             <Sprout size={20} strokeWidth={1.5} />
           </div>
           <span className="font-serif text-xl font-bold text-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
         </div>
-      </header>
+      </motion.header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 pt-24 pb-12">
         <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-12 lg:gap-24 max-w-5xl mx-auto w-full">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="flex-1 text-center md:text-left"
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 text-primary text-sm font-medium mb-6 border border-primary/15">
+          <div className="flex-1 text-center md:text-left">
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 text-primary text-sm font-medium mb-6 border border-primary/15"
+            >
               <Sprout size={13} />
               <span>A personal assistant for community building</span>
-            </div>
+            </motion.div>
 
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground leading-tight mb-6">
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.32 }}
+              className="text-5xl md:text-6xl font-serif text-foreground leading-tight mb-6"
+            >
               Grow what matters,{" "}
               <span className="text-primary italic">together</span>.
-            </h1>
+            </motion.h1>
 
-            <p className="text-lg text-muted-foreground mb-10 max-w-md mx-auto md:mx-0 leading-relaxed">
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.46 }}
+              className="text-lg text-muted-foreground mb-10 max-w-md mx-auto md:mx-0 leading-relaxed"
+            >
               Eleanor turns one-time plans into traditions — coordinating everyone's calendars so the things worth repeating actually do.
-            </p>
+            </motion.p>
 
             {authError && (
-              <div className="mb-6 px-4 py-3 rounded-xl bg-destructive/10 text-destructive text-sm border border-destructive/20">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mb-6 px-4 py-3 rounded-xl bg-destructive/10 text-destructive text-sm border border-destructive/20"
+              >
                 Something went wrong with sign-in. Please try again.
-              </div>
+              </motion.div>
             )}
 
-            <button
+            <motion.button
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.58 }}
+              whileHover={{ y: -2, boxShadow: "var(--shadow-warm-lg)" }}
+              whileTap={{ y: 0 }}
               onClick={handleGoogleSignIn}
-              className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-card border-2 border-border text-foreground font-medium text-lg shadow-[var(--shadow-warm-md)] hover:shadow-[var(--shadow-warm-lg)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 max-w-sm w-full mx-auto md:mx-0"
+              className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-card border-2 border-border text-foreground font-medium text-lg animate-glow-breathe transition-shadow duration-300 max-w-sm w-full mx-auto md:mx-0"
             >
               <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
                 <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
@@ -92,12 +118,17 @@ export default function Onboarding() {
                 </g>
               </svg>
               Continue with Google
-            </button>
+            </motion.button>
 
-            <p className="mt-4 text-xs text-muted-foreground max-w-sm mx-auto md:mx-0">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.75 }}
+              className="mt-4 text-xs text-muted-foreground max-w-sm mx-auto md:mx-0"
+            >
               Eleanor asks for Google Calendar access so your traditions always have a home in your schedule.
-            </p>
-          </motion.div>
+            </motion.p>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

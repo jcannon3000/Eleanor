@@ -70,6 +70,26 @@ router.get("/people", async (req, res): Promise<void> => {
     .where(eq(momentUserTokensTable.email, ownerEmail));
   const ownerMomentIds = ownerTokenRows.map(t => t.momentId);
 
+  // Add practice-only people (not already in the map from rituals)
+  if (ownerMomentIds.length > 0) {
+    const practiceTokenRows = await db
+      .select({ email: momentUserTokensTable.email, name: momentUserTokensTable.name })
+      .from(momentUserTokensTable)
+      .where(inArray(momentUserTokensTable.momentId, ownerMomentIds));
+    for (const row of practiceTokenRows) {
+      if (!row.email || row.email === ownerEmail) continue;
+      if (!map.has(row.email)) {
+        map.set(row.email, {
+          name: row.name || row.email,
+          email: row.email,
+          sharedCircleCount: 0,
+          firstCircleDate: new Date(),
+          sharedRitualIds: [],
+        });
+      }
+    }
+  }
+
   const peopleEnriched = await Promise.all(
     Array.from(map.values()).map(async (p) => {
       let maxStreak = 0;
@@ -177,7 +197,26 @@ router.get("/people/:email", async (req, res): Promise<void> => {
         templateType: sharedMomentsTable.templateType,
         createdAt: sharedMomentsTable.createdAt,
       }).from(sharedMomentsTable).where(inArray(sharedMomentsTable.id, sharedMomentIds));
-      sharedPractices = moments.map(m => ({ ...m, createdAt: m.createdAt.toISOString() }));
+
+      // Compute live bloom counts per practice from windows table
+      const bloomCountRows = await db
+        .select({
+          momentId: momentWindowsTable.momentId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(momentWindowsTable)
+        .where(and(
+          inArray(momentWindowsTable.momentId, sharedMomentIds),
+          eq(momentWindowsTable.status, "bloom")
+        ))
+        .groupBy(momentWindowsTable.momentId);
+      const bloomCountMap = new Map(bloomCountRows.map(r => [r.momentId, r.count]));
+
+      sharedPractices = moments.map(m => ({
+        ...m,
+        totalBlooms: bloomCountMap.get(m.id) ?? m.totalBlooms,
+        createdAt: m.createdAt.toISOString(),
+      }));
     }
   }
 

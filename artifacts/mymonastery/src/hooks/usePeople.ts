@@ -73,7 +73,7 @@ export function usePeople(ownerId: number | undefined) {
       return res.json();
     },
     enabled: !!ownerId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 }
 
@@ -91,7 +91,7 @@ export function usePersonProfile(email: string | undefined, ownerId: number | un
       return res.json();
     },
     enabled: !!email && !!ownerId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
     retry: false,
   });
 }

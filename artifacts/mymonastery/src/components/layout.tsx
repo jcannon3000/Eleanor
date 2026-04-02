@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth, useLogout } from "@/hooks/useAuth";
-import { LogOut, ChevronDown, Sprout, Users } from "lucide-react";
+import { LogOut, ChevronDown, Sprout, Users, LayoutDashboard, Plus } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -83,7 +83,7 @@ export function Layout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1 flex flex-col pt-24 pb-12 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 flex flex-col pt-24 pb-24 sm:pb-12 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto w-full">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -93,6 +93,39 @@ export function Layout({ children }: { children: ReactNode }) {
           {children}
         </motion.div>
       </main>
+
+      {/* Mobile bottom nav */}
+      {user && (
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-20 bg-card/95 backdrop-blur-sm border-t border-card-border flex items-stretch">
+          <Link
+            href="/dashboard"
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-medium transition-colors ${
+              location === "/dashboard" ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            <LayoutDashboard size={20} strokeWidth={1.5} />
+            <span>Home</span>
+          </Link>
+          <Link
+            href="/people"
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-medium transition-colors ${
+              location.startsWith("/people") ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            <Users size={20} strokeWidth={1.5} />
+            <span>People</span>
+          </Link>
+          <Link
+            href="/tradition/new"
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-medium text-muted-foreground transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center -mt-5 shadow-[var(--shadow-warm-md)] animate-glow-breathe">
+              <Plus size={18} className="text-primary-foreground" />
+            </div>
+            <span className="mt-0.5">New</span>
+          </Link>
+        </nav>
+      )}
     </div>
   );
 }

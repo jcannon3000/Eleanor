@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,6 +41,22 @@ const FREQ_LABEL: Record<string, string> = {
 
 const PLANT_FRAMES = ["\uD83C\uDF31", "\uD83C\uDF3F", "\uD83C\uDF3F", "\uD83C\uDF3E", "\uD83C\uDF3F", "\uD83C\uDF31"];
 
+function formatDateHuman(val: string): string {
+  if (!val) return "";
+  try {
+    return format(new Date(val), "EEEE, MMMM d · h:mm a");
+  } catch {
+    return val;
+  }
+}
+
+function localDateStr(daysFromNow: number, hours: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hours, 0, 0, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(hours).padStart(2, "0")}:00`;
+}
+
 /* ─── small components ──────────────────────────────────────────────────────── */
 
 function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
@@ -71,7 +88,7 @@ function ContinueButton({ disabled, onClick }: { disabled?: boolean; onClick: ()
       <button
         onClick={onClick}
         disabled={disabled}
-        className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40"
+        className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40 animate-glow-breathe-amber disabled:animate-none"
       >
         Continue →
       </button>
@@ -143,6 +160,8 @@ export default function TraditionNew() {
   });
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
+
+  const [editingSlot, setEditingSlot] = useState<null | "first" | "alt1" | "alt2">(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -464,40 +483,122 @@ export default function TraditionNew() {
           {/* ── 6  When ── */}
           {step === 6 && (
             <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">When should you first gather?</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-6">
-                Pick your first choice and two alternates. Your group will say which works best.
+              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">When should you first gather? 🌿</h1>
+              <p className="text-sm text-[#2C1810]/50 mb-6 leading-relaxed">
+                Eleanor will share these options with {firstNames || "your group"} — everyone says which works.
+                More options means more people can bloom.
               </p>
 
-              <div className="flex flex-col gap-5">
-                <div>
-                  <label className="block text-xs font-semibold text-[#C17F24] uppercase tracking-widest mb-2">First pick</label>
-                  <input
-                    type="datetime-local"
-                    value={firstPick}
-                    onChange={(e) => setFirstPick(e.target.value)}
-                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
-                  />
+              <div className="flex flex-col gap-3">
+
+                {/* ── First pick ── large amber card */}
+                <div className="border-2 border-[#C17F24] bg-[#C17F24]/5 rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#C17F24] uppercase tracking-widest mb-1.5">Your first pick</p>
+                      {editingSlot === "first" ? (
+                        <input
+                          type="datetime-local"
+                          value={firstPick}
+                          autoFocus
+                          onChange={(e) => { setFirstPick(e.target.value); setEditingSlot(null); }}
+                          onBlur={() => setEditingSlot(null)}
+                          className="w-full border border-[#C17F24]/40 rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]"
+                        />
+                      ) : (
+                        <p className="font-serif text-xl text-[#2C1810]">{formatDateHuman(firstPick)}</p>
+                      )}
+                    </div>
+                    {editingSlot !== "first" && (
+                      <button
+                        onClick={() => setEditingSlot("first")}
+                        className="text-xs text-[#C17F24] hover:underline font-medium flex-shrink-0 mt-1"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#2C1810]/40 uppercase tracking-widest mb-2">First alternative</label>
-                  <input
-                    type="datetime-local"
-                    value={alt1}
-                    onChange={(e) => setAlt1(e.target.value)}
-                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#2C1810]/40 uppercase tracking-widest mb-2">Second alternative</label>
-                  <input
-                    type="datetime-local"
-                    value={alt2}
-                    onChange={(e) => setAlt2(e.target.value)}
-                    className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2.5 text-sm text-[#2C1810] focus:outline-none focus:border-[#C17F24]/60 bg-white"
-                  />
-                </div>
+
+                {/* ── Alt 1 ── */}
+                {alt1 ? (
+                  <div className="border border-[#e8d5b8] bg-white rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[#2C1810]/40 uppercase tracking-widest mb-1.5">Backup option</p>
+                        {editingSlot === "alt1" ? (
+                          <input
+                            type="datetime-local"
+                            value={alt1}
+                            autoFocus
+                            onChange={(e) => { setAlt1(e.target.value); setEditingSlot(null); }}
+                            onBlur={() => setEditingSlot(null)}
+                            className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]/60"
+                          />
+                        ) : (
+                          <p className="text-base font-medium text-[#2C1810]">{formatDateHuman(alt1)}</p>
+                        )}
+                      </div>
+                      {editingSlot !== "alt1" && (
+                        <div className="flex items-center gap-3 flex-shrink-0 mt-1">
+                          <button onClick={() => setEditingSlot("alt1")} className="text-xs text-[#C17F24] hover:underline">Edit</button>
+                          <button onClick={() => setAlt1("")} className="text-[#2C1810]/30 hover:text-[#2C1810]/60 text-lg leading-none">×</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAlt1(localDateStr(3, 18))}
+                    className="w-full border-2 border-dashed border-[#e8d5b8] rounded-2xl p-4 text-[#2C1810]/40 hover:border-[#C17F24]/40 hover:text-[#C17F24] transition-all text-sm flex items-center justify-center gap-2"
+                  >
+                    <span className="text-base leading-none">+</span> Add a backup time
+                  </button>
+                )}
+
+                {/* ── Alt 2 — only show if alt1 is set ── */}
+                {alt1 && (
+                  alt2 ? (
+                    <div className="border border-[#e8d5b8] bg-white rounded-2xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-[#2C1810]/40 uppercase tracking-widest mb-1.5">Second option</p>
+                          {editingSlot === "alt2" ? (
+                            <input
+                              type="datetime-local"
+                              value={alt2}
+                              autoFocus
+                              onChange={(e) => { setAlt2(e.target.value); setEditingSlot(null); }}
+                              onBlur={() => setEditingSlot(null)}
+                              className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]/60"
+                            />
+                          ) : (
+                            <p className="text-base font-medium text-[#2C1810]">{formatDateHuman(alt2)}</p>
+                          )}
+                        </div>
+                        {editingSlot !== "alt2" && (
+                          <div className="flex items-center gap-3 flex-shrink-0 mt-1">
+                            <button onClick={() => setEditingSlot("alt2")} className="text-xs text-[#C17F24] hover:underline">Edit</button>
+                            <button onClick={() => setAlt2("")} className="text-[#2C1810]/30 hover:text-[#2C1810]/60 text-lg leading-none">×</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAlt2(localDateStr(5, 10))}
+                      className="w-full border-2 border-dashed border-[#e8d5b8] rounded-2xl p-4 text-[#2C1810]/40 hover:border-[#C17F24]/40 hover:text-[#C17F24] transition-all text-sm flex items-center justify-center gap-2"
+                    >
+                      <span className="text-base leading-none">+</span> Add another option
+                    </button>
+                  )
+                )}
+
               </div>
+
+              <p className="text-xs text-[#2C1810]/40 text-center mt-5">
+                Eleanor will reach out to everyone in your tradition with these times.
+              </p>
 
               {sendError && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
@@ -505,7 +606,15 @@ export default function TraditionNew() {
                 </div>
               )}
 
-              <ContinueButton disabled={!firstPick} onClick={() => { setSendError(""); goNext(); }} />
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => { setSendError(""); goNext(); }}
+                  disabled={!firstPick}
+                  className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40 animate-glow-breathe-amber disabled:animate-none"
+                >
+                  Send to the group 🌿
+                </button>
+              </div>
             </div>
           )}
 

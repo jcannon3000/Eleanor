@@ -108,6 +108,22 @@
   --elevate-2: rgba(44, 24, 16, 0.07);
 }
 
+@keyframes glow-breathe {
+  0%, 100% { box-shadow: 0 4px 12px rgba(107, 143, 113, 0.18); }
+  50%       { box-shadow: 0 4px 28px rgba(107, 143, 113, 0.48); }
+}
+@keyframes glow-breathe-amber {
+  0%, 100% { box-shadow: 0 4px 12px rgba(193, 127, 36, 0.18); }
+  50%       { box-shadow: 0 4px 28px rgba(193, 127, 36, 0.48); }
+}
+
+.animate-glow-breathe {
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+.animate-glow-breathe-amber {
+  animation: glow-breathe-amber 3s ease-in-out infinite;
+}
+
 @layer base {
   * {
     @apply border-border;

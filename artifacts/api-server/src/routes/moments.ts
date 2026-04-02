@@ -1390,7 +1390,7 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       .set({ personalTime, personalTimezone })
       .where(eq(momentUserTokensTable.id, myTokenRow.id));
 
-    // Compute next occurrences for DB tracking and GCal update
+    // Compute next occurrences for DB tracking
     const occurrences = nextOccurrences(personalTime, personalTimezone, moment.frequency, moment.dayOfWeek ?? null, 2);
     for (let i = 0; i < occurrences.length; i++) {
       await db.insert(momentCalendarEventsTable).values({
@@ -1401,30 +1401,65 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       });
     }
 
-    // Update the Google Calendar event to the new personal time
-    // Use buildLocalEventTimes for correct timezone-aware local strings (avoids UTC math bugs)
-    if (myTokenRow.googleCalendarEventId) {
-      try {
-        const allTokenRows = await db.select().from(momentUserTokensTable)
-          .where(eq(momentUserTokensTable.momentId, momentId));
-        const organizerToken = allTokenRows.reduce((min, t) => t.id < min.id ? t : min, allTokenRows[0]);
-        const [organizer] = await db.select().from(usersTable)
-          .where(eq(usersTable.email, organizerToken.email));
+    // Create or update a Google Calendar event on the USER'S OWN calendar
+    const [hh2, mm2] = personalTime.split(":").map(Number);
+    const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone, practiceEventDurationMins(moment.templateType));
 
-        if (organizer?.googleAccessToken) {
-          const [hh2, mm2] = personalTime.split(":").map(Number);
-          const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh2, mm2, personalTimezone, practiceEventDurationMins(moment.templateType));
-          const updated = await updateCalendarEvent(organizer.id, myTokenRow.googleCalendarEventId, {
-            startLocalStr,
-            endLocalStr,
-            timeZone: personalTimezone,
-            attendees: [myTokenRow.email],
-          });
-          console.info(`Personal time GCal update for moment ${momentId}: ${updated ? "ok" : "failed"} → ${startLocalStr} ${personalTimezone}`);
-        }
-      } catch (gcalErr) {
-        console.error("Personal time GCal update failed (non-fatal):", gcalErr);
+    // Build recurrence rule matching the practice frequency
+    const recurrence: string[] = [];
+    if (moment.frequency === "daily") {
+      recurrence.push("RRULE:FREQ=DAILY");
+    } else if (moment.frequency === "weekly" && moment.dayOfWeek) {
+      recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${moment.dayOfWeek}`);
+    } else if (moment.frequency === "weekly") {
+      recurrence.push("RRULE:FREQ=WEEKLY");
+    }
+
+    let calEventId = myTokenRow.googleCalendarEventId;
+
+    // Helper to create a fresh event on the user's own calendar
+    const createFreshEvent = async () => {
+      const newId = await createCalendarEvent(sessionUserId, {
+        summary: `🔔 ${moment.name}`,
+        description: moment.intention ?? `Your ${moment.name} practice — set aside this time, wherever you are.`,
+        startDate: new Date(),
+        startLocalStr,
+        endLocalStr,
+        timeZone: personalTimezone,
+        recurrence: recurrence.length > 0 ? recurrence : undefined,
+      });
+      if (newId) {
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: newId, calendarConnected: true })
+          .where(eq(momentUserTokensTable.id, myTokenRow.id));
+        console.info(`Bell created GCal event ${newId} for moment ${momentId}, user ${user.email}`);
       }
+      return newId;
+    };
+
+    try {
+      if (calEventId) {
+        // Try to update existing event (may be on user's calendar or accepted invite)
+        const updated = await updateCalendarEvent(sessionUserId, calEventId, {
+          summary: `🔔 ${moment.name}`,
+          startLocalStr,
+          endLocalStr,
+          timeZone: personalTimezone,
+        });
+        if (updated) {
+          console.info(`Bell updated GCal for moment ${momentId}, user ${user.email} → ${startLocalStr} ${personalTimezone}`);
+        } else {
+          // Update failed (event not on this user's calendar) — create a new one
+          console.info(`Bell update failed for ${user.email}, creating fresh event`);
+          await createFreshEvent();
+        }
+      } else {
+        await createFreshEvent();
+      }
+    } catch (gcalErr) {
+      // Update threw — try creating a new event as fallback
+      console.error("Bell GCal update threw, attempting fresh create:", gcalErr);
+      try { await createFreshEvent(); } catch { /* non-fatal */ }
     }
 
     res.json({ ok: true, calendarEventsCreated: occurrences.length });
@@ -1530,6 +1565,39 @@ router.post("/moments/:momentToken/join", async (req, res): Promise<void> => {
           });
         }
       }
+
+      // Create a Google Calendar event on the joining member's own calendar (if logged in)
+      const joinSessionUserId = req.user ? (req.user as { id: number }).id : null;
+      if (joinSessionUserId && !tokenRow.googleCalendarEventId) {
+        try {
+          const [hh, mm] = personalTime.split(":").map(Number);
+          const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, personalTimezone, practiceEventDurationMins(moment.templateType));
+
+          const recurrence: string[] = [];
+          if (moment.frequency === "daily") recurrence.push("RRULE:FREQ=DAILY");
+          else if (moment.frequency === "weekly" && moment.dayOfWeek) recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${moment.dayOfWeek}`);
+          else if (moment.frequency === "weekly") recurrence.push("RRULE:FREQ=WEEKLY");
+
+          const calEventId = await createCalendarEvent(joinSessionUserId, {
+            summary: `🔔 ${moment.name}`,
+            description: moment.intention ?? `Your ${moment.name} practice — set aside this time, wherever you are.`,
+            startDate: new Date(),
+            startLocalStr,
+            endLocalStr,
+            timeZone: personalTimezone,
+            recurrence: recurrence.length > 0 ? recurrence : undefined,
+          });
+
+          if (calEventId) {
+            await db.update(momentUserTokensTable)
+              .set({ googleCalendarEventId: calEventId, calendarConnected: true })
+              .where(eq(momentUserTokensTable.id, tokenRow.id));
+            console.info(`Join GCal event ${calEventId} created for ${email} on moment ${moment.id}`);
+          }
+        } catch (gcalErr) {
+          console.error("Join GCal event creation failed (non-fatal):", gcalErr);
+        }
+      }
     }
 
     const baseUrl = `${getFrontendUrl()}/moment`;
@@ -1566,22 +1634,6 @@ router.patch("/moments/:id/archive", async (req, res): Promise<void> => {
   const isMember = allMemberTokens.some(t => t.email === user.email);
   if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  // Determine organizer (lowest ID row) — all calendar events were created with their credentials
-  const organizerToken = allMemberTokens.length > 0
-    ? allMemberTokens.reduce((min, t) => t.id < min.id ? t : min, allMemberTokens[0])
-    : null;
-  const [organizerUser] = organizerToken
-    ? await db.select().from(usersTable).where(eq(usersTable.email, organizerToken.email))
-    : [null];
-  const calDeleteUserId = organizerUser?.id ?? sessionUserId;
-
-  // Delete all Google Calendar events using organizer credentials (events were created by them)
-  await Promise.allSettled(
-    allMemberTokens
-      .filter((t) => t.googleCalendarEventId)
-      .map((t) => deleteCalendarEvent(calDeleteUserId, t.googleCalendarEventId!))
-  );
-
   await db.update(sharedMomentsTable)
     .set({ state: "archived" })
     .where(eq(sharedMomentsTable.id, momentId));
@@ -1609,22 +1661,6 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
 
   const isMember = allMemberTokens.some(t => t.email === user.email);
   if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
-
-  // Determine organizer (lowest ID row) — all calendar events were created with their credentials
-  const organizerToken = allMemberTokens.length > 0
-    ? allMemberTokens.reduce((min, t) => t.id < min.id ? t : min, allMemberTokens[0])
-    : null;
-  const [organizerUser] = organizerToken
-    ? await db.select().from(usersTable).where(eq(usersTable.email, organizerToken.email))
-    : [null];
-  const calDeleteUserId = organizerUser?.id ?? sessionUserId;
-
-  // Delete all Google Calendar events using organizer credentials (events were created by them)
-  await Promise.allSettled(
-    allMemberTokens
-      .filter((t) => t.googleCalendarEventId)
-      .map((t) => deleteCalendarEvent(calDeleteUserId, t.googleCalendarEventId!))
-  );
 
   // Hard delete — cascades remove windows, posts, tokens, calendar events, renewals
   await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
