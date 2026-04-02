@@ -46,6 +46,9 @@ export async function createCalendarEvent(
     attendees?: string[];
     recurrence?: string[];
     timeZone?: string;      // e.g. "America/New_York"
+    colorId?: string;       // Google Calendar color (e.g. "5" = banana/yellow)
+    status?: string;        // "tentative" | "confirmed"
+    reminders?: Array<{ method: string; minutes: number }>;
   }
 ): Promise<string | null> {
   const auth = await getAuthedClient(userId);
@@ -59,6 +62,11 @@ export async function createCalendarEvent(
   const tz = opts.timeZone ?? "UTC";
 
   const attendeeList = opts.attendees?.map(email => ({ email })) ?? [];
+
+  const defaultReminders = [
+    { method: "popup", minutes: 10 },
+    { method: "email", minutes: 60 },
+  ];
 
   try {
     const event = await calendar.events.insert({
@@ -76,12 +84,11 @@ export async function createCalendarEvent(
           : { dateTime: end.toISOString(), timeZone: "UTC" },
         attendees: attendeeList.length > 0 ? attendeeList : undefined,
         recurrence: opts.recurrence,
+        colorId: opts.colorId,
+        status: opts.status,
         reminders: {
           useDefault: false,
-          overrides: [
-            { method: "popup", minutes: 10 },
-            { method: "email", minutes: 60 },
-          ],
+          overrides: opts.reminders ?? defaultReminders,
         },
       },
     });

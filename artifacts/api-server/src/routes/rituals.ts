@@ -3,6 +3,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
+import { createCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -423,6 +424,7 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
   }
 
   // Create a planned meetup row so dashboard shows the proposed date
+  let meetupId: number | null = null;
   if (parsed.data.proposedTimes && parsed.data.proposedTimes.length > 0) {
     const placeholderTime = new Date(parsed.data.proposedTimes[0]);
     const existingMeetups = await db
@@ -433,13 +435,151 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
 
     if (existingPlanned) {
       await db.update(meetupsTable).set({ scheduledDate: placeholderTime }).where(eq(meetupsTable.id, existingPlanned.id));
+      meetupId = existingPlanned.id;
     } else {
-      await db.insert(meetupsTable).values({
+      const [inserted] = await db.insert(meetupsTable).values({
         ritualId: id,
         scheduledDate: placeholderTime,
         status: "planned",
-      });
+      }).returning();
+      meetupId = inserted.id;
     }
+  }
+
+  // ─── Create Google Calendar event for the tradition ─────────────────────────
+  try {
+    const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+    if (organizer && parsed.data.proposedTimes.length > 0) {
+      const appBase = getFrontendUrl();
+      const organizerFirstName = (organizer.name ?? organizer.email ?? "Someone").split(" ")[0];
+
+      // Warm one-liner based on tradition name
+      const nameLower = (ritual.name ?? "").toLowerCase();
+      const WARM_LINES: Record<string, string> = {
+        coffee: "A recurring time to share a cup together.",
+        meal: "A standing meal, week after week.",
+        walk: "A regular walk, together.",
+        run: "Keeping the pace, keeping the commitment.",
+      };
+      const warmLine = WARM_LINES[nameLower] ?? "A recurring tradition worth tending.";
+
+      // Frequency label
+      const FREQ_LABELS: Record<string, string> = {
+        weekly: "Every week",
+        biweekly: "Every 2 weeks",
+        monthly: "Once a month",
+      };
+      const freqLabel = FREQ_LABELS[ritual.frequency] ?? ritual.frequency;
+
+      // Format proposed times for the description
+      function formatProposedTime(isoStr: string): string {
+        const d = new Date(isoStr);
+        const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const day = dayNames[d.getDay()];
+        const month = monthNames[d.getMonth()];
+        const date = d.getDate();
+        const h = d.getHours();
+        const m = d.getMinutes();
+        const period = h < 12 ? "AM" : "PM";
+        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const minStr = m === 0 ? "" : `:${String(m).padStart(2, "0")}`;
+        return `${day}, ${month} ${date} · ${hour12}${minStr} ${period}`;
+      }
+
+      // Fetch invite tokens to build personalized descriptions per participant
+      const allTokens = await db.select().from(inviteTokensTable)
+        .where(eq(inviteTokensTable.ritualId, id));
+
+      // One event per participant with their personal invite link
+      const proposedTimes = parsed.data.proposedTimes;
+      for (const token of allTokens) {
+        const inviteUrl = `${appBase}/invite/${token.token}`;
+        const isOrganizerToken = token.email === organizer.email;
+
+        // Build description lines
+        const lines: string[] = [];
+
+        if (isOrganizerToken) {
+          lines.push(`Your ${ritual.name} tradition on Eleanor 🌿`);
+          lines.push(warmLine);
+        } else {
+          lines.push(`${organizerFirstName} invited you to ${ritual.name} 🌿`);
+          lines.push(warmLine);
+        }
+
+        lines.push("");
+        lines.push("──────────────────────");
+        lines.push("");
+
+        if (proposedTimes.length > 0) {
+          if (!isOrganizerToken) {
+            lines.push(`${organizerFirstName} suggested these times.`);
+            lines.push("Choose the one that works for you:");
+            lines.push("");
+          } else {
+            lines.push("Proposed times:");
+            lines.push("");
+          }
+
+          for (let i = 0; i < proposedTimes.length; i++) {
+            const label = i === 0 ? "✓ First choice" : "· Alternate";
+            lines.push(`  ${label}: ${formatProposedTime(proposedTimes[i])}`);
+          }
+
+          if (!isOrganizerToken) {
+            lines.push("");
+            lines.push("Or suggest your own time at the link below.");
+          }
+
+          lines.push("");
+          lines.push("──────────────────────");
+          lines.push("");
+        }
+
+        lines.push(`${ritual.name} · ${freqLabel}`);
+        lines.push(`${organizerFirstName} is tending this with Eleanor 🌿`);
+        lines.push("");
+        lines.push(`Open your invitation →`);
+        lines.push(inviteUrl);
+        lines.push("");
+        lines.push("──────────────────────");
+        lines.push("");
+        lines.push("Eleanor helps recurring gatherings actually happen.");
+
+        if (!isOrganizerToken) {
+          lines.push("You don't need an account — your link above is all you need.");
+        }
+
+        const description = lines.join("\n");
+
+        const eventStart = new Date(proposedTimes[0]);
+        const eventEnd = new Date(eventStart.getTime() + 60 * 60_000); // 1 hour
+
+        const eventId = await createCalendarEvent(sessionUserId, {
+          summary: ritual.name,
+          description,
+          startDate: eventStart,
+          endDate: eventEnd,
+          attendees: isOrganizerToken ? undefined : [token.email],
+          colorId: "5", // banana/yellow — closest to Eleanor amber
+          status: "tentative",
+          reminders: [
+            { method: "email", minutes: 1440 },   // 1 day before
+            { method: "popup", minutes: 120 },     // 2 hours before
+          ],
+        });
+
+        if (eventId && meetupId && isOrganizerToken) {
+          // Store the organizer's event ID on the meetup for later updates
+          await db.update(meetupsTable)
+            .set({ googleCalendarEventId: eventId })
+            .where(eq(meetupsTable.id, meetupId));
+        }
+      }
+    }
+  } catch (calErr) {
+    console.error("Tradition calendar event creation failed (non-fatal):", calErr);
   }
 
   res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });

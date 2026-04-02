@@ -233,7 +233,7 @@ export default function TraditionNew() {
         name,
         frequency,
         participants: selectedPeople,
-        intention: `A ${type} tradition. Together.`,
+        intention: TYPE_OPTIONS.find(o => o.value === type)?.tagline ?? `A ${type} tradition worth tending.`,
         ownerId: user.id,
         dayPreference: "",
       });
