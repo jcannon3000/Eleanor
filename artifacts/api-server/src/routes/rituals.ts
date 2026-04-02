@@ -713,7 +713,7 @@ router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
     return;
   }
 
-  const confirmedTime = new Date(parsed.data.confirmedTime);
+  const confirmedTime = parsed.data.confirmedTime;
 
   await db
     .update(ritualsTable)

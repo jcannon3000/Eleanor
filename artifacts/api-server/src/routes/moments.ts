@@ -338,10 +338,10 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
   // Calendar invites for non-organizer members only.
   // The organizer gets their own bell event — not a duplicate invite event.
-  const inviteTokens = insertedTokens.filter(t => t.email !== organizer.email);
+  const nonOrganizerTokens = insertedTokens.filter(t => t.email !== organizer.email);
   let gcalCreated = false;
 
-  for (const t of inviteTokens) {
+  for (const t of nonOrganizerTokens) {
     const shortLink = `${getFrontendUrl()}/m/${t.userToken}`;
     const description = [
       `${organizerName} invited you to practice together.`,
@@ -1355,6 +1355,7 @@ router.get("/rituals/:id/moments/:momentId/journal", async (req, res): Promise<v
   const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
   if (!moment) { res.status(404).json({ error: "Not found" }); return; }
 
+  if (!moment.ritualId) { res.status(403).json({ error: "Forbidden" }); return; }
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, moment.ritualId));
   if (!ritual || ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
 
@@ -1794,11 +1795,15 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
       });
     await Promise.allSettled(calDeletePromises);
 
-    // Also delete the moment-level calendar event if one exists
-    if (moment.googleCalendarEventId) {
-      try {
-        await deleteCalendarEvent(sessionUserId, moment.googleCalendarEventId);
-      } catch { /* best effort */ }
+    // Also delete moment-level calendar events from momentCalendarEventsTable
+    const momentCalEvents = await db.select().from(momentCalendarEventsTable)
+      .where(eq(momentCalendarEventsTable.sharedMomentId, momentId));
+    for (const evt of momentCalEvents) {
+      if (evt.googleCalendarEventId) {
+        try {
+          await deleteCalendarEvent(sessionUserId, evt.googleCalendarEventId);
+        } catch { /* best effort */ }
+      }
     }
 
     // Explicitly delete child rows first (in case DB CASCADE wasn't applied via migration)
