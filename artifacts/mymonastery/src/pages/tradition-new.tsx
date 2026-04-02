@@ -105,15 +105,13 @@ export default function TraditionNew() {
   // ─── Step 3 — Who ───────────────────────────────────────────────────────────
 
   const { data: peopleData } = useQuery({
-    queryKey: ["/api/people", user?.id],
-    queryFn: () =>
-      fetch(`/api/people?ownerId=${user!.id}`, { credentials: "include" }).then((r) => r.json()),
-    enabled: !!user?.id && step === 3,
+    queryKey: ["/api/connections"],
+    queryFn: () => apiRequest<{ connections: { name: string; email: string }[] }>("GET", "/api/connections"),
+    enabled: step === 3,
   });
 
-  const existingConnections: { name: string; email: string }[] = Array.isArray(peopleData)
-    ? peopleData
-    : [];
+  const existingConnections: { name: string; email: string }[] =
+    peopleData?.connections ?? [];
 
   function toggleExistingPerson(person: { name: string; email: string }) {
     setSelectedPeople((prev) => {
