@@ -7,7 +7,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, updateCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -1415,10 +1415,20 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
       recurrence.push("RRULE:FREQ=WEEKLY");
     }
 
-    let calEventId = myTokenRow.googleCalendarEventId;
+    const oldCalEventId = myTokenRow.googleCalendarEventId;
 
-    // Helper to create a fresh event on the user's own calendar
-    const createFreshEvent = async () => {
+    try {
+      // Step 1: Delete the old calendar event if one exists
+      if (oldCalEventId) {
+        try {
+          await deleteCalendarEvent(sessionUserId, oldCalEventId);
+          console.info(`Bell deleted old GCal event ${oldCalEventId} for user ${user.email}`);
+        } catch {
+          console.info(`Bell could not delete old GCal event ${oldCalEventId} for ${user.email} — may be on organizer's calendar`);
+        }
+      }
+
+      // Step 2: Always create a fresh recurring event on the user's own calendar
       const newId = await createCalendarEvent(sessionUserId, {
         summary: `🔔 ${moment.name}`,
         description: moment.intention ?? `Your ${moment.name} practice — set aside this time, wherever you are.`,
@@ -1428,38 +1438,21 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
         timeZone: personalTimezone,
         recurrence: recurrence.length > 0 ? recurrence : undefined,
       });
-      if (newId) {
-        await db.update(momentUserTokensTable)
-          .set({ googleCalendarEventId: newId, calendarConnected: true })
-          .where(eq(momentUserTokensTable.id, myTokenRow.id));
-        console.info(`Bell created GCal event ${newId} for moment ${momentId}, user ${user.email}`);
-      }
-      return newId;
-    };
 
-    try {
-      if (calEventId) {
-        // Try to update existing event (may be on user's calendar or accepted invite)
-        const updated = await updateCalendarEvent(sessionUserId, calEventId, {
-          summary: `🔔 ${moment.name}`,
-          startLocalStr,
-          endLocalStr,
-          timeZone: personalTimezone,
-        });
-        if (updated) {
-          console.info(`Bell updated GCal for moment ${momentId}, user ${user.email} → ${startLocalStr} ${personalTimezone}`);
-        } else {
-          // Update failed (event not on this user's calendar) — create a new one
-          console.info(`Bell update failed for ${user.email}, creating fresh event`);
-          await createFreshEvent();
-        }
-      } else {
-        await createFreshEvent();
+      // Step 3: Save the new event ID
+      await db.update(momentUserTokensTable)
+        .set({
+          googleCalendarEventId: newId ?? null,
+          calendarConnected: !!newId,
+        })
+        .where(eq(momentUserTokensTable.id, myTokenRow.id));
+
+      if (newId) {
+        console.info(`Bell created new GCal event ${newId} for moment ${momentId}, user ${user.email} at ${startLocalStr} ${personalTimezone}`);
       }
     } catch (gcalErr) {
-      // Update threw — try creating a new event as fallback
-      console.error("Bell GCal update threw, attempting fresh create:", gcalErr);
-      try { await createFreshEvent(); } catch { /* non-fatal */ }
+      console.error("Bell GCal sync error:", gcalErr);
+      // Non-fatal — the personal time was still saved to the DB
     }
 
     res.json({ ok: true, calendarEventsCreated: occurrences.length });
