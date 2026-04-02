@@ -552,6 +552,7 @@ export default function MomentNew() {
       const t = setTimeout(() => setShowIntro(false), 1600);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [showIntro]);
 
   // Step navigation

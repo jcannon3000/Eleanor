@@ -218,7 +218,7 @@ export default function RitualDetail() {
       .catch(() => null);
   }, [showInviteSheet, ritualId]);
 
-  const joinLink = `${window.location.origin}/join/${ritual?.scheduleToken ?? ""}`;
+  const joinLink = `${window.location.origin}/join/${(ritual as any)?.scheduleToken ?? ""}`;
 
   const handleAddEmailToQueue = () => {
     const email = inviteEmailInput.trim();

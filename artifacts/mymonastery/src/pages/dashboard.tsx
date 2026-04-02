@@ -63,7 +63,7 @@ const GROWTH_LABELS: Record<string, string> = {
 
 // ─── Card Components ──────────────────────────────────────────────────────────
 
-function GatheringCard({ ritual, dim }: { ritual: ReturnType<typeof useListRituals>["data"] extends (infer T)[] | undefined ? T : never; dim: boolean }) {
+function GatheringCard({ ritual, dim }: { ritual: any; dim: boolean }) {
   const next = ritual.nextMeetupDate ? parseISO(ritual.nextMeetupDate) : null;
   const isConfirmed = !!ritual.confirmedTime;
   const statusKey = ritual.status ?? "needs_scheduling";
@@ -88,7 +88,7 @@ function GatheringCard({ ritual, dim }: { ritual: ReturnType<typeof useListRitua
           {/* Participants */}
           {ritual.participants && ritual.participants.length > 0 && (
             <p className="text-sm text-muted-foreground mb-2">
-              with {ritual.participants.slice(0, 3).map(p => (p.name || p.email || "").split(" ")[0]).join(", ")}
+              with {ritual.participants.slice(0, 3).map((p: any) => (p.name || p.email || "").split(" ")[0]).join(", ")}
               {ritual.participants.length > 3 && ` +${ritual.participants.length - 3}`}
             </p>
           )}
@@ -345,7 +345,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const { data: rituals, isLoading: ritualsLoading } = useListRituals({ ownerId: user?.id });
-  const { data: momentsData, isLoading: momentsLoading } = useQuery({
+  const { data: momentsData, isLoading: momentsLoading } = useQuery<{ moments: MomentData[] }>({
     queryKey: ["/api/moments"],
     queryFn: () => apiRequest("GET", "/api/moments"),
     enabled: !!user,
@@ -545,7 +545,7 @@ export default function Dashboard() {
                             {r.nextMeetupDate && (
                               <p className="text-sm text-foreground/80">
                                 {dayLabel(parseISO(r.nextMeetupDate))} · {format(parseISO(r.nextMeetupDate), "h:mm a")}
-                                {r.location && <> · {r.location}</>}
+                                {(r as any).location && <> · {(r as any).location}</>}
                               </p>
                             )}
                           </div>

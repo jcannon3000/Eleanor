@@ -84,7 +84,7 @@ export default function MomentPlant() {
     },
   });
 
-  const { data: ritual } = useQuery({
+  const { data: ritual } = useQuery<{ name: string }>({
     queryKey: [`/api/rituals/${ritualId}`],
     queryFn: () => apiRequest("GET", `/api/rituals/${ritualId}`),
   });

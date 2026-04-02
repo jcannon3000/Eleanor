@@ -212,6 +212,7 @@ function IntercessionPrayerPage({
       return () => clearTimeout(t);
     }
     prevPostedRef.current = alreadyPosted;
+    return undefined;
   }, [alreadyPosted, confirmStep]);
 
   // Warm glow when a second person prays
@@ -223,6 +224,7 @@ function IntercessionPrayerPage({
       return () => clearTimeout(t);
     }
     prevCountRef.current = todayPostCount;
+    return undefined;
   }, [todayPostCount]);
 
   // Bloom animation: track newly-prayed members
@@ -253,7 +255,7 @@ function IntercessionPrayerPage({
   };
   const headerItem = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { duration: 0.4, ease: "easeOut" } },
+    visible: { opacity: 1, transition: { duration: 0.4, ease: "easeOut" as const } },
   };
 
   // ── Confirmation screen (slides up from below) ──────────────────────────────
