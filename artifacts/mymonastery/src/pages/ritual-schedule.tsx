@@ -54,23 +54,19 @@ export default function RitualSchedule() {
     async function load() {
       setIsLoading(true);
       try {
-        const [ritualRes, timesRes] = await Promise.all([
-          fetch(`/api/rituals/${ritualId}`, { credentials: "include" }),
-          fetch(`/api/rituals/${ritualId}/suggested-times?tzOffset=${new Date().getTimezoneOffset()}`, { credentials: "include" }),
-        ]);
+        const ritualRes = await fetch(`/api/rituals/${ritualId}`, { credentials: "include" });
         if (ritualRes.ok) {
           const ritual = await ritualRes.json();
           setRitualName(ritual.name ?? "");
           setLocationEdit(ritual.location ?? "");
-        }
-        if (timesRes.ok) {
-          const data = await timesRes.json();
-          const proposed: string[] = data.proposedTimes ?? [];
-          const filled = proposed.map((t: string) => isoToLocalInput(t));
-          setTimes([filled[0] || "", filled[1] || "", filled[2] || ""]);
-          if (filled[0]) setFixedTime(filled[0]);
-          const visibleCount = Math.max(1, proposed.length);
-          setShownSlots(visibleCount);
+          // Load existing proposed times from the ritual data
+          const proposed: string[] = ritual.proposedTimes ?? [];
+          if (proposed.length > 0) {
+            const filled = proposed.map((t: string) => isoToLocalInput(t));
+            setTimes([filled[0] || "", filled[1] || "", filled[2] || ""]);
+            if (filled[0]) setFixedTime(filled[0]);
+            setShownSlots(Math.max(1, proposed.length));
+          }
         }
       } catch {
         toast({ variant: "destructive", title: "Could not load schedule" });
@@ -106,7 +102,7 @@ export default function RitualSchedule() {
       });
       toast({
         title: "Gathering confirmed 🌱",
-        description: "Eleanor will send calendar invites to your tradition.",
+        description: "Your tradition is planted.",
       });
       setLocation(`/ritual/${ritualId}`);
     } catch {
@@ -210,7 +206,7 @@ export default function RitualSchedule() {
             >
               <div className="bg-card border border-card-border rounded-2xl p-5">
                 <p className="font-medium text-foreground mb-0.5">When will you gather?</p>
-                <p className="text-sm text-muted-foreground mb-3">One time, confirmed. Eleanor will send everyone a calendar invite.</p>
+                <p className="text-sm text-muted-foreground mb-3">One time, confirmed. Eleanor will notify everyone.</p>
                 <input
                   type="datetime-local"
                   value={fixedTime}
@@ -288,7 +284,7 @@ export default function RitualSchedule() {
           <label className="block font-medium text-foreground mb-0.5">
             📍 Where will you gather?
           </label>
-          <p className="text-sm text-muted-foreground mb-3">Optional — shows up in calendar invites.</p>
+          <p className="text-sm text-muted-foreground mb-3">Optional — shows up in the gathering details.</p>
           <input
             type="text"
             value={locationEdit}
@@ -327,7 +323,7 @@ export default function RitualSchedule() {
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           {mode === "fixed"
-            ? "Eleanor will send calendar invites to everyone in your tradition."
+            ? "Eleanor will reach out to everyone in your tradition."
             : "Eleanor will reach out to your tradition with these options."}
         </p>
       </div>

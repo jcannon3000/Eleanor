@@ -3,8 +3,6 @@ import { Router, type IRouter } from "express";
 import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
-import { createCalendarEvent, updateCalendarEvent, getCalendarEvent, deleteCalendarEvent, getCalendarEventAttendees, addAttendeesToCalendarEvent } from "../lib/calendar";
-
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -219,18 +217,6 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
   if (!ritual) { res.status(404).json({ error: "Tradition not found" }); return; }
   if (!sessionUserId || ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Only the owner can delete this tradition" }); return; }
 
-  // Delete calendar events for all meetups
-  const meetups = await db
-    .select({ googleCalendarEventId: meetupsTable.googleCalendarEventId })
-    .from(meetupsTable)
-    .where(eq(meetupsTable.ritualId, params.data.id));
-
-  await Promise.allSettled(
-    meetups
-      .filter((m) => m.googleCalendarEventId)
-      .map((m) => deleteCalendarEvent(sessionUserId, m.googleCalendarEventId!))
-  );
-
   // Delete all dependent records (tables without ON DELETE CASCADE in the actual DB)
   await db.delete(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
   await db.delete(ritualMessagesTable).where(eq(ritualMessagesTable.ritualId, params.data.id));
@@ -286,21 +272,6 @@ router.post("/rituals/:id/meetups", async (req, res): Promise<void> => {
       notes: parsed.data.notes ?? null,
     })
     .returning();
-
-  if (parsed.data.status === "completed" && ritual.ownerId) {
-    const scheduledDate = new Date(parsed.data.scheduledDate);
-    const calEventId = await createCalendarEvent(ritual.ownerId, {
-      summary: `${ritual.name} ✓`,
-      description: parsed.data.notes ?? `Completed meetup for ${ritual.name}`,
-      startDate: scheduledDate,
-    });
-    if (calEventId) {
-      await db
-        .update(meetupsTable)
-        .set({ googleCalendarEventId: calEventId })
-        .where(eq(meetupsTable.id, meetup.id));
-    }
-  }
 
   res.status(201).json(meetup);
 });
@@ -474,7 +445,7 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
   res.json({ proposedTimes: updated.proposedTimes, confirmedTime: updated.confirmedTime });
 });
 
-// GET /api/rituals/:id/timeline — returns upcoming (planned) meetup synced with Google Calendar + past meetups
+// GET /api/rituals/:id/timeline — returns upcoming (planned) meetup + past meetups
 router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
@@ -494,36 +465,6 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
 
   // The upcoming meetup is the most recent "planned" one
   let upcoming = allMeetups.find((m) => m.status === "planned") ?? null;
-
-  // Sync with Google Calendar: if the event was rescheduled or deleted in Google, update our record
-  if (upcoming?.googleCalendarEventId) {
-    try {
-      const calEvent = await getCalendarEvent(sessionUserId, upcoming.googleCalendarEventId);
-      if (calEvent) {
-        const storedTime = upcoming.scheduledDate.getTime();
-        const calTime = calEvent.startDate.getTime();
-        if (Math.abs(storedTime - calTime) > 60_000) {
-          // More than 1 minute difference — Google Calendar was updated, sync the new time
-          const [synced] = await db
-            .update(meetupsTable)
-            .set({ scheduledDate: calEvent.startDate })
-            .where(eq(meetupsTable.id, upcoming.id))
-            .returning();
-          upcoming = synced;
-        }
-      } else {
-        // Event was deleted from Google Calendar — clear the event ID from our record
-        const [cleared] = await db
-          .update(meetupsTable)
-          .set({ googleCalendarEventId: null })
-          .where(eq(meetupsTable.id, upcoming.id))
-          .returning();
-        upcoming = cleared;
-      }
-    } catch {
-      // Calendar sync failure is non-fatal
-    }
-  }
 
   // Also check if ritual.confirmedTime has a matching planned meetup; if not, create one
   if (ritual.confirmedTime && !upcoming) {
@@ -648,51 +589,21 @@ router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
     .set({ confirmedTime })
     .where(eq(ritualsTable.id, id));
 
-  // Gather all participant emails from scheduling responses + ritual participants
-  const responses = await db
-    .select()
-    .from(schedulingResponsesTable)
-    .where(eq(schedulingResponsesTable.ritualId, id));
-
-  const responseEmails = responses.map((r) => r.email);
-  const participantEmails = ((ritual.participants as Array<{ email: string }>) ?? []).map((p) => p.email);
-  const allEmails = [...new Set([...responseEmails, ...participantEmails])].filter(Boolean);
-
-  // Find existing calendar event on the most recent meetup for this ritual
-  const meetups = await db
+  // Create a planned meetup for the confirmed time
+  const existingMeetups = await db
     .select()
     .from(meetupsTable)
-    .where(eq(meetupsTable.ritualId, id))
-    .orderBy(desc(meetupsTable.createdAt));
+    .where(eq(meetupsTable.ritualId, id));
+  const existingPlanned = existingMeetups.find((m) => m.status === "planned");
 
-  const existingEventId = meetups.find((m) => m.googleCalendarEventId)?.googleCalendarEventId ?? null;
-
-  if (existingEventId) {
-    updateCalendarEvent(sessionUserId, existingEventId, {
-      summary: ritual.name,
-      description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
-      startDate: confirmedTime,
-      attendees: allEmails,
-    }).catch((err) => req.log.warn({ err }, "Failed to update calendar event"));
+  if (existingPlanned) {
+    await db.update(meetupsTable).set({ scheduledDate: confirmedTime }).where(eq(meetupsTable.id, existingPlanned.id));
   } else {
-    // Create a new event and persist its ID to a new meetup row for future updates
-    createCalendarEvent(sessionUserId, {
-      summary: ritual.name,
-      description: ritual.intention ?? `Confirmed gathering: ${ritual.name}`,
-      startDate: confirmedTime,
-      attendees: allEmails,
-    })
-      .then(async (eventId) => {
-        if (eventId) {
-          await db.insert(meetupsTable).values({
-            ritualId: id,
-            scheduledDate: confirmedTime,
-            status: "planned",
-            googleCalendarEventId: eventId,
-          });
-        }
-      })
-      .catch((err) => req.log.warn({ err }, "Failed to create confirmation calendar event"));
+    await db.insert(meetupsTable).values({
+      ritualId: id,
+      scheduledDate: confirmedTime,
+      status: "planned",
+    });
   }
 
   res.json({ confirmedTime: confirmedTime.toISOString() });
@@ -756,7 +667,7 @@ router.get("/rituals/:id/connections", async (req, res): Promise<void> => {
 });
 
 // ─── POST /api/rituals/:id/invite ────────────────────────────────────────────
-// Adds new participants to the tradition and invites them via calendar
+// Adds new participants to the tradition
 router.post("/rituals/:id/invite", async (req, res): Promise<void> => {
   try {
     const sessionUserId = req.user ? (req.user as { id: number }).id : null;
@@ -797,68 +708,9 @@ router.post("/rituals/:id/invite", async (req, res): Promise<void> => {
       }
     }
 
-    // Add new participants to the Google Calendar event (if one exists)
-    const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
-    const eventMeetup = meetups.find(m => m.googleCalendarEventId);
-    if (eventMeetup?.googleCalendarEventId) {
-      await addAttendeesToCalendarEvent(
-        sessionUserId,
-        eventMeetup.googleCalendarEventId,
-        newParts.map(p => p.email)
-      ).catch(() => null);
-    }
-
     res.json({ participants: merged, added: newParts });
   } catch (err) {
     console.error("POST /api/rituals/:id/invite error:", err);
-    if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ─── GET /api/rituals/:id/calendar-sync ──────────────────────────────────────
-// Syncs attendees from the Google Calendar event into tradition members
-router.get("/rituals/:id/calendar-sync", async (req, res): Promise<void> => {
-  try {
-    const sessionUserId = req.user ? (req.user as { id: number }).id : null;
-    if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-    const ritualId = parseInt(req.params.id, 10);
-    if (isNaN(ritualId)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
-
-    const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
-    if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
-
-    const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
-    const eventMeetup = meetups.find(m => m.googleCalendarEventId);
-    if (!eventMeetup?.googleCalendarEventId) {
-      res.json({ synced: [], declinedEmails: [] });
-      return;
-    }
-
-    const attendees = await getCalendarEventAttendees(sessionUserId, eventMeetup.googleCalendarEventId);
-    if (!attendees) {
-      res.json({ synced: [], declinedEmails: [] });
-      return;
-    }
-
-    const current = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
-    const currentEmails = new Set(current.map(p => p.email.toLowerCase()));
-
-    // Find attendees not in tradition — add them
-    const toAdd = attendees.filter(a => !currentEmails.has(a.email.toLowerCase()));
-    const declinedEmails = attendees
-      .filter(a => a.responseStatus === "declined" && currentEmails.has(a.email.toLowerCase()))
-      .map(a => a.email.toLowerCase());
-
-    if (toAdd.length > 0) {
-      const newParts = toAdd.map(a => ({ email: a.email, name: a.displayName ?? a.email }));
-      await db.update(ritualsTable)
-        .set({ participants: [...current, ...newParts] })
-        .where(eq(ritualsTable.id, ritualId));
-    }
-
-    res.json({ synced: toAdd.map(a => ({ email: a.email, name: a.displayName ?? a.email })), declinedEmails });
-  } catch (err) {
-    console.error("GET /api/rituals/:id/calendar-sync error:", err);
     if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
   }
 });

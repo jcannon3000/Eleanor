@@ -186,26 +186,7 @@ export default function RitualDetail() {
     }
   };
 
-  // ── Calendar sync: run once on page load ──────────────────────────────────
-  useEffect(() => {
-    if (!ritualId) return;
-    fetch(`/api/rituals/${ritualId}/calendar-sync`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { synced: Array<{ name: string; email: string }>; declinedEmails: string[] } | null) => {
-        if (!data) return;
-        if (data.synced.length > 0) {
-          setCalSyncNotifs(data.synced);
-          setCalSyncedEmails(new Set(data.synced.map(m => m.email.toLowerCase())));
-          queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
-          // Auto-dismiss after 5 seconds
-          setTimeout(() => setCalSyncNotifs([]), 5000);
-        }
-        if (data.declinedEmails.length > 0) {
-          setDeclinedEmails(new Set(data.declinedEmails));
-        }
-      })
-      .catch(() => null);
-  }, [ritualId]);
+  // Calendar sync removed — no longer needed
 
   // ── Invite sheet: fetch connections when opened ───────────────────────────
   useEffect(() => {
