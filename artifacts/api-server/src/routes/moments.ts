@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 import {
   db, ritualsTable, inviteTokensTable, usersTable,
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
-  momentCalendarEventsTable,
+  momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
 import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, updateCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
@@ -1662,10 +1662,22 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   const isMember = allMemberTokens.some(t => t.email === user.email);
   if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  // Hard delete — cascades remove windows, posts, tokens, calendar events, renewals
-  await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  try {
+    // Explicitly delete child rows first (in case DB CASCADE wasn't applied via migration)
+    await db.delete(momentCalendarEventsTable).where(eq(momentCalendarEventsTable.sharedMomentId, momentId));
+    await db.delete(momentPostsTable).where(eq(momentPostsTable.momentId, momentId));
+    await db.delete(momentWindowsTable).where(eq(momentWindowsTable.momentId, momentId));
+    await db.delete(momentUserTokensTable).where(eq(momentUserTokensTable.momentId, momentId));
+    // momentRenewalsTable also references shared_moments
+    await db.delete(momentRenewalsTable).where(eq(momentRenewalsTable.momentId, momentId)).catch(() => {});
 
-  res.json({ ok: true });
+    await db.delete(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /moments/:id error:", err);
+    res.status(500).json({ error: "Failed to delete practice" });
+  }
 });
 
 // ─── GET /api/connections — return all unique people in user's moments + traditions ────

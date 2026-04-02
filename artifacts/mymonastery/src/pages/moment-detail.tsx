@@ -235,11 +235,15 @@ export default function MomentDetail() {
     },
   });
 
+  const [deleteError, setDeleteError] = useState("");
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", `/api/moments/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/moments"] });
       setLocation("/dashboard");
+    },
+    onError: (err: Error) => {
+      setDeleteError(err.message || "Failed to delete. Try again.");
     },
   });
 
@@ -847,16 +851,19 @@ export default function MomentDetail() {
                       <p className="text-xs text-rose-700/80 mb-4">
                         This cannot be undone. All history, streaks, and reflections will be permanently removed for everyone.
                       </p>
+                      {deleteError && (
+                        <p className="text-xs text-rose-700 bg-rose-100 rounded-lg px-3 py-2 mb-3">{deleteError}</p>
+                      )}
                       <div className="flex gap-3">
                         <button
-                          onClick={() => deleteMutation.mutate()}
+                          onClick={() => { setDeleteError(""); deleteMutation.mutate(); }}
                           disabled={deleteMutation.isPending}
                           className="text-sm font-semibold text-white bg-rose-600 rounded-full px-5 py-2.5 hover:bg-rose-700 transition-colors disabled:opacity-50"
                         >
                           {deleteMutation.isPending ? "Deleting…" : "Yes, delete it"}
                         </button>
                         <button
-                          onClick={() => setShowDeleteConfirm(false)}
+                          onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
                           className="text-sm text-rose-700 px-3 py-2.5 hover:text-rose-900 transition-colors"
                         >
                           Cancel
