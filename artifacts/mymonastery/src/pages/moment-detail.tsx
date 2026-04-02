@@ -103,34 +103,27 @@ function parsePracticeDays(raw: string | string[] | null | undefined): string[] 
   try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch { return null; }
 }
 
-const TIME_OF_DAY_LABELS: Record<string, string> = {
-  "early-morning": "morning", "morning": "morning", "midday": "midday",
+const TIME_OF_DAY_FALLBACK: Record<string, string> = {
+  "early-morning": "early morning", "morning": "morning", "midday": "midday",
   "afternoon": "afternoon", "late-afternoon": "late afternoon", "evening": "evening", "night": "night",
 };
 
-// Convert a 24h hour to a friendly time-of-day label
-function clockToTimeLabel(scheduledTime: string): string {
-  const [h] = scheduledTime.split(":").map(Number);
-  if (h < 6) return "early morning";
-  if (h < 12) return "morning";
-  if (h < 14) return "midday";
-  if (h < 17) return "afternoon";
-  if (h < 20) return "evening";
-  return "night";
-}
-
 function scheduleLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
-  const todLabel = timeOfDay ? (TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay) : clockToTimeLabel(scheduledTime);
-  if (frequency === "daily") return `Every ${todLabel}`;
+  // Old practices stored "00:00" — fall back to time-of-day label if available
+  const timeStr = scheduledTime === "00:00" && timeOfDay
+    ? TIME_OF_DAY_FALLBACK[timeOfDay] ?? formatTime(scheduledTime)
+    : formatTime(scheduledTime);
+  const prefix = scheduledTime === "00:00" && timeOfDay ? "" : "at ";
+  if (frequency === "daily") return `Every day ${prefix}${timeStr}`;
   if (frequency === "weekly") {
     if (practiceDays && practiceDays.length > 1) {
       const names = practiceDays.map(d => DAY_NAMES[d]?.slice(0, 3) ?? d).join(", ");
-      return `${names} ${todLabel}`;
+      return `${names} ${prefix}${timeStr}`;
     }
-    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} ${todLabel}`;
-    return `Weekly ${todLabel}`;
+    if (dayOfWeek) return `Every ${DAY_NAMES[dayOfWeek] ?? dayOfWeek} ${prefix}${timeStr}`;
+    return `Weekly ${prefix}${timeStr}`;
   }
-  return `Monthly ${todLabel}`;
+  return `Monthly ${prefix}${timeStr}`;
 }
 
 function goalProgress(createdAt: string, goalDays: number): number {
@@ -160,32 +153,35 @@ function isTodayPracticeDay(frequency: string, dayOfWeek?: string | null, practi
   return true;
 }
 
-// Next practice description — always uses friendly time-of-day words
+// Next practice description — shows actual bell time
 function nextPracticeLabel(frequency: string, scheduledTime: string, dayOfWeek?: string | null, practiceDays?: string[] | null, timeOfDay?: string | null): string {
-  const todLabel = timeOfDay ? (TIME_OF_DAY_LABELS[timeOfDay] ?? timeOfDay) : clockToTimeLabel(scheduledTime);
+  const timeStr = scheduledTime === "00:00" && timeOfDay
+    ? TIME_OF_DAY_FALLBACK[timeOfDay] ?? formatTime(scheduledTime)
+    : formatTime(scheduledTime);
+  const prefix = scheduledTime === "00:00" && timeOfDay ? "" : "at ";
   const today = new Date().getDay(); // 0=Sun
   const pastTime = isPastScheduledTime(scheduledTime);
 
   if (frequency === "daily") {
-    return pastTime ? `Tomorrow ${todLabel}` : `Today ${todLabel}`;
+    return pastTime ? `Tomorrow ${prefix}${timeStr}` : `Today ${prefix}${timeStr}`;
   }
 
   if (frequency === "weekly") {
     const days = practiceDays && practiceDays.length > 0 ? practiceDays : (dayOfWeek ? [dayOfWeek] : []);
-    if (days.length === 0) return `Next practice ${todLabel}`;
+    if (days.length === 0) return `Next practice ${prefix}${timeStr}`;
 
     for (let i = 0; i <= 7; i++) {
       const checkDow = (today + i) % 7;
       const isDayMatch = days.some(d => DAY_DOW[d] === checkDow);
       if (isDayMatch) {
-        if (i === 0 && !pastTime) return `Today ${todLabel}`;
-        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow ${todLabel}`;
+        if (i === 0 && !pastTime) return `Today ${prefix}${timeStr}`;
+        if (i === 1 || (i === 0 && pastTime)) return `Tomorrow ${prefix}${timeStr}`;
         const name = Object.keys(DAY_DOW).find(k => DAY_DOW[k] === checkDow);
-        return `${name ? DAY_NAMES[name] : "Next"} ${todLabel}`;
+        return `${name ? DAY_NAMES[name] : "Next"} ${prefix}${timeStr}`;
       }
     }
   }
-  return `Next practice ${todLabel}`;
+  return `Next practice ${prefix}${timeStr}`;
 }
 
 const STATUS_ICON: Record<string, string> = { bloom: "🌸", solo: "👤", wither: "🥀" };
