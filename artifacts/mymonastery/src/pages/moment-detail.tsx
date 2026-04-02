@@ -661,7 +661,7 @@ export default function MomentDetail() {
                               : ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "")
                               ? `Prayed · ${loggedTime}`
                               : isContemplative
-                              ? `Sat · ${loggedTime}`
+                              ? `In silence · ${loggedTime}`
                               : `Practiced · ${loggedTime}`}
                           </p>
                         ) : (
