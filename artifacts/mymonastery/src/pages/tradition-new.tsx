@@ -163,7 +163,6 @@ export default function TraditionNew() {
     { value: "weekly", emoji: "📅", label: "Every week", tagline: "A weekly rhythm" },
     { value: "biweekly", emoji: "📅", label: "Every two weeks", tagline: "A fortnightly ritual" },
     { value: "monthly", emoji: "📅", label: "Once a month", tagline: "A monthly anchor" },
-    { value: "weekly", emoji: "🌱", label: "We'll figure it out", tagline: "Eleanor will suggest times", special: true },
   ];
 
   const frequencyLabel =
@@ -481,23 +480,12 @@ export default function TraditionNew() {
                 This is your commitment to each other — not a schedule. Eleanor will handle making it happen.
               </p>
               <div className="flex flex-col gap-3">
-                {[
-                  { value: "weekly", emoji: "📅", label: "Every week", tagline: "A weekly rhythm" },
-                  { value: "biweekly", emoji: "📅", label: "Every two weeks", tagline: "A fortnightly ritual" },
-                  { value: "monthly", emoji: "📅", label: "Once a month", tagline: "A monthly anchor" },
-                  { value: "weekly-auto", emoji: "🌱", label: "We'll figure it out", tagline: "Eleanor will suggest times" },
-                ].map((opt) => {
-                  const fVal = opt.value === "weekly-auto" ? "weekly" : opt.value;
-                  const isSelected = frequency === fVal && (opt.value !== "weekly-auto" ? opt.value !== "weekly-auto" : true);
-                  const selected = opt.value === "weekly-auto"
-                    ? frequency === "weekly" && rhythmOptions.findIndex((r) => r.special) >= 0
-                    : frequency === opt.value;
-                  // Simple: just compare frequency to value (weekly-auto maps to weekly too)
-                  const active = frequency === fVal && frequency !== "";
+                {rhythmOptions.map((opt) => {
+                  const active = frequency === opt.value && frequency !== "";
                   return (
                     <button
                       key={opt.value}
-                      onClick={() => setFrequency(fVal)}
+                      onClick={() => setFrequency(opt.value)}
                       className={`w-full text-left p-4 rounded-2xl border flex items-center gap-4 transition-all ${
                         active
                           ? "border-2 border-[#C17F24] bg-[#C17F24]/5"
