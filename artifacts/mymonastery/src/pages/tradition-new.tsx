@@ -44,6 +44,33 @@ function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
   );
 }
 
+// ─── Planting animation screen ────────────────────────────────────────────────
+
+function PlantingScreen({ frames, name, firstNames }: { frames: string[]; name: string; firstNames: string }) {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), 600);
+    return () => clearInterval(id);
+  }, [frames.length]);
+
+  return (
+    <div className="min-h-screen bg-[#2C1810] flex flex-col items-center justify-center px-6">
+      <div className="text-7xl mb-6 transition-all duration-300" key={frame}>
+        {frames[frame]}
+      </div>
+      <h1 className="font-serif text-2xl text-[#F7F0E6] text-center mb-2">
+        Planting {name || "your tradition"}…
+      </h1>
+      {firstNames && (
+        <p className="text-[#F7F0E6]/50 text-sm text-center">
+          Sending invites to {firstNames}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function TraditionNew() {
@@ -269,7 +296,7 @@ export default function TraditionNew() {
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/rituals"] });
-      setLocation(`/ritual/${ritualId}`);
+      setLocation("/dashboard");
     } catch (err) {
       console.error("Failed to create ritual", err);
     } finally {
@@ -281,40 +308,19 @@ export default function TraditionNew() {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
-  // Confirmation screen
+  // Auto-send on step 7
+  useEffect(() => {
+    if (step === 7 && !isCreating) {
+      handleSendInvites();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Planting animation screen
   if (step === 7) {
+    const frames = ["🌱", "🌿", "🌿", "🌾", "🌿", "🌱"];
     return (
-      <div className="min-h-screen bg-[#2C1810] flex flex-col items-center justify-center px-6 py-12">
-        <div className="text-6xl mb-6">🌱</div>
-        <h1 className="font-serif text-3xl text-[#F7F0E6] text-center mb-3">
-          Your {name} is planted.
-        </h1>
-        <p className="text-[#F7F0E6]/60 text-sm text-center mb-8">
-          {frequency === "weekly"
-            ? "Every week"
-            : frequency === "biweekly"
-            ? "Every two weeks"
-            : frequency === "monthly"
-            ? "Once a month"
-            : "Regular gatherings"}{" "}
-          · First gathering{" "}
-          {selectedTime ? format(selectedTime, "MMMM d") : ""}
-          {firstNames ? ` · with ${firstNames}` : ""}
-        </p>
-        <button
-          onClick={handleSendInvites}
-          disabled={isCreating}
-          className="bg-[#F7F0E6] text-[#2C1810] rounded-2xl px-8 py-4 font-semibold text-base w-full max-w-xs mb-4 hover:bg-[#ede6da] transition-colors disabled:opacity-60"
-        >
-          {isCreating ? "Planting… 🌱" : "Send invites 🌿"}
-        </button>
-        <button
-          onClick={() => setLocation("/")}
-          className="text-[#F7F0E6]/40 hover:text-[#F7F0E6]/70 text-sm transition-colors"
-        >
-          ← Back to garden
-        </button>
-      </div>
+      <PlantingScreen frames={frames} name={name} firstNames={firstNames} />
     );
   }
 
