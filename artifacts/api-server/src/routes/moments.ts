@@ -7,7 +7,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -1003,11 +1003,11 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
 
   const insertedNewTokens = await db.insert(momentUserTokensTable).values(newTokenRows).returning();
 
-  // Create individual calendar events for each new member
+  // Add new members to the existing group calendar event
   try {
     const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
     if (moment) {
-      // Find the organizer (lowest-ID token row) for auth
+      // Find the organizer's token row (lowest ID) — they own the group event
       const allTokens = await db.select().from(momentUserTokensTable)
         .where(eq(momentUserTokensTable.momentId, momentId));
       const organizerToken = allTokens.reduce((min, t) => t.id < min.id ? t : min, allTokens[0]);
@@ -1015,53 +1015,52 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
         .where(eq(usersTable.email, organizerToken.email));
 
       if (organizer?.googleAccessToken) {
-        const baseUrl = `${getFrontendUrl()}/moment`;
+        const newEmails = insertedNewTokens.map(t => t.email);
 
-        const [hh, mm] = moment.scheduledTime.split(":").map(Number);
-        const startDate = new Date();
-        startDate.setHours(hh, mm, 0, 0);
-        if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
-        const endDate = new Date(startDate.getTime() + practiceEventDurationMins(moment.templateType) * 60_000);
-
-        const recurrenceRule = moment.frequency === "daily"
-          ? ["RRULE:FREQ=DAILY"]
-          : moment.frequency === "weekly"
-          ? ["RRULE:FREQ=WEEKLY"]
-          : ["RRULE:FREQ=MONTHLY"];
-
-        const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
-
-        for (const t of insertedNewTokens) {
-          const shortLink = `${getFrontendUrl()}/m/${t.userToken}`;
-          const description = [
-            `${organizerName} invited you to practice together.`,
-            ...(moment.intention ? [`"${moment.intention}"`] : []),
-            "",
-            "Tap to log:",
-            shortLink,
-            "",
-            "No login needed. 🌿",
-          ].join("\n");
+        if (organizerToken.googleCalendarEventId) {
+          // Add new members as attendees to the existing group event — they'll get an email invite
+          await addAttendeesToCalendarEvent(organizer.id, organizerToken.googleCalendarEventId, newEmails)
+            .catch(() => null);
+          console.info(`Added ${newEmails.join(", ")} to GCal event ${organizerToken.googleCalendarEventId}`);
+        } else {
+          // No existing group event — create one now with all current members
+          const allEmails = allTokens.map(t => t.email).filter(e => e !== organizer.email);
+          const [hh, mm] = moment.scheduledTime.split(":").map(Number);
+          const startDate = new Date();
+          startDate.setHours(hh, mm, 0, 0);
+          if (startDate < new Date()) startDate.setDate(startDate.getDate() + 1);
+          const endDate = new Date(startDate.getTime() + practiceEventDurationMins(moment.templateType) * 60_000);
+          const recurrenceRule = moment.frequency === "daily"
+            ? ["RRULE:FREQ=DAILY"]
+            : moment.frequency === "weekly"
+            ? ["RRULE:FREQ=WEEKLY"]
+            : ["RRULE:FREQ=MONTHLY"];
 
           const eventId = await createCalendarEvent(organizer.id, {
             summary: `🌿 ${moment.name}`,
-            description,
+            description: [
+              `${moment.name} practice on Eleanor.`,
+              ...(moment.intention ? [`"${moment.intention}"`] : []),
+              "",
+              `Open Eleanor → ${getFrontendUrl()}/moments/${momentId}`,
+            ].join("\n"),
             startDate,
             endDate,
-            attendees: [t.email],
+            attendees: allEmails,
             recurrence: recurrenceRule,
           }).catch(() => null);
 
           if (eventId) {
             await db.update(momentUserTokensTable)
               .set({ googleCalendarEventId: eventId })
-              .where(eq(momentUserTokensTable.id, t.id));
+              .where(eq(momentUserTokensTable.id, organizerToken.id));
+            console.info(`Created new group GCal event ${eventId} for moment ${momentId}`);
           }
         }
       }
     }
   } catch (calErr) {
-    console.error("Invite calendar event creation failed (non-fatal):", calErr);
+    console.error("Invite calendar event update failed (non-fatal):", calErr);
   }
 
   res.json({ added: newPeople.length, people: newPeople });
