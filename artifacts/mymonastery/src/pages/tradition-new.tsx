@@ -176,18 +176,27 @@ export default function TraditionNew() {
 
   // ─── Step 5 — Goal ──────────────────────────────────────────────────────────
 
+  const GATHERINGS_PER_MONTH: Record<string, number> = {
+    weekly: 4,
+    biweekly: 2,
+    monthly: 1,
+  };
+
+  function gatheringsFor(months: number): string {
+    const perMonth = GATHERINGS_PER_MONTH[frequency] ?? 4;
+    const count = perMonth * months;
+    return months === 1 ? `${count} gathering${count === 1 ? "" : "s"}` : `~${count} gatherings`;
+  }
+
   const goalOptions = [
-    { months: 1, emoji: "🌱", label: "One month", tagline: "Taking root · 4 gatherings" },
-    { months: 3, emoji: "🌿", label: "Three months", tagline: "Growing · ~6 gatherings" },
-    { months: 6, emoji: "🌸", label: "Six months", tagline: "In bloom · ~12 gatherings" },
-    { months: 0, emoji: "🌾", label: "Ongoing", tagline: "No end date — tend it as long as it grows" },
+    { months: 1, emoji: "🌱", label: "One month", phase: "Taking root" },
+    { months: 3, emoji: "🌿", label: "Three months", phase: "Growing" },
+    { months: 6, emoji: "🌸", label: "Six months", phase: "In bloom" },
+    { months: 0, emoji: "🌾", label: "Ongoing", phase: "" },
   ];
 
   function goalLabel(months: number): string {
-    if (months === 1) return "4";
-    if (months === 3) return "~6";
-    if (months === 6) return "~12";
-    return null as unknown as string;
+    return gatheringsFor(months);
   }
 
   // ─── Step 6 — First gathering ───────────────────────────────────────────────
@@ -544,7 +553,11 @@ export default function TraditionNew() {
                       <span className="text-2xl">{opt.emoji}</span>
                       <div>
                         <div className="font-medium text-[#2C1810]">{opt.label}</div>
-                        <div className="text-sm text-[#2C1810]/50">{opt.tagline}</div>
+                        <div className="text-sm text-[#2C1810]/50">
+                          {opt.months === 0
+                            ? "No end date — tend it as long as it grows"
+                            : `${opt.phase} · ${gatheringsFor(opt.months)}`}
+                        </div>
                       </div>
                     </button>
                   );
@@ -554,7 +567,7 @@ export default function TraditionNew() {
                 <p className="text-sm text-[#C17F24] italic mt-4">
                   {goalMonths === 0
                     ? "As many gatherings as it takes. Eleanor will make sure they happen."
-                    : `${goalLabel(goalMonths)} gatherings to look forward to. Eleanor will make sure they happen.`}
+                    : `${gatheringsFor(goalMonths)} to look forward to. Eleanor will make sure they happen.`}
                 </p>
               )}
               {goalMonths !== null && (
