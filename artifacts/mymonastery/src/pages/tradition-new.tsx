@@ -40,6 +40,16 @@ const FREQ_LABEL: Record<string, string> = {
 
 const PLANT_FRAMES = ["\uD83C\uDF31", "\uD83C\uDF3F", "\uD83C\uDF3F", "\uD83C\uDF3E", "\uD83C\uDF3F", "\uD83C\uDF31"];
 
+/* ─── helpers ──────────────────────────────────────────────────────────────── */
+
+function defaultTime(daysFromNow: number, hour: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hour, 0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /* ─── small components ──────────────────────────────────────────────────────── */
 
 function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
@@ -112,9 +122,9 @@ export default function TraditionNew() {
   const [newPeople, setNewPeople] = useState<{ name: string; email: string }[]>([{ name: "", email: "" }]);
   const [frequency, setFrequency] = useState("");
   const [goalMonths, setGoalMonths] = useState<number | null>(null);
-  const [firstPick, setFirstPick] = useState("");
-  const [alt1, setAlt1] = useState("");
-  const [alt2, setAlt2] = useState("");
+  const [firstPick, setFirstPick] = useState(() => defaultTime(2, 10));
+  const [alt1, setAlt1] = useState(() => defaultTime(3, 18));
+  const [alt2, setAlt2] = useState(() => defaultTime(5, 10));
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
 
