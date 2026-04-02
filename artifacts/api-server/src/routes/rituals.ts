@@ -3,7 +3,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
-import { createCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -217,6 +217,20 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
   const [ritual] = await db.select({ ownerId: ritualsTable.ownerId }).from(ritualsTable).where(eq(ritualsTable.id, params.data.id));
   if (!ritual) { res.status(404).json({ error: "Tradition not found" }); return; }
   if (!sessionUserId || ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Only the owner can delete this tradition" }); return; }
+
+  // Delete Google Calendar events from meetups before removing DB records
+  try {
+    const meetupsToClean = await db.select({ id: meetupsTable.id, googleCalendarEventId: meetupsTable.googleCalendarEventId })
+      .from(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
+    for (const m of meetupsToClean) {
+      if (m.googleCalendarEventId) {
+        try {
+          await deleteCalendarEvent(sessionUserId, m.googleCalendarEventId);
+          console.info(`Deleted tradition GCal event ${m.googleCalendarEventId}`);
+        } catch { /* best effort */ }
+      }
+    }
+  } catch { /* non-fatal */ }
 
   // Delete all dependent records (tables without ON DELETE CASCADE in the actual DB)
   await db.delete(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
@@ -487,95 +501,72 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
         return `${day}, ${month} ${date} · ${hour12}${minStr} ${period}`;
       }
 
-      // Fetch invite tokens to build personalized descriptions per participant
+      // Create ONE group calendar event with all participants as attendees.
+      // Each person gets their individual invite link via the Eleanor invite page, not the calendar.
+      const proposedTimes = parsed.data.proposedTimes;
+      const attendeeEmails = participants.map(p => p.email).filter(e => e !== organizer.email);
+
+      // Fetch organizer's invite token for the link
       const allTokens = await db.select().from(inviteTokensTable)
         .where(eq(inviteTokensTable.ritualId, id));
+      const organizerInviteToken = allTokens.find(t => t.email === organizer.email);
+      const scheduleUrl = ritual.scheduleToken
+        ? `${appBase}/schedule/${ritual.scheduleToken}`
+        : (organizerInviteToken ? `${appBase}/invite/${organizerInviteToken.token}` : appBase);
 
-      // One event per participant with their personal invite link
-      const proposedTimes = parsed.data.proposedTimes;
-      for (const token of allTokens) {
-        const inviteUrl = `${appBase}/invite/${token.token}`;
-        const isOrganizerToken = token.email === organizer.email;
+      // Build description
+      const lines: string[] = [];
+      lines.push(`${organizerFirstName} is gathering people for ${ritual.name} 🌿`);
+      lines.push(warmLine);
+      lines.push("");
+      lines.push("──────────────────────");
+      lines.push("");
 
-        // Build description lines
-        const lines: string[] = [];
-
-        if (isOrganizerToken) {
-          lines.push(`Your ${ritual.name} tradition on Eleanor 🌿`);
-          lines.push(warmLine);
-        } else {
-          lines.push(`${organizerFirstName} invited you to ${ritual.name} 🌿`);
-          lines.push(warmLine);
+      if (proposedTimes.length > 0) {
+        lines.push("Proposed times:");
+        lines.push("");
+        for (let i = 0; i < proposedTimes.length; i++) {
+          const label = i === 0 ? "✓ First choice" : "· Alternate";
+          lines.push(`  ${label}: ${formatProposedTime(proposedTimes[i])}`);
         }
-
         lines.push("");
         lines.push("──────────────────────");
         lines.push("");
+      }
 
-        if (proposedTimes.length > 0) {
-          if (!isOrganizerToken) {
-            lines.push(`${organizerFirstName} suggested these times.`);
-            lines.push("Choose the one that works for you:");
-            lines.push("");
-          } else {
-            lines.push("Proposed times:");
-            lines.push("");
-          }
+      lines.push(`${ritual.name} · ${freqLabel}`);
+      lines.push(`Tended with Eleanor 🌿`);
+      lines.push("");
+      lines.push("View this tradition →");
+      lines.push(scheduleUrl);
+      lines.push("");
+      lines.push("──────────────────────");
+      lines.push("");
+      lines.push("Eleanor helps recurring gatherings actually happen.");
+      lines.push("Check your email for your personal invite link to respond.");
 
-          for (let i = 0; i < proposedTimes.length; i++) {
-            const label = i === 0 ? "✓ First choice" : "· Alternate";
-            lines.push(`  ${label}: ${formatProposedTime(proposedTimes[i])}`);
-          }
+      const description = lines.join("\n");
+      const eventStart = new Date(proposedTimes[0]);
+      const eventEnd = new Date(eventStart.getTime() + 60 * 60_000);
 
-          if (!isOrganizerToken) {
-            lines.push("");
-            lines.push("Or suggest your own time at the link below.");
-          }
+      const eventId = await createCalendarEvent(sessionUserId, {
+        summary: ritual.name,
+        description,
+        startDate: eventStart,
+        endDate: eventEnd,
+        attendees: attendeeEmails,
+        colorId: "5",
+        status: "tentative",
+        reminders: [
+          { method: "email", minutes: 1440 },
+          { method: "popup", minutes: 120 },
+        ],
+      });
 
-          lines.push("");
-          lines.push("──────────────────────");
-          lines.push("");
-        }
-
-        lines.push(`${ritual.name} · ${freqLabel}`);
-        lines.push(`${organizerFirstName} is tending this with Eleanor 🌿`);
-        lines.push("");
-        lines.push(`Open your invitation →`);
-        lines.push(inviteUrl);
-        lines.push("");
-        lines.push("──────────────────────");
-        lines.push("");
-        lines.push("Eleanor helps recurring gatherings actually happen.");
-
-        if (!isOrganizerToken) {
-          lines.push("You don't need an account — your link above is all you need.");
-        }
-
-        const description = lines.join("\n");
-
-        const eventStart = new Date(proposedTimes[0]);
-        const eventEnd = new Date(eventStart.getTime() + 60 * 60_000); // 1 hour
-
-        const eventId = await createCalendarEvent(sessionUserId, {
-          summary: ritual.name,
-          description,
-          startDate: eventStart,
-          endDate: eventEnd,
-          attendees: isOrganizerToken ? undefined : [token.email],
-          colorId: "5", // banana/yellow — closest to Eleanor amber
-          status: "tentative",
-          reminders: [
-            { method: "email", minutes: 1440 },   // 1 day before
-            { method: "popup", minutes: 120 },     // 2 hours before
-          ],
-        });
-
-        if (eventId && meetupId && isOrganizerToken) {
-          // Store the organizer's event ID on the meetup for later updates
-          await db.update(meetupsTable)
-            .set({ googleCalendarEventId: eventId })
-            .where(eq(meetupsTable.id, meetupId));
-        }
+      if (eventId && meetupId) {
+        await db.update(meetupsTable)
+          .set({ googleCalendarEventId: eventId })
+          .where(eq(meetupsTable.id, meetupId));
       }
     }
   } catch (calErr) {

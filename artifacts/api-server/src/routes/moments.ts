@@ -3,7 +3,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
-  db, ritualsTable, inviteTokensTable, usersTable,
+  db, ritualsTable, inviteTokensTable, usersTable, meetupsTable,
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
@@ -316,39 +316,36 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
   const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
 
-  // ── One personalised event per member — only THEIR link in the description ──
-  const eventResults = await Promise.allSettled(
-    insertedTokens.map(t => {
-      const personalLink = `${baseUrl}/${momentToken}/${t.userToken}`;
-      const description = [
-        `${organizerName} invited you to practice together.`,
-        ...(intention ? [`"${intention}"`] : []),
-        "",
-        "Tap to log:",
-        personalLink,
-        "",
-        "No login needed. 🌿",
-      ].join("\n");
-
-      return createCalendarEvent(sessionUserId, {
-        summary: `🌿 ${name}`,
-        description,
-        startDate,
-        endDate,
-        attendees: [t.email],
-        recurrence: recurrenceRule,
-      }).catch(() => null);
-    })
-  );
-
-  // Store each member's individual event ID
+  // Calendar invites for non-organizer members only.
+  // The organizer gets their own bell event — not a duplicate invite event.
+  const inviteTokens = insertedTokens.filter(t => t.email !== organizer.email);
   let gcalCreated = false;
-  for (let i = 0; i < insertedTokens.length; i++) {
-    const result = eventResults[i];
-    if (result.status === "fulfilled" && result.value) {
+
+  for (const t of inviteTokens) {
+    const shortLink = `${getFrontendUrl()}/m/${t.userToken}`;
+    const description = [
+      `${organizerName} invited you to practice together.`,
+      ...(intention ? [`"${intention}"`] : []),
+      "",
+      "Tap to log:",
+      shortLink,
+      "",
+      "No login needed. 🌿",
+    ].join("\n");
+
+    const eventId = await createCalendarEvent(sessionUserId, {
+      summary: `🌿 ${name}`,
+      description,
+      startDate,
+      endDate,
+      attendees: [t.email],
+      recurrence: recurrenceRule,
+    }).catch(() => null);
+
+    if (eventId) {
       await db.update(momentUserTokensTable)
-        .set({ googleCalendarEventId: result.value })
-        .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
+        .set({ googleCalendarEventId: eventId })
+        .where(eq(momentUserTokensTable.id, t.id));
       gcalCreated = true;
     }
   }
@@ -695,58 +692,50 @@ router.post("/moments", async (req, res): Promise<void> => {
     ].join("\n");
   }
 
-  // ─── Create one personalised calendar event per member ─────────────────────
-  // Each member gets exactly one event with their own personal link (no group event = no duplicates)
+  // ─── Calendar invite events for NON-organizer members only ─────────────────
+  // The organizer gets their own bell event via the personal-time handler.
+  // Members receive a Google Calendar invite so they know about the practice.
   const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
-  let gcalEventId: string | null = null;
+  const inviteTokens = insertedTokens.filter(t => t.email !== organizer.email);
+  let gcalCreated = false;
 
   if (isFasting) {
     const fastingDateStr = getFastingStartDateStr();
     const fastingRec = getFastingRecurrence();
     const fastingTitle = buildEventTitle();
-    const fastingResults = await Promise.allSettled(
-      insertedTokens.map(t =>
-        createAllDayCalendarEvent(sessionUserId, {
-          summary: fastingTitle,
-          description: buildFastingDescription(t.userToken, organizerName, t.email === organizer.email),
-          dateStr: fastingDateStr,
-          attendees: [t.email],
-          recurrence: fastingRec,
-        }).catch(() => null)
-      )
-    );
-    for (let i = 0; i < insertedTokens.length; i++) {
-      const result = fastingResults[i];
-      if (result.status === "fulfilled" && result.value) {
+    for (const t of inviteTokens) {
+      const eventId = await createAllDayCalendarEvent(sessionUserId, {
+        summary: fastingTitle,
+        description: buildFastingDescription(t.userToken, organizerName, false),
+        dateStr: fastingDateStr,
+        attendees: [t.email],
+        recurrence: fastingRec,
+      }).catch(() => null);
+      if (eventId) {
         await db.update(momentUserTokensTable)
-          .set({ googleCalendarEventId: result.value })
-          .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
-        if (insertedTokens[i].email === organizer.email) gcalEventId = result.value;
+          .set({ googleCalendarEventId: eventId })
+          .where(eq(momentUserTokensTable.id, t.id));
+        gcalCreated = true;
       }
     }
   } else {
     const eventTitle = buildEventTitle();
-    const eventResults = await Promise.allSettled(
-      insertedTokens.map(t =>
-        createCalendarEvent(sessionUserId, {
-          summary: eventTitle,
-          description: buildDescription(t.userToken, t.name ?? t.email, organizerName, t.email === organizer.email),
-          startDate,
-          startLocalStr,
-          endLocalStr,
-          timeZone: tz,
-          attendees: [t.email],
-          recurrence: recurrenceRule,
-        }).catch(() => null)
-      )
-    );
-    for (let i = 0; i < insertedTokens.length; i++) {
-      const result = eventResults[i];
-      if (result.status === "fulfilled" && result.value) {
+    for (const t of inviteTokens) {
+      const eventId = await createCalendarEvent(sessionUserId, {
+        summary: eventTitle,
+        description: buildDescription(t.userToken, t.name ?? t.email, organizerName, false),
+        startDate,
+        startLocalStr,
+        endLocalStr,
+        timeZone: tz,
+        attendees: [t.email],
+        recurrence: recurrenceRule,
+      }).catch(() => null);
+      if (eventId) {
         await db.update(momentUserTokensTable)
-          .set({ googleCalendarEventId: result.value })
-          .where(eq(momentUserTokensTable.id, insertedTokens[i].id));
-        if (insertedTokens[i].email === organizer.email) gcalEventId = result.value;
+          .set({ googleCalendarEventId: eventId })
+          .where(eq(momentUserTokensTable.id, t.id));
+        gcalCreated = true;
       }
     }
   }
@@ -754,7 +743,7 @@ router.post("/moments", async (req, res): Promise<void> => {
   res.status(201).json({
     moment: { ...moment },
     memberCount: uniqueMembers.length,
-    gcalCreated: !!gcalEventId,
+    gcalCreated,
   });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1921,6 +1910,45 @@ router.post("/moments/cleanup-calendars", async (req, res): Promise<void> => {
           cleaned++;
         } catch { /* best effort */ }
       }
+    }
+
+    // ─── Tradition/ritual calendar cleanup ──────────────────────────────────
+    // Find meetups with calendar event IDs whose rituals no longer exist
+    const allMeetups = await db.select({
+      id: meetupsTable.id,
+      ritualId: meetupsTable.ritualId,
+      googleCalendarEventId: meetupsTable.googleCalendarEventId,
+    }).from(meetupsTable);
+
+    const existingRitualIds = new Set(
+      (await db.select({ id: ritualsTable.id }).from(ritualsTable)).map(r => r.id)
+    );
+
+    for (const meetup of allMeetups) {
+      if (!meetup.googleCalendarEventId) continue;
+      if (existingRitualIds.has(meetup.ritualId)) continue;
+
+      // Orphaned meetup — ritual was deleted but calendar event remains
+      try {
+        await deleteCalendarEvent(sessionUserId, meetup.googleCalendarEventId);
+        console.info(`Cleanup tradition: deleted GCal event ${meetup.googleCalendarEventId} for deleted ritual ${meetup.ritualId}`);
+        cleaned++;
+      } catch { /* best effort */ }
+
+      await db.update(meetupsTable)
+        .set({ googleCalendarEventId: null })
+        .where(eq(meetupsTable.id, meetup.id));
+    }
+
+    // Also clean up existing meetups for active rituals — try with the session user's credentials
+    // (covers events the organizer created)
+    for (const meetup of allMeetups) {
+      if (!meetup.googleCalendarEventId) continue;
+      if (!existingRitualIds.has(meetup.ritualId)) continue;
+
+      // Check if this ritual still has pending/active state — skip active ones
+      // Only clean events for rituals that exist but don't need them anymore
+      // (We skip this for now — active tradition events should stay)
     }
 
     res.json({ ok: true, archivedPractices: archivedIds.length, calendarEventsDeleted: cleaned });
