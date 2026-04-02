@@ -87,7 +87,7 @@ export default function TraditionNew() {
   const [frequency, setFrequency] = useState<string>("");
   const [goalMonths, setGoalMonths] = useState<number | null>(null);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<{ startISO: string; label: string; worksForAll: boolean }[]>([]);
   const [readableEmails, setReadableEmails] = useState<string[]>([]);
   const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
@@ -230,7 +230,7 @@ export default function TraditionNew() {
 
   const suggestMutation = useMutation({
     mutationFn: () =>
-      apiRequest<{ suggestions: string[]; readableEmails: string[] }>("POST", "/api/rituals/suggest-times-for-group", {
+      apiRequest<{ suggestions: { startISO: string; label: string; worksForAll: boolean }[]; unreadableMembers: string[] }>("POST", "/api/rituals/suggest-times-for-group", {
         memberEmails: selectedPeople.map((p) => p.email),
         frequency,
         type,
@@ -238,7 +238,7 @@ export default function TraditionNew() {
       }),
     onSuccess: (data) => {
       setSuggestions(data.suggestions ?? []);
-      setReadableEmails(data.readableEmails ?? []);
+      setReadableEmails([]);
       setSuggestionsLoaded(true);
       setSuggestionsError(false);
     },
@@ -254,18 +254,6 @@ export default function TraditionNew() {
     }
   }, [step]);
 
-  function slotDayType(iso: string): string {
-    const d = new Date(iso);
-    const dow = d.getDay();
-    const hour = d.getHours();
-    if (dow === 0 || dow === 6) return "Weekend 🌅";
-    if (hour < 12) return "Morning 🌿";
-    return "After work 🌿";
-  }
-
-  function allMembersReadable(): boolean {
-    return selectedPeople.every((p) => readableEmails.includes(p.email));
-  }
 
   // ─── Confirmation ────────────────────────────────────────────────────────────
 
@@ -287,7 +275,7 @@ export default function TraditionNew() {
       // participants respond via their invite link to pick which works for them.
       const orderedTimes = [
         selectedTime.toISOString(),
-        ...suggestions.filter((s) => s !== selectedTime.toISOString()),
+        ...suggestions.map((s) => s.startISO).filter((iso) => iso !== selectedTime.toISOString()),
       ];
 
       await apiRequest("PATCH", `/api/rituals/${ritualId}/proposed-times`, {
@@ -663,15 +651,14 @@ export default function TraditionNew() {
                   <p className="text-sm text-[#2C1810]/50 mb-1">
                     Pick your first choice. Eleanor will send all three to your group so they can say which works.
                   </p>
-                  {suggestions.map((iso, i) => {
-                    const d = new Date(iso);
+                  {suggestions.map((slot, i) => {
+                    const d = new Date(slot.startISO);
                     if (isNaN(d.getTime())) return null;
                     const isSelected = selectedTime?.toISOString() === d.toISOString();
-                    const label = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
-                    const worksForAll = allMembersReadable();
+                    const pickLabel = i === 0 ? "First pick" : i === 1 ? "Alternative" : "Backup option";
                     return (
                       <button
-                        key={iso}
+                        key={slot.startISO}
                         onClick={() => setSelectedTime(d)}
                         className={`w-full text-left p-4 rounded-2xl border transition-all ${
                           isSelected
@@ -689,8 +676,8 @@ export default function TraditionNew() {
                           {format(d, "h:mm a")} – {format(addHours(d, 1), "h:mm a")}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-medium text-[#C17F24]/70">{label}</span>
-                          {worksForAll && (
+                          <span className="text-xs font-medium text-[#C17F24]/70">{pickLabel}</span>
+                          {slot.worksForAll && (
                             <span className="text-xs text-[#6B8F71]">· Works for everyone 🌿</span>
                           )}
                         </div>
