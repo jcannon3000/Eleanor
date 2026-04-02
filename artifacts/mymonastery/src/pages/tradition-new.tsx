@@ -88,9 +88,9 @@ export default function TraditionNew() {
     { value: "custom", emoji: "🌱", label: "Something else", tagline: "Name your own tradition", prefillName: "" },
   ];
 
-  function handleSelectType(value: string, prefillName: string) {
+  function handleSelectType(value: string, _prefillName: string) {
     setType(value);
-    setName(prefillName);
+    setName("");
     goNext();
   }
 
