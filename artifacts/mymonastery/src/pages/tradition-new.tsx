@@ -89,20 +89,37 @@ function ContinueButton({ disabled, onClick }: { disabled?: boolean; onClick: ()
   );
 }
 
-function PlantingScreen({ name, firstNames }: { name: string; firstNames: string }) {
+function PlantingScreen({ name, firstNames, error, onRetry }: { name: string; firstNames: string; error: string; onRetry: () => void }) {
   const [frame, setFrame] = useState(0);
+  const [stalled, setStalled] = useState(false);
   useEffect(() => {
     const id = setInterval(() => setFrame((f) => (f + 1) % PLANT_FRAMES.length), 600);
     return () => clearInterval(id);
   }, []);
+  useEffect(() => {
+    const t = setTimeout(() => setStalled(true), 12000);
+    return () => clearTimeout(t);
+  }, []);
+  const showError = error || stalled;
   return (
     <div className="min-h-screen bg-[#2C1810] flex flex-col items-center justify-center px-6">
       <div className="text-7xl mb-6" key={frame}>{PLANT_FRAMES[frame]}</div>
       <h1 className="font-serif text-2xl text-[#F7F0E6] text-center mb-2">
-        Planting {name || "your tradition"}…
+        {showError ? "Hmm, something didn't take root" : `Planting ${name || "your tradition"}…`}
       </h1>
-      {firstNames && (
+      {!showError && firstNames && (
         <p className="text-[#F7F0E6]/50 text-sm text-center">Sending invites to {firstNames}</p>
+      )}
+      {showError && (
+        <div className="mt-4 text-center">
+          <p className="text-[#F7F0E6]/50 text-sm mb-4">{error || "This is taking longer than expected."}</p>
+          <button
+            onClick={onRetry}
+            className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors"
+          >
+            ← Go back and try again
+          </button>
+        </div>
       )}
     </div>
   );
@@ -182,7 +199,16 @@ export default function TraditionNew() {
   /* ─── send invites (step 7 auto-fires this) ──────────────────────────────── */
 
   async function send() {
-    if (!user || !firstPick) return;
+    if (!user) {
+      setSendError("Not signed in. Please go back and sign in first.");
+      setStep(6);
+      return;
+    }
+    if (!firstPick) {
+      setSendError("Please pick a time for your first gathering.");
+      setStep(6);
+      return;
+    }
     setSending(true);
     try {
       const ritual = await apiRequest<{ id: number }>("POST", "/api/rituals", {
@@ -223,7 +249,7 @@ export default function TraditionNew() {
   /* ─── planting screen ─────────────────────────────────────────────────────── */
 
   if (step === 7) {
-    return <PlantingScreen name={name} firstNames={firstNames} />;
+    return <PlantingScreen name={name} firstNames={firstNames} error={sendError} onRetry={() => { setSending(false); setSendError(""); setStep(6); }} />;
   }
 
   /* ─── render ──────────────────────────────────────────────────────────────── */
