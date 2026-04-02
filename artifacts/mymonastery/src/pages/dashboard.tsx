@@ -88,7 +88,7 @@ function GatheringCard({ ritual, dim }: { ritual: ReturnType<typeof useListRitua
           {/* Participants */}
           {ritual.participants && ritual.participants.length > 0 && (
             <p className="text-sm text-muted-foreground mb-2">
-              with {ritual.participants.slice(0, 3).map(p => p.name.split(" ")[0]).join(", ")}
+              with {ritual.participants.slice(0, 3).map(p => (p.name || p.email || "").split(" ")[0]).join(", ")}
               {ritual.participants.length > 3 && ` +${ritual.participants.length - 3}`}
             </p>
           )}
@@ -366,7 +366,7 @@ export default function Dashboard() {
 
   const today = new Date();
   const todayStr = format(today, "EEEE, d MMMM");
-  const firstName = user.name.split(" ")[0];
+  const firstName = (user.name || user.email || "").split(" ")[0];
 
   // Compute what's happening this week
   const weekEnd = addDays(startOfDay(today), 7);
@@ -540,7 +540,7 @@ export default function Dashboard() {
                               <span className="text-[11px] font-medium text-muted-foreground/70 bg-white/60 rounded-full px-2 py-0.5 border border-border/40 ml-2 shrink-0">Invited</span>
                             </div>
                             {organizer && (
-                              <p className="text-sm text-muted-foreground mb-1">Organized by {organizer.name.split(" ")[0]}</p>
+                              <p className="text-sm text-muted-foreground mb-1">Organized by {(organizer.name || organizer.email || "").split(" ")[0]}</p>
                             )}
                             {r.nextMeetupDate && (
                               <p className="text-sm text-foreground/80">

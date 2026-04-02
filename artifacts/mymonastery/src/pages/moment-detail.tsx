@@ -632,8 +632,8 @@ export default function MomentDetail() {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 mb-2">Today</p>
               <div className="bg-card border border-border/60 rounded-2xl divide-y divide-border/20 overflow-hidden">
                 {todayLogs.map((log, i) => {
-                  const firstName = log.name.split(" ")[0];
-                  const initials = log.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                  const firstName = (log.name || log.email || "?").split(" ")[0];
+                  const initials = (log.name || log.email || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                   const loggedTime = log.loggedAt
                     ? new Date(log.loggedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()
                     : null;

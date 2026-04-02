@@ -2,6 +2,41 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Component, type ReactNode, type ErrorInfo } from "react";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("React render error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, fontFamily: "monospace", background: "#FAF6F0", minHeight: "100vh" }}>
+          <h2 style={{ color: "#C17F24" }}>Something went wrong</h2>
+          <pre style={{ whiteSpace: "pre-wrap", color: "#2C1810", fontSize: 13 }}>
+            {this.state.error.message}
+            {"\n"}
+            {this.state.error.stack}
+          </pre>
+          <button
+            onClick={() => { this.setState({ error: null }); window.location.href = "/dashboard"; }}
+            style={{ marginTop: 16, padding: "8px 20px", background: "#C17F24", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
+          >
+            Back to dashboard
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import NotFound from "@/pages/not-found";
 
 import Onboarding from "./pages/onboarding";
@@ -56,10 +91,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <ErrorBoundary>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   );

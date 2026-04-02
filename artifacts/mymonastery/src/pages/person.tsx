@@ -312,7 +312,7 @@ export default function PersonProfile() {
           >
             <div>
               <p className="font-medium text-foreground group-hover:text-primary transition-colors">Invite to something new</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Start a practice or tradition with {person.name.split(" ")[0]}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Start a practice or tradition with {(person.name || "them").split(" ")[0]}</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
               <Plus size={16} className="text-primary group-hover:text-primary-foreground" />

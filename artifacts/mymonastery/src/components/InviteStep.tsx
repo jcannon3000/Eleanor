@@ -112,7 +112,7 @@ export function InviteStep({ type, onPeopleChange }: InviteStepProps) {
           {initials(c.name)}
         </div>
         <p className={`font-bold text-[13px] leading-tight truncate ${sel ? "text-white" : "text-foreground"}`}>
-          {c.name.split(" ")[0]}
+          {(c.name || c.email || "").split(" ")[0]}
         </p>
         <p className={`text-[11px] truncate mt-0.5 ${sel ? "text-white/70" : "text-muted-foreground"}`}>
           {c.email}
