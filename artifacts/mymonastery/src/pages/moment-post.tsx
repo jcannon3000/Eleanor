@@ -61,6 +61,7 @@ type MomentData = {
     templateType: string | null;
     intercessionFullText: string | null;
     intercessionTopic: string | null;
+    intercessionSource: string | null;
     currentStreak: number;
     longestStreak: number;
     state: string;
@@ -184,10 +185,11 @@ function NamedPresenceWithBloom({ members, myToken, justBloomed }: { members: Mo
 
 // ─── Intercession prayer page ─────────────────────────────────────────────────
 function IntercessionPrayerPage({
-  topic, fullText, intention, reflectionPrompt, memberCount, todayPostCount,
+  topic, fullText, intention, reflectionPrompt, intercessionSource, memberCount, todayPostCount,
   members, myToken, canPray, alreadyPosted, myReflection, isPraying, postFailed, nextWindowLabel: _nwl, onComplete, onBack,
 }: {
   topic: string; fullText: string; intention: string; reflectionPrompt: string;
+  intercessionSource: string | null;
   memberCount: number; todayPostCount: number; members: MomentMember[]; myToken?: string;
   canPray: boolean; alreadyPosted: boolean; myReflection: string | null;
   isPraying: boolean; postFailed: boolean; nextWindowLabel: string;
@@ -285,7 +287,7 @@ function IntercessionPrayerPage({
                 <p className="font-serif italic text-[#6B8F71] text-sm mb-2">"{reflectionPrompt}"</p>
                 <textarea value={reflection} onChange={e => setReflection(e.target.value.slice(0, 280))} rows={3}
                   className="w-full px-4 py-3 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:outline-none bg-white resize-none text-sm"
-                  placeholder="What are you holding today?" autoFocus />
+                  placeholder="What is on your heart today?" autoFocus />
                 <button onClick={() => onComplete(reflection)} className="mt-2 w-full py-3 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold">
                   Save reflection
                 </button>
@@ -319,13 +321,13 @@ function IntercessionPrayerPage({
         {/* Header — staggered fade-in */}
         <motion.div variants={headerContainer} initial="hidden" animate="visible" className="text-center mb-5">
           <motion.p variants={headerItem} className="text-[11px] uppercase tracking-widest text-[#6B8F71]/60 mb-2">
-            Intercession Prayer
+            {intercessionSource === "bcp" ? "Intercession Prayer" : "Prayer Together"}
           </motion.p>
           <motion.h1 variants={headerItem} className="text-[22px] font-bold text-[#2C1A0E] leading-snug mb-2"
             style={{ fontFamily: "Space Grotesk, sans-serif" }}>
             {topic}
           </motion.h1>
-          {intention && (
+          {intention && intention !== topic && (
             <motion.p variants={headerItem} className="text-[#6B8F71] text-[13px]">
               Praying for: {intention}
             </motion.p>
@@ -346,9 +348,11 @@ function IntercessionPrayerPage({
               style={{ fontFamily: "Playfair Display, Georgia, serif" }}>
               {fullText}
             </p>
-            <p className="text-[12px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
-              📖 From the Book of Common Prayer
-            </p>
+            {intercessionSource === "bcp" && (
+              <p className="text-[12px] text-[#6b5c4a]/50 mt-5 italic border-t border-[#c9b99a]/20 pt-3">
+                📖 From the Book of Common Prayer
+              </p>
+            )}
           </motion.div>
         )}
 
@@ -397,7 +401,7 @@ function IntercessionPrayerPage({
                 <textarea
                   value={reflection}
                   onChange={e => setReflection(e.target.value.slice(0, 280))}
-                  placeholder="Who or what are you holding today?"
+                  placeholder="What is on your heart today?"
                   rows={3}
                   className="w-full px-4 py-4 rounded-2xl border border-[#c9b99a]/40 focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white resize-none text-base leading-relaxed"
                 />
@@ -752,7 +756,8 @@ export default function MomentPostPage() {
         topic={moment.intercessionTopic ?? moment.name}
         fullText={moment.intercessionFullText ?? ""}
         intention={moment.intention}
-        reflectionPrompt={moment.reflectionPrompt ?? "What are you holding today?"}
+        intercessionSource={moment.intercessionSource}
+        reflectionPrompt={moment.reflectionPrompt ?? "What is on your heart today?"}
         memberCount={actualMemberCount}
         todayPostCount={actualTodayCount}
         members={liveMembers}

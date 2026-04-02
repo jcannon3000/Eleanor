@@ -264,7 +264,7 @@ const TEMPLATES = [
       name: "Intercession 🙏",
       intention: "",
       loggingType: "reflection" as LoggingType,
-      reflectionPrompt: "What are you holding today?",
+      reflectionPrompt: "What is on your heart today?",
       scheduledHour: 8, scheduledAmPm: "AM" as "AM" | "PM",
       frequency: "daily" as Frequency,
     },
@@ -736,16 +736,17 @@ export default function MomentNew() {
     setName(prayer.title);
     setIntention("");
     setLoggingType("reflection");
-    setReflectionPrompt("What are you holding today?");
+    setReflectionPrompt("What is on your heart today?");
     setIntercessionMode(null);
     setStep("intention");
   }
 
   function confirmCustomIntercession() {
-    if (!intercessionTopic.trim()) return;
     setIntercessionSource("custom");
     setIntercessionFullText("");
-    setIntention(`We hold this together in prayer. Today we intercede for: ${intercessionTopic.trim()}.`);
+    setLoggingType("reflection");
+    setReflectionPrompt("What is on your heart today?");
+    setIntercessionMode(null);
     setStep("name");
   }
 
@@ -817,19 +818,17 @@ export default function MomentNew() {
     }
     if (step === "bcp-invite") return true;
     if (step === "name") return name.trim().length >= 2;
-    if (step === "intention") return intention.trim().length >= 4;
+    if (step === "intention") {
+      if (templateId === "intercession" && intercessionSource === "custom") return intention.trim().length >= 3;
+      return intention.trim().length >= 4;
+    }
     if (step === "logging") {
       if (loggingType === "reflection") return reflectionPrompt.trim().length >= 1;
       return true;
     }
     if (step === "schedule") {
-      if (isSpiritual) {
-        if (timeOfDay === null) return false;
-        // Intercession: if weekly, exactly one day must be chosen
-        if (templateId === "intercession" && frequency === "weekly" && scheduledDays.length !== 1) return false;
-        return true;
-      }
-      if (frequency === "weekly" && scheduledDays.length === 0) return false;
+      if (templateId === "intercession" && frequency === "weekly" && scheduledDays.length !== 1) return false;
+      if (templateId !== "intercession" && frequency === "weekly" && scheduledDays.length === 0) return false;
       return true;
     }
     if (step === "commitment") return true;
@@ -847,7 +846,6 @@ export default function MomentNew() {
         return;
       }
       setDone(true);
-      if (isSpiritual) setShowPersonalTimePrompt(true);
     },
   });
 
@@ -946,7 +944,7 @@ export default function MomentNew() {
       intercessionSource: intercessionTopic.trim() ? intercessionSource : undefined,
       intercessionFullText: intercessionFullText.trim() || undefined,
       frequency: fastingFreqForApi as "daily" | "weekly" | "monthly",
-      scheduledTime: (isSpiritual || isFasting) ? "00:00" : scheduledTime,
+      scheduledTime: isFasting ? "00:00" : scheduledTime,
       dayOfWeek: isFasting ? (fastingDayOfWeekRrule as "MO"|"TU"|"WE"|"TH"|"FR"|"SA"|"SU" | undefined) : dayOfWeek,
       practiceDays: isSpiritual && frequency === "weekly" && scheduledDays.length > 0
         ? JSON.stringify(scheduledDays)
@@ -954,7 +952,7 @@ export default function MomentNew() {
       goalDays: commitmentDays,
       commitmentDuration: commitmentDays,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      timeOfDay: isSpiritual ? timeOfDay : undefined,
+      timeOfDay: undefined,
       participants: validParticipants,
       ritualId: ritualIdFromUrl ?? undefined,
       // Contemplative
@@ -996,100 +994,6 @@ export default function MomentNew() {
     const todLabel = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.label?.toLowerCase() ?? "morning";
 
     // ── Organizer personal time prompt (spiritual templates only) ────────────
-    if (showPersonalTimePrompt) {
-      return (
-        <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-sm w-full text-[#F5EDD8]"
-          >
-            <div className="text-5xl mb-4 text-center">{todEmoji}</div>
-            <h2 className="text-2xl font-semibold text-center mb-2">You've planted {["a","e","i","o","u"].includes(todLabel[0]) ? "an" : "a"} {todLabel} practice.</h2>
-            <p className="text-[#c9b99a] text-center text-sm mb-8">
-              When would you like to be notified via a calendar invite?
-            </p>
-
-            {(() => {
-              const todC = timeOfDay ? TOD_CONSTRAINTS[timeOfDay] : null;
-              const availableHours = todC ? todC.hours : [1,2,3,4,5,6,7,8,9,10,11,12];
-              const amPmMode = todC ? todC.amPm : "mixed";
-              return (
-            <div className="bg-[#3a2410] rounded-2xl p-6 space-y-5">
-              {/* Hour */}
-              <div>
-                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Hour</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {availableHours.map(hv => (
-                    <button key={hv} onClick={() => setPersonalHour(hv)}
-                      className={`py-2 rounded-lg border text-sm font-medium transition-all ${personalHour === hv ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
-                      {hv}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Minute */}
-              <div>
-                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Minute</label>
-                <div className="flex gap-2">
-                  {[0, 15, 30, 45].map(mv => (
-                    <button key={mv} onClick={() => setPersonalMinute(mv)}
-                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${personalMinute === mv ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
-                      :{String(mv).padStart(2, "0")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* AM/PM — show toggle only if mixed (midday); otherwise show label only */}
-              {amPmMode === "mixed" ? (
-                <div className="flex gap-3">
-                  {(["AM", "PM"] as const).map(p => (
-                    <button key={p} onClick={() => setPersonalAmPm(p)}
-                      className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all ${personalAmPm === p ? "border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f]" : "border-[#5a3d28] text-[#c9b99a] hover:border-[#6B8F71]/40"}`}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center">
-                  <span className="inline-block px-5 py-2 rounded-xl border border-[#6B8F71] bg-[#6B8F71]/20 text-[#9ecc9f] font-medium text-sm">
-                    {amPmMode}
-                  </span>
-                </div>
-              )}
-              {/* Timezone */}
-              <div>
-                <label className="block text-xs font-medium text-[#c9b99a] uppercase tracking-widest mb-2">Your timezone</label>
-                <select value={personalTimezone} onChange={e => setPersonalTimezone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-[#2C1A0E] border border-[#5a3d28] text-[#F5EDD8] focus:border-[#6B8F71] focus:outline-none text-sm">
-                  {Intl.supportedValuesOf("timeZone").map(tz => (
-                    <option key={tz} value={tz}>{tz}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-[#c9b99a]/60 italic text-center">
-                Eleanor will send your calendar invite at this time.<br />
-                Everyone in this practice chooses their own.
-              </p>
-            </div>
-              );
-            })()}
-
-            <button
-              onClick={handleSavePersonalTime}
-              disabled={personalTimeMutation.isPending}
-              className="w-full mt-6 py-4 rounded-2xl bg-[#6B8F71] text-white text-base font-semibold hover:bg-[#5a7a60] transition-colors disabled:opacity-40"
-            >
-              {personalTimeMutation.isPending ? "Saving..." : "Add to my calendar 🌿"}
-            </button>
-            {personalTimeMutation.isError && (
-              <p className="text-xs text-red-400 text-center mt-2">Something went wrong. Please try again.</p>
-            )}
-          </motion.div>
-        </div>
-      );
-    }
-
     return (
       <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center px-4">
         <motion.div
@@ -1099,17 +1003,13 @@ export default function MomentNew() {
         >
           <div className="text-6xl mb-6">🌱</div>
           <h2 className="text-3xl font-semibold mb-3">{name} is planted.</h2>
-          {isSpiritual && timeOfDay ? (
-            <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : "Weekly"} · {todEmoji} {todLabel} practice</p>
-          ) : (
-            <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : frequency === "weekly" ? `Weekly` : "Monthly"} at {timeLabel}</p>
-          )}
+          <p className="text-[#c9b99a] mb-2">{frequency === "daily" ? "Every day" : frequency === "weekly" ? "Weekly" : "Monthly"} at {timeLabel}</p>
           {commitmentLabel && (
             <p className="text-[#c9b99a] mb-6">{commitmentLabel.emoji} {commitmentLabel.label}</p>
           )}
           <p className="text-[#c9b99a] mb-8 text-sm leading-relaxed">
             Invites are on their way.<br />
-            {isSpiritual ? "Each person will choose their own time." : "Eleanor will ring the bell when it's time."}<br />
+            Eleanor will ring the bell when it's time.<br />
             You just have to practice.
           </p>
           <button
@@ -1307,13 +1207,13 @@ export default function MomentNew() {
                             </div>
                           </div>
                         </button>
-                        <button onClick={() => setIntercessionMode("custom")}
+                        <button onClick={confirmCustomIntercession}
                           className="w-full text-left p-5 rounded-2xl border-2 border-border hover:border-[#6B8F71]/60 hover:bg-[#6B8F71]/5 transition-all">
                           <div className="flex items-start gap-4">
                             <span className="text-3xl">✍️</span>
                             <div>
                               <p className="font-semibold text-foreground">Name your own intention</p>
-                              <p className="text-sm text-muted-foreground mt-0.5">Write what your practice will hold together</p>
+                              <p className="text-sm text-muted-foreground mt-0.5">You'll write the intention on the next screen</p>
                             </div>
                           </div>
                         </button>
@@ -1671,6 +1571,38 @@ export default function MomentNew() {
                     </details>
                   </div>
                 </div>
+              ) : step === "intention" && templateId === "intercession" && intercessionSource === "custom" ? (
+                <div className="space-y-7 flex-1">
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-1">Who are you praying for? 🙏</h2>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      This will be shown to everyone in the practice when they open their link to pray.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-widest text-[#6B8F71]">Your intention</label>
+                    <input autoFocus type="text" value={intention}
+                      onChange={e => setIntention(e.target.value.slice(0, 120))}
+                      placeholder="e.g. End to the war in Iran, My mother's health, Our parish community..."
+                      className="w-full px-0 py-3 bg-transparent border-b-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors text-base placeholder:text-muted-foreground/40"
+                    />
+                    {intention.length > 80 && (
+                      <p className="text-right text-xs text-muted-foreground/50">{intention.length}/120</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-widest text-[#6B8F71]">A prayer (optional)</label>
+                    <p className="text-xs text-muted-foreground/60">
+                      Write your own prayer, or leave this blank and Eleanor will display just your intention.
+                    </p>
+                    <textarea value={intercessionFullText}
+                      onChange={e => setIntercessionFullText(e.target.value)}
+                      rows={4}
+                      placeholder="Write a prayer for your group to pray together..."
+                      className="w-full px-0 py-3 bg-transparent border-b-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors resize-none text-base placeholder:text-muted-foreground/40 font-serif"
+                    />
+                  </div>
+                </div>
               ) : step === "intention" && (
                 <div className="space-y-6 flex-1">
                   <div>
@@ -1680,7 +1612,7 @@ export default function MomentNew() {
                   <textarea autoFocus value={intention}
                     onChange={e => setIntention(e.target.value)}
                     maxLength={280} rows={3}
-                    placeholder="Write what holds this practice together..."
+                    placeholder="The heart of this practice in a sentence..."
                     className="w-full px-0 py-3 bg-transparent border-b-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors resize-none text-lg placeholder:text-muted-foreground/40 font-serif italic"
                   />
                   <p className="text-right text-xs text-muted-foreground/50">{intention.length}/280</p>
@@ -1688,7 +1620,37 @@ export default function MomentNew() {
               )}
 
               {/* ── Logging type ───────────────────────────────────── */}
-              {step === "logging" && (
+              {step === "logging" && templateId === "intercession" && intercessionSource === "custom" ? (
+                <div className="space-y-6 flex-1">
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-1">What will you ask your group? 🌿</h2>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      This question appears on everyone's prayer page each time they pray.
+                    </p>
+                  </div>
+                  <input autoFocus type="text" value={reflectionPrompt}
+                    onChange={e => setReflectionPrompt(e.target.value)}
+                    className="w-full px-0 py-3 bg-transparent border-b-2 border-border focus:border-[#6B8F71] focus:outline-none transition-colors text-base"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "What is on your heart today?",
+                      "What are you bringing to prayer?",
+                      "What is God stirring in you?",
+                      "What do you want to offer today?",
+                    ].map(chip => (
+                      <button key={chip} onClick={() => setReflectionPrompt(chip)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                          reflectionPrompt === chip
+                            ? "border-[#6B8F71] bg-[#6B8F71]/10 text-[#6B8F71]"
+                            : "border-border text-muted-foreground hover:border-[#6B8F71]/40"
+                        }`}>
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : step === "logging" && (
                 <div className="space-y-5 flex-1">
                   <div>
                     <h2 className="text-2xl font-semibold mb-1">How will your practice be held? 🌿</h2>
@@ -1727,103 +1689,9 @@ export default function MomentNew() {
               {/* ── Schedule ───────────────────────────────────────── */}
               {step === "schedule" && (
                 <div className="space-y-6 flex-1">
-                  {isSpiritual ? (
-                    <>
-                      <div>
-                        <h2 className="text-2xl font-semibold mb-1">When does this practice happen?</h2>
-                        <p className="text-sm text-muted-foreground">Choose the time of day. Each person will set their own specific time.</p>
-                      </div>
-
-                      {/* Frequency — intercession gets daily/weekly + single day picker here */}
-                      {templateId === "intercession" && (
-                        <>
-                          <div>
-                            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
-                            <div className="flex gap-3">
-                              {(["daily", "weekly"] as Frequency[]).map(f => (
-                                <button key={f} onClick={() => { setFrequency(f); setScheduledDays([]); }}
-                                  className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                                  {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          {/* Single-day picker for weekly intercession */}
-                          {frequency === "weekly" && (
-                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which day?</label>
-                              <div className="flex flex-wrap gap-2">
-                                {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
-                                  <button key={val} onClick={() => setScheduledDays([val])}
-                                    className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays[0] === val ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Frequency — only shown for non-intercession spiritual */}
-                      {templateId !== "intercession" && (
-                        <>
-                          <div>
-                            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
-                            <div className="flex gap-3">
-                              {(["daily", "weekly"] as Frequency[]).map(f => (
-                                <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setScheduledDays([]); }}
-                                  className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                                  {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Day pills for weekly */}
-                          {frequency === "weekly" && (
-                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days</label>
-                              <div className="flex flex-wrap gap-2">
-                                {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
-                                  <button key={val} onClick={() => setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])}
-                                    className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays.includes(val) ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Time of day cards */}
-                      <div>
-                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">Time of day</label>
-                        <div className="grid gap-3">
-                          {TIME_OF_DAY_OPTIONS.map(opt => (
-                            <button key={opt.id} onClick={() => setTimeOfDay(opt.id)}
-                              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${timeOfDay === opt.id ? "border-[#6B8F71] bg-[#6B8F71]/5" : "border-border hover:border-[#6B8F71]/30"}`}>
-                              <div className="flex items-center gap-4">
-                                <span className="text-2xl">{opt.emoji}</span>
-                                <div className="flex-1">
-                                  <p className="font-semibold text-foreground text-sm">{opt.label}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">"{opt.sub}"</p>
-                                  <p className="text-xs text-muted-foreground/60 mt-0.5">{opt.range}</p>
-                                </div>
-                                {timeOfDay === opt.id && <span className="text-[#6B8F71]">✓</span>}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground/60 italic">This describes the spirit of when the practice happens. Each person chooses their own specific time when they join.</p>
-                    </>
-                  ) : (
-                    <>
                   <div>
-                    <h2 className="text-2xl font-semibold mb-1">When does the window open?</h2>
-                    <p className="text-sm text-muted-foreground">Everyone has one hour to practice.</p>
+                    <h2 className="text-2xl font-semibold mb-1">When should the bell ring? 🔔</h2>
+                    <p className="text-sm text-muted-foreground">Everyone in the practice gets the bell at this time.</p>
                   </div>
 
                   {/* Frequency */}
@@ -1831,7 +1699,7 @@ export default function MomentNew() {
                     <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">How often</label>
                     <div className="flex gap-3">
                       {(["daily", "weekly"] as Frequency[]).map(f => (
-                        <button key={f} onClick={() => { setFrequency(f); if (f !== "weekly") setScheduledDays([]); }}
+                        <button key={f} onClick={() => { setFrequency(f); setScheduledDays([]); }}
                           className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
                           {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
                         </button>
@@ -1839,13 +1707,19 @@ export default function MomentNew() {
                     </div>
                   </div>
 
-                  {/* Day pills for weekly */}
+                  {/* Day picker for weekly */}
                   {frequency === "weekly" && (
                     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Which days</label>
+                      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
+                        {templateId === "intercession" ? "Which day?" : "Which days"}
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {[["Mo","MO"],["Tu","TU"],["We","WE"],["Th","TH"],["Fr","FR"],["Sa","SA"],["Su","SU"]].map(([label, val]) => (
-                          <button key={val} onClick={() => setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])}
+                          <button key={val}
+                            onClick={() => templateId === "intercession"
+                              ? setScheduledDays([val])
+                              : setScheduledDays(prev => prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val])
+                            }
                             className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${scheduledDays.includes(val) ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
                             {label}
                           </button>
@@ -1890,9 +1764,7 @@ export default function MomentNew() {
                     ))}
                   </div>
 
-                  <p className="text-xs text-muted-foreground/60 italic">Members receive calendar invites in their own timezone.</p>
-                    </>
-                  )}
+                  <p className="text-xs text-muted-foreground/60 italic">Everyone can log ±2 hours around this time.</p>
                 </div>
               )}
 

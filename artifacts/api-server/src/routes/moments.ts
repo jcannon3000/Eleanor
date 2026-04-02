@@ -1225,6 +1225,7 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       templateType: moment.templateType,
       intercessionFullText: moment.intercessionFullText,
       intercessionTopic: moment.intercessionTopic,
+      intercessionSource: moment.intercessionSource,
       currentStreak: moment.currentStreak,
       longestStreak: moment.longestStreak,
       state: moment.state,
