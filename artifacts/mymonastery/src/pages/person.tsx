@@ -307,7 +307,7 @@ export default function PersonProfile() {
           transition={{ duration: 0.5, delay: 0.3 }}
         >
           <Link
-            href={`/create`}
+            href="/tradition/new"
             className="flex items-center justify-between w-full p-5 bg-card rounded-3xl border border-card-border shadow-[var(--shadow-warm-sm)] hover:border-primary/40 hover:shadow-[var(--shadow-warm-md)] transition-all group"
           >
             <div>
