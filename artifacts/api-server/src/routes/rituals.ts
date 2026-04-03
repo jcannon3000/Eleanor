@@ -503,7 +503,7 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
       // Create ONE group calendar event with all participants as attendees.
       // Each person gets their individual invite link via the Eleanor invite page, not the calendar.
       const proposedTimes = parsed.data.proposedTimes;
-      const attendeeEmails = participants.map(p => p.email).filter(e => e !== organizer.email);
+      const attendeeEmails = participants.map(p => p.email); // All members get invites from scheduler
 
       // Fetch organizer's invite token for the link
       const allTokens = await db.select().from(inviteTokensTable)
@@ -939,7 +939,7 @@ router.post("/rituals/:id/restore-calendar", async (req, res): Promise<void> => 
 
   const eventStart = new Date(planned.scheduledDate);
   const eventEnd = new Date(eventStart.getTime() + 60 * 60_000);
-  const attendeeEmails = participants.map(p => p.email).filter(e => e !== organizer.email);
+  const attendeeEmails = participants.map(p => p.email); // All members get invites from scheduler
 
   const eventId = await createCalendarEvent(sessionUserId, {
     summary: ritual.name,

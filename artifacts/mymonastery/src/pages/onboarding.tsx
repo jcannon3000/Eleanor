@@ -126,7 +126,7 @@ export default function Onboarding() {
               transition={{ duration: 0.5, delay: 0.75 }}
               className="mt-4 text-xs text-muted-foreground max-w-sm mx-auto md:mx-0"
             >
-              Eleanor asks for Google Calendar access so your traditions always have a home in your schedule.
+              Eleanor sends calendar invites so your traditions always have a home in your schedule.
             </motion.p>
           </div>
 

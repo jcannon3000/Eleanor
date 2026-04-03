@@ -2,6 +2,7 @@ import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import passport from "passport";
 import { Strategy as GoogleStrategy, type Profile } from "passport-google-oauth20";
+import { google } from "googleapis";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -23,7 +24,7 @@ if (GOOGLE_CONFIGURED) {
         clientID: process.env["GOOGLE_CLIENT_ID"]!,
         clientSecret: process.env["GOOGLE_CLIENT_SECRET"]!,
         callbackURL,
-        scope: ["profile", "email", "https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/contacts.readonly"],
+        scope: ["profile", "email"],
       },
       async (
         accessToken: string,
@@ -37,17 +38,13 @@ if (GOOGLE_CONFIGURED) {
           const avatarUrl = profile.photos?.[0]?.value ?? null;
           const googleId = profile.id;
 
+          // Calendar tokens no longer stored per-user — scheduler account handles all events.
           const existing = await db.select().from(usersTable).where(eq(usersTable.googleId, googleId));
           if (existing.length > 0) {
             const prev = existing[0];
             const [user] = await db
               .update(usersTable)
-              .set({
-                googleAccessToken: accessToken,
-                googleRefreshToken: refreshToken ?? prev.googleRefreshToken,
-                googleTokenExpiry: new Date(Date.now() + 3600 * 1000),
-                avatarUrl,
-              })
+              .set({ avatarUrl })
               .where(eq(usersTable.id, prev.id))
               .returning();
             return done(null, user);
@@ -57,7 +54,7 @@ if (GOOGLE_CONFIGURED) {
           if (byEmail.length > 0) {
             const [user] = await db
               .update(usersTable)
-              .set({ googleId, googleAccessToken: accessToken, googleRefreshToken: refreshToken, googleTokenExpiry: new Date(Date.now() + 3600 * 1000), avatarUrl })
+              .set({ googleId, avatarUrl })
               .where(eq(usersTable.id, byEmail[0].id))
               .returning();
             return done(null, user);
@@ -65,7 +62,7 @@ if (GOOGLE_CONFIGURED) {
 
           const [user] = await db
             .insert(usersTable)
-            .values({ name, email, avatarUrl, googleId, googleAccessToken: accessToken, googleRefreshToken: refreshToken, googleTokenExpiry: new Date(Date.now() + 3600 * 1000) })
+            .values({ name, email, avatarUrl, googleId })
             .returning();
           return done(null, user);
         } catch (err) {
@@ -94,7 +91,7 @@ router.get("/auth/google", (_req, res, next) => {
     res.status(503).send("Google Sign-In is not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
     return;
   }
-  passport.authenticate("google", { accessType: "offline", prompt: "consent" })(res.req, res, next);
+  passport.authenticate("google", { accessType: "offline" })(res.req, res, next);
 });
 
 router.get(
@@ -110,6 +107,60 @@ router.get(
     });
   }
 );
+
+// ─── Scheduler account setup (one-time) ──────────────────────────────────────
+// Visit /api/auth/scheduler/setup to authorize eleanorscheduler@gmail.com
+// and get the refresh token to store as SCHEDULER_GOOGLE_REFRESH_TOKEN env var.
+const schedulerCallbackURL = callbackURL.replace("/auth/google/callback", "/auth/scheduler/callback");
+
+router.get("/auth/scheduler/setup", (_req, res) => {
+  if (!GOOGLE_CONFIGURED) {
+    res.status(503).send("Google OAuth not configured."); return;
+  }
+  const oauth2 = new google.auth.OAuth2(
+    process.env["GOOGLE_CLIENT_ID"]!,
+    process.env["GOOGLE_CLIENT_SECRET"]!,
+    schedulerCallbackURL
+  );
+  const url = oauth2.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["https://www.googleapis.com/auth/calendar"],
+  });
+  res.redirect(url);
+});
+
+router.get("/auth/scheduler/callback", async (req, res): Promise<void> => {
+  const code = req.query.code as string;
+  if (!code) { res.status(400).send("No code returned from Google."); return; }
+
+  try {
+    const oauth2 = new google.auth.OAuth2(
+      process.env["GOOGLE_CLIENT_ID"]!,
+      process.env["GOOGLE_CLIENT_SECRET"]!,
+      callbackURL.replace("/auth/google/callback", "/auth/scheduler/callback")
+    );
+    const { tokens } = await oauth2.getToken(code);
+    const refreshToken = tokens.refresh_token;
+
+    if (!refreshToken) {
+      res.status(400).send("No refresh token returned. Make sure you revoked previous access at https://myaccount.google.com/permissions and try again.");
+      return;
+    }
+
+    res.send(`
+      <html><body style="font-family: system-ui; padding: 2rem; max-width: 600px; margin: 0 auto;">
+        <h2>✅ Scheduler account authorized</h2>
+        <p>Set this as your <code>SCHEDULER_GOOGLE_REFRESH_TOKEN</code> environment variable on Railway:</p>
+        <pre style="background: #f5f5f5; padding: 1rem; border-radius: 8px; word-break: break-all; font-size: 14px;">${refreshToken}</pre>
+        <p style="color: #666; font-size: 14px;">Once set, Eleanor will send all calendar invites from this scheduler account.</p>
+      </body></html>
+    `);
+  } catch (err) {
+    console.error("Scheduler OAuth callback error:", err);
+    res.status(500).send("Failed to exchange code for tokens.");
+  }
+});
 
 router.get("/auth/me", (req, res) => {
   if (!req.user) {

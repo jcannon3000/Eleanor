@@ -802,9 +802,7 @@ router.post("/moments", async (req, res): Promise<void> => {
 
   // ─── Create ONE group calendar event with all members ──────────────────────
   const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
-  const attendeeEmails = insertedTokens
-    .map(t => t.email)
-    .filter(e => e !== organizer.email);
+  const attendeeEmails = insertedTokens.map(t => t.email); // All members get invites from scheduler
   let gcalCreated = false;
 
   // Reminders: 5 min popup + 1 day email
@@ -1126,7 +1124,7 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
           console.info(`Added ${newEmails.join(", ")} to GCal event ${organizerToken.googleCalendarEventId}`);
         } else {
           // No existing group event — create one now with all current members
-          const allEmails = allTokens.map(t => t.email).filter(e => e !== organizer.email);
+          const allEmails = allTokens.map(t => t.email); // All members get invites from scheduler
           const [hh, mm] = moment.scheduledTime.split(":").map(Number);
           const startDate = new Date();
           startDate.setHours(hh, mm, 0, 0);
@@ -1669,9 +1667,7 @@ router.post("/moments/:id/personal-time", async (req, res): Promise<void> => {
 
     // Create ONE new group calendar event on the organizer's calendar with all members
     try {
-      const attendeeEmails = allMembers
-        .map(m => m.email)
-        .filter(e => e !== user.email);
+      const attendeeEmails = allMembers.map(m => m.email); // All members get invites from scheduler
 
       const newId = await createCalendarEvent(sessionUserId, {
         summary: `🔔 ${moment.name}`,
@@ -1944,7 +1940,7 @@ router.patch("/moments/:id", async (req, res): Promise<void> => {
 
       // Create new group event on the requester's calendar with all members as attendees
       const myTokenRow = allTokens.find(t => t.email === user.email);
-      const attendeeEmails = allTokens.map(m => m.email).filter(e => e !== user.email);
+      const attendeeEmails = allTokens.map(m => m.email); // All members get invites from scheduler
       const newEventId = await createCalendarEvent(sessionUserId, {
         summary: `🔔 ${updated.name}`,
         description: [
@@ -2444,9 +2440,7 @@ router.post("/moments/:id/restore-calendar", async (req, res): Promise<void> => 
     ? ["RRULE:FREQ=WEEKLY"]
     : ["RRULE:FREQ=MONTHLY"];
 
-  const attendeeEmails = allMembers
-    .map(m => m.email)
-    .filter(e => e.toLowerCase() !== user.email.toLowerCase());
+  const attendeeEmails = allMembers.map(m => m.email); // All members get invites from scheduler
 
   const eventId = await createCalendarEvent(sessionUserId, {
     summary: `🌿 ${moment.name}`,

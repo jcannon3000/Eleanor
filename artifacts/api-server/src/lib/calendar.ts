@@ -1,6 +1,9 @@
 import { google } from "googleapis";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+
+// ─── Scheduler-based calendar client ─────────────────────────────────────────
+// All calendar events are created from a single scheduler account
+// (eleanorscheduler@gmail.com) instead of individual user accounts.
+// Attendees receive email invitations and the event appears on their calendar.
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(
@@ -10,48 +13,52 @@ function getOAuth2Client() {
   );
 }
 
-async function getAuthedClient(userId: number) {
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-  if (!user || !user.googleAccessToken) return null;
+// In-memory cache for the scheduler's access token (refreshed automatically)
+let cachedAccessToken: string | null = null;
+let cachedTokenExpiry: number | null = null;
+
+async function getSchedulerClient() {
+  const refreshToken = process.env["SCHEDULER_GOOGLE_REFRESH_TOKEN"];
+  if (!refreshToken) {
+    console.warn("SCHEDULER_GOOGLE_REFRESH_TOKEN not set — calendar features disabled");
+    return null;
+  }
 
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: user.googleAccessToken,
-    refresh_token: user.googleRefreshToken,
-    expiry_date: user.googleTokenExpiry ? user.googleTokenExpiry.getTime() : undefined,
+    access_token: cachedAccessToken,
+    refresh_token: refreshToken,
+    expiry_date: cachedTokenExpiry,
   });
 
-  oauth2Client.on("tokens", async (tokens) => {
-    const update: Record<string, unknown> = {};
-    if (tokens.access_token) update.googleAccessToken = tokens.access_token;
-    if (tokens.expiry_date) update.googleTokenExpiry = new Date(tokens.expiry_date);
-    if (Object.keys(update).length > 0) {
-      await db.update(usersTable).set(update).where(eq(usersTable.id, userId));
-    }
+  // Cache new tokens in memory when they're refreshed
+  oauth2Client.on("tokens", (tokens) => {
+    if (tokens.access_token) cachedAccessToken = tokens.access_token;
+    if (tokens.expiry_date) cachedTokenExpiry = tokens.expiry_date;
   });
 
   return oauth2Client;
 }
 
 export async function createCalendarEvent(
-  userId: number,
+  _userId: number, // kept for call-site compatibility; scheduler account is used
   opts: {
     summary: string;
     description?: string;
     location?: string;
     startDate: Date;
-    startLocalStr?: string; // "2026-03-31T08:00:00" — preferred for tz-aware scheduling
+    startLocalStr?: string;
     endDate?: Date;
-    endLocalStr?: string;   // "2026-03-31T09:00:00"
+    endLocalStr?: string;
     attendees?: string[];
     recurrence?: string[];
-    timeZone?: string;      // e.g. "America/New_York"
-    colorId?: string;       // Google Calendar color (e.g. "5" = banana/yellow)
-    status?: string;        // "tentative" | "confirmed"
+    timeZone?: string;
+    colorId?: string;
+    status?: string;
     reminders?: Array<{ method: string; minutes: number }>;
   }
 ): Promise<string | null> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -99,7 +106,7 @@ export async function createCalendarEvent(
 }
 
 export async function createAllDayCalendarEvent(
-  userId: number,
+  _userId: number,
   opts: {
     summary: string;
     description?: string;
@@ -108,7 +115,7 @@ export async function createAllDayCalendarEvent(
     recurrence?: string[];
   }
 ): Promise<string | null> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -139,13 +146,13 @@ export async function createAllDayCalendarEvent(
   }
 }
 
-export async function deleteCalendarEvent(userId: number, eventId: string): Promise<void> {
-  const auth = await getAuthedClient(userId);
+export async function deleteCalendarEvent(_userId: number, eventId: string): Promise<void> {
+  const auth = await getSchedulerClient();
   if (!auth) return;
 
   const calendar = google.calendar({ version: "v3", auth });
   try {
-    await calendar.events.delete({ calendarId: "primary", eventId });
+    await calendar.events.delete({ calendarId: "primary", eventId, sendUpdates: "all" });
   } catch (err) {
     console.error("Calendar event delete failed:", err);
   }
@@ -153,20 +160,20 @@ export async function deleteCalendarEvent(userId: number, eventId: string): Prom
 
 
 export async function updateCalendarEvent(
-  userId: number,
+  _userId: number,
   eventId: string,
   opts: {
     summary?: string;
     description?: string;
     startDate?: Date;
-    startLocalStr?: string;  // "2026-04-01T12:15:00" — preferred for tz-aware updates
+    startLocalStr?: string;
     endDate?: Date;
-    endLocalStr?: string;    // "2026-04-01T13:15:00"
-    timeZone?: string;       // e.g. "America/Chicago" — required when using startLocalStr
+    endLocalStr?: string;
+    timeZone?: string;
     attendees?: string[];
   }
 ): Promise<boolean> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return false;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -174,17 +181,20 @@ export async function updateCalendarEvent(
   const useLocalTime = !!(opts.startLocalStr && opts.timeZone);
   const tz = opts.timeZone ?? "UTC";
 
-  let startField: { dateTime: string; timeZone: string };
-  let endField: { dateTime: string; timeZone: string };
+  // Only include start/end fields if time data was provided
+  let startField: { dateTime: string; timeZone: string } | undefined;
+  let endField: { dateTime: string; timeZone: string } | undefined;
 
-  if (useLocalTime) {
-    startField = { dateTime: opts.startLocalStr!, timeZone: tz };
-    endField = { dateTime: opts.endLocalStr ?? opts.startLocalStr!, timeZone: tz };
-  } else {
-    const start = opts.startDate ?? new Date();
-    const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
-    startField = { dateTime: start.toISOString(), timeZone: "UTC" };
-    endField = { dateTime: end.toISOString(), timeZone: "UTC" };
+  if (opts.startDate || opts.startLocalStr) {
+    if (useLocalTime) {
+      startField = { dateTime: opts.startLocalStr!, timeZone: tz };
+      endField = { dateTime: opts.endLocalStr ?? opts.startLocalStr!, timeZone: tz };
+    } else {
+      const start = opts.startDate ?? new Date();
+      const end = opts.endDate ?? new Date(start.getTime() + 60 * 60 * 1000);
+      startField = { dateTime: start.toISOString(), timeZone: "UTC" };
+      endField = { dateTime: end.toISOString(), timeZone: "UTC" };
+    }
   }
 
   try {
@@ -195,8 +205,8 @@ export async function updateCalendarEvent(
       requestBody: {
         summary: opts.summary,
         description: opts.description,
-        start: startField,
-        end: endField,
+        ...(startField ? { start: startField } : {}),
+        ...(endField ? { end: endField } : {}),
         attendees: attendeeList.length > 0 ? attendeeList : undefined,
       },
     });
@@ -208,10 +218,10 @@ export async function updateCalendarEvent(
 }
 
 export async function getCalendarEvent(
-  userId: number,
+  _userId: number,
   eventId: string
 ): Promise<{ startDate: Date; endDate: Date } | null> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -230,10 +240,10 @@ export async function getCalendarEvent(
 }
 
 export async function getCalendarEventAttendees(
-  userId: number,
+  _userId: number,
   eventId: string
 ): Promise<Array<{ email: string; displayName?: string; responseStatus?: string }> | null> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return null;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -253,11 +263,11 @@ export async function getCalendarEventAttendees(
 }
 
 export async function addAttendeesToCalendarEvent(
-  userId: number,
+  _userId: number,
   eventId: string,
   newEmails: string[]
 ): Promise<boolean> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return false;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -281,11 +291,11 @@ export async function addAttendeesToCalendarEvent(
 }
 
 export async function removeAttendeesFromCalendarEvent(
-  userId: number,
+  _userId: number,
   eventId: string,
   emailsToRemove: string[]
 ): Promise<boolean> {
-  const auth = await getAuthedClient(userId);
+  const auth = await getSchedulerClient();
   if (!auth) return false;
 
   const calendar = google.calendar({ version: "v3", auth });
@@ -305,4 +315,3 @@ export async function removeAttendeesFromCalendarEvent(
     return false;
   }
 }
-
