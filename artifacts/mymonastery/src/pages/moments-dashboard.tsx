@@ -215,6 +215,11 @@ function MomentCard({ moment }: { moment: MomentData }) {
               <p className="text-sm font-medium mb-2" style={{ color: isMorning ? "#C8975A" : "#7B9EBE" }}>
                 {moment.todayPostCount} of {moment.memberCount} prayed today
               </p>
+            ) : moment.templateType === "listening" ? (
+              <p className="text-sm text-[#4a6b50] mb-2 line-clamp-2">
+                A {moment.frequency === "daily" ? "daily" : "weekly"} practice of listening to{" "}
+                <span className="font-medium">{moment.listeningTitle ?? moment.listeningArtist ?? "music"}</span> together
+              </p>
             ) : isSpiritual ? (
               <p className="text-sm text-[#6B8F71] font-medium mb-2">
                 {moment.todayPostCount} of {moment.memberCount} practiced today
@@ -224,6 +229,11 @@ function MomentCard({ moment }: { moment: MomentData }) {
                 {moment.minutesLeft} min left · {moment.todayPostCount} of {moment.memberCount} posted
               </p>
             )
+          ) : moment.templateType === "listening" ? (
+            <p className="text-sm text-[#4a6b50] mb-2 line-clamp-2">
+              A {moment.frequency === "daily" ? "daily" : "weekly"} practice of listening to{" "}
+              <span className="font-medium">{moment.listeningTitle ?? moment.listeningArtist ?? "music"}</span> together
+            </p>
           ) : (
             <p className="text-xs text-[#6b5c4a]/60 mb-2">
               {isBcp || isSpiritual
