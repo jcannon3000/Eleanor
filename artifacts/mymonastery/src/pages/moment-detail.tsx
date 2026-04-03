@@ -251,6 +251,7 @@ export default function MomentDetail() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
+  const [amConnecting, setAmConnecting] = useState(false);
   // Bell editing removed — shared time, editable via Settings > Edit practice
   const [editingPractice, setEditingPractice] = useState(false);
   const [editName, setEditName] = useState("");
@@ -263,6 +264,17 @@ export default function MomentDetail() {
     queryFn: () => apiRequest<MomentDetail>("GET", `/api/moments/${id}`),
     enabled: !!user && !!id,
     refetchInterval: 30_000,
+  });
+
+  const { data: amStatus, refetch: refetchAmStatus } = useQuery({
+    queryKey: ["/api/apple-music/status"],
+    queryFn: () => apiRequest<{ connected: boolean; lastPolled: string | null }>("GET", "/api/apple-music/status"),
+    enabled: !!user,
+  });
+
+  const amDisconnectMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/apple-music/disconnect", {}),
+    onSuccess: () => { void refetchAmStatus(); },
   });
 
   const seedMutation = useMutation({
@@ -356,6 +368,27 @@ export default function MomentDetail() {
   if (!data) return null;
 
   const { moment, members, memberCount, myStreak, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
+
+  // Apple Music connect handler
+  async function connectAppleMusic() {
+    setAmConnecting(true);
+    try {
+      const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
+      const mk = (window as unknown as Record<string, unknown>)["MusicKit"] as {
+        configure: (opts: object) => Promise<void>;
+        getInstance: () => { authorize: () => Promise<string> };
+      } | undefined;
+      if (!mk) throw new Error("MusicKit not loaded");
+      await mk.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
+      const musicUserToken = await mk.getInstance().authorize();
+      await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
+      void refetchAmStatus();
+    } catch (err) {
+      console.error("Apple Music connect failed", err);
+    } finally {
+      setAmConnecting(false);
+    }
+  }
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
   const isIntercession = moment.templateType === "intercession";
@@ -526,6 +559,47 @@ export default function MomentDetail() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Apple Music connection — listening practices only */}
+        {isListening && (
+          <>
+            {/* Load MusicKit JS */}
+            <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async crossOrigin="anonymous" />
+
+            {amStatus?.connected ? (
+              <div className="mb-5 flex items-center justify-between bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎵</span>
+                  <div>
+                    <p className="text-sm font-semibold text-[#a02030]">Apple Music connected</p>
+                    <p className="text-xs text-[#a02030]/60 mt-0.5">Eleanor will auto-log when you listen</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => amDisconnectMutation.mutate()}
+                  className="text-xs text-[#a02030]/50 hover:text-[#a02030] transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-4">
+                <p className="text-sm font-semibold text-foreground mb-1">Auto-log with Apple Music</p>
+                <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                  Connect your account and Eleanor will detect when you listen — no button needed.
+                </p>
+                <button
+                  onClick={connectAppleMusic}
+                  disabled={amConnecting}
+                  className="w-full py-2.5 rounded-xl font-medium text-sm text-white transition-all disabled:opacity-60"
+                  style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
+                >
+                  {amConnecting ? "Connecting…" : "🎵 Connect Apple Music"}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Open Now Banner — only when actually open */}

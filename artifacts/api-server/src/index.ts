@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { migrate } from "./lib/migrate";
 import { attachWebSocketServer } from "./lib/ws";
+import { startAppleMusicPoller } from "./lib/appleMusic";
 
 const rawPort = process.env["PORT"] ?? "3001";
 const port = Number(rawPort);
@@ -18,6 +19,7 @@ migrate()
 
     server.listen(port, () => {
       logger.info({ port }, "Server listening");
+      startAppleMusicPoller();
     });
   })
   .catch((err) => {

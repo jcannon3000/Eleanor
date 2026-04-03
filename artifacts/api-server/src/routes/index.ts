@@ -9,6 +9,7 @@ import scheduleRouter from "./schedule";
 import inviteRouter from "./invite";
 import momentsRouter from "./moments";
 import prayerRouter from "./prayer";
+import appleMusicRouter from "./appleMusic";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(scheduleRouter);
 router.use(inviteRouter);
 router.use(momentsRouter);
 router.use(prayerRouter);
+router.use(appleMusicRouter);
 
 export default router;
