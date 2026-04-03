@@ -1,11 +1,11 @@
 import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db, ritualsTable, inviteTokensTable, usersTable, meetupsTable,
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
-  momentCalendarEventsTable, momentRenewalsTable,
+  momentCalendarEventsTable, momentRenewalsTable, userConnectionsCacheTable,
 } from "@workspace/db";
 import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent, getCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
@@ -15,6 +15,23 @@ const router: IRouter = Router();
 
 function generateToken() {
   return crypto.randomBytes(16).toString("hex");
+}
+
+// Saves bidirectional connection pairs between all members (so recommendations persist after deletion).
+async function saveConnectionCache(members: Array<{ email: string; name: string | null }>) {
+  if (members.length < 2) return;
+  try {
+    for (const a of members) {
+      for (const b of members) {
+        if (a.email === b.email) continue;
+        await db.execute(
+          sql`INSERT INTO user_connections_cache (user_email, contact_email, contact_name, last_seen_at)
+              VALUES (${a.email}, ${b.email}, ${b.name}, NOW())
+              ON CONFLICT (user_email, contact_email) DO UPDATE SET contact_name = ${b.name}, last_seen_at = NOW()`
+        );
+      }
+    }
+  } catch { /* non-fatal */ }
 }
 
 // ─── Timezone-aware time helpers ─────────────────────────────────────────────
@@ -1148,6 +1165,13 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
     console.error("Invite calendar event update failed (non-fatal):", calErr);
   }
 
+  // Save connections to cache so they persist even if this practice is later deleted
+  try {
+    const updatedMembers = await db.select({ email: momentUserTokensTable.email, name: momentUserTokensTable.name })
+      .from(momentUserTokensTable).where(eq(momentUserTokensTable.momentId, momentId));
+    await saveConnectionCache(updatedMembers.map(m => ({ email: m.email, name: m.name ?? null })));
+  } catch { /* non-fatal */ }
+
   res.json({ added: newPeople.length, people: newPeople });
 });
 
@@ -2052,6 +2076,9 @@ router.delete("/moments/:id", async (req, res): Promise<void> => {
   if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
 
   try {
+    // Save connections to cache before deleting (so they persist in the recommender)
+    await saveConnectionCache(allMemberTokens.map(t => ({ email: t.email, name: t.name ?? null })));
+
     // Delete Google Calendar events for all members (best effort, non-blocking)
     const calDeletePromises = allMemberTokens
       .filter(t => t.googleCalendarEventId)
@@ -2108,12 +2135,12 @@ router.get("/connections", async (req, res): Promise<void> => {
     const seen = new Set<string>([user.email]);
     const connections: { name: string; email: string }[] = [];
 
-    // Members from traditions (rituals owned by this user)
-    const rituals = await db.select({ participants: ritualsTable.participants })
+    // Members from ALL traditions (owned by user OR where user is a participant)
+    const allRituals = await db.select({ participants: ritualsTable.participants })
       .from(ritualsTable)
-      .where(eq(ritualsTable.ownerId, sessionUserId));
+      .where(sql`owner_id = ${sessionUserId} OR participants @> ${JSON.stringify([{ email: user.email }])}::jsonb`);
 
-    for (const r of rituals) {
+    for (const r of allRituals) {
       const parts = (r.participants as Array<{ name: string; email: string }>) ?? [];
       for (const p of parts) {
         if (p.email && !seen.has(p.email)) {
@@ -2123,7 +2150,7 @@ router.get("/connections", async (req, res): Promise<void> => {
       }
     }
 
-    // Members from practices (moments this user is part of)
+    // Members from active practices (moments this user is currently part of)
     const userTokenRows = await db.select({ momentId: momentUserTokensTable.momentId })
       .from(momentUserTokensTable)
       .where(eq(momentUserTokensTable.email, user.email));
@@ -2139,6 +2166,21 @@ router.get("/connections", async (req, res): Promise<void> => {
           seen.add(m.email);
           connections.push({ name: m.name ?? m.email, email: m.email });
         }
+      }
+    }
+
+    // Past connections from deleted practices (cached before deletion)
+    const cached = await db.select({
+      contactEmail: userConnectionsCacheTable.contactEmail,
+      contactName: userConnectionsCacheTable.contactName,
+    })
+      .from(userConnectionsCacheTable)
+      .where(eq(userConnectionsCacheTable.userEmail, user.email));
+
+    for (const c of cached) {
+      if (c.contactEmail && !seen.has(c.contactEmail)) {
+        seen.add(c.contactEmail);
+        connections.push({ name: c.contactName ?? c.contactEmail, email: c.contactEmail });
       }
     }
 

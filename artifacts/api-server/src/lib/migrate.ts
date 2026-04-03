@@ -322,6 +322,17 @@ export async function migrate() {
     await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_music_snapshot TEXT`);
     await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_music_last_polled TIMESTAMPTZ`);
 
+    // Connection cache — persists even when practices are deleted
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS user_connections_cache (
+        user_email TEXT NOT NULL,
+        contact_email TEXT NOT NULL,
+        contact_name TEXT,
+        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_email, contact_email)
+      )
+    `);
+
     // Time suggestions from tradition members
     await run(client, `
       CREATE TABLE IF NOT EXISTS ritual_time_suggestions (
