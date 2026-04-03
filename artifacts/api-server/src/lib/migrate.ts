@@ -346,6 +346,19 @@ export async function migrate() {
       )
     `);
 
+    // Magic link tokens for email-based login
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS email_login_tokens (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        name TEXT,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
