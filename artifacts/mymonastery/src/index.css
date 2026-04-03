@@ -201,24 +201,3 @@
 .animate-streak-glow {
   animation: streak-glow 3s ease-in-out infinite;
 }
-
-/* Listening practice — song name ticker */
-@keyframes listening-ticker {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-100%); }
-}
-.listening-ticker {
-  display: inline-block;
-  animation: listening-ticker linear infinite;
-  animation-delay: 1.5s;
-  padding-right: 3rem;
-}
-
-/* Listening practice — active pulse dot */
-@keyframes listening-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%       { opacity: 1; }
-}
-.listening-pulse-dot {
-  animation: listening-pulse 2s ease-in-out infinite;
-}
