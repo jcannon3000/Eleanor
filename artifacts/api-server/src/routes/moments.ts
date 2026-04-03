@@ -7,7 +7,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable, userConnectionsCacheTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent, getCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent, getCalendarEvent, updateCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 import { broadcastLog } from "../lib/ws";
 
@@ -2307,6 +2307,98 @@ router.post("/moments/cleanup-calendars", async (req, res): Promise<void> => {
     console.error("POST /moments/cleanup-calendars error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ─── POST /api/moments/:id/refresh-calendar — update existing event title + description ───
+// Updates the calendar event on the creator's Google Calendar to reflect the current
+// description format (removes old member names, applies latest copy).
+router.post("/moments/:id/refresh-calendar", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  const allMembers = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+
+  const myTokenRow = allMembers.find(m => m.email.toLowerCase() === user.email.toLowerCase());
+  if (!myTokenRow?.googleCalendarEventId) {
+    res.status(400).json({ error: "No calendar event to update" }); return;
+  }
+
+  // Build the new title and description in current format
+  const DIV = "──────────────────────";
+  const shortLink = `${getFrontendUrl()}/m/${myTokenRow.userToken}`;
+  const freqLabel = moment.frequency === "daily" ? "Daily" : moment.frequency === "weekly" ? "Weekly" : "Monthly";
+  const [h, m] = (moment.scheduledTime || "08:00").split(":").map(Number);
+  const period = h < 12 ? "AM" : "PM";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const calTimeLabel = `${hour12}${m > 0 ? `:${String(m).padStart(2, "0")}` : ""} ${period}`;
+  const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const goalSessions = moment.commitmentSessionsGoal ?? null;
+
+  let newSummary: string;
+  let newDescription: string;
+
+  if (moment.templateType === "listening") {
+    const listeningArtist = moment.listeningArtist ?? null;
+    const listeningTitle = moment.listeningTitle ?? null;
+    const listeningType = moment.listeningType ?? null;
+    const what = listeningType === "artist"
+      ? `${listeningArtist ?? listeningTitle ?? moment.name}`
+      : listeningType === "album"
+        ? `${listeningTitle ?? "an album"} by ${listeningArtist ?? "an artist"}`
+        : `${listeningTitle ?? "a song"} by ${listeningArtist ?? "an artist"}`;
+    const headline = goalSessions
+      ? `We're listening to ${what} together — ${goalSessions} days, building a streak.`
+      : `We're listening to ${what} together.`;
+
+    newSummary = `🎵 Listening to ${listeningArtist ?? listeningTitle ?? moment.name} together`;
+    newDescription = [
+      headline,
+      "",
+      "Though you'll be in different places, you'll each listen — knowing the other is too. That's the whole thing.",
+      "",
+      "Tap when you've listened →",
+      shortLink,
+      "", DIV, "",
+      `When: ${freqLabel} at ${calTimeLabel} · Starting ${todayStr}`,
+      "", DIV, "",
+      "No account needed. Your link above is all you need.",
+    ].join("\n");
+  } else {
+    // For non-listening practices, rebuild with current format (no member names)
+    newSummary = `🌱 ${moment.name}`;
+    newDescription = [
+      `${user.name?.split(" ")[0] ?? "Someone"} invited you to practice together.`,
+      "",
+      ...(moment.intention ? [`"${moment.intention}"`] : []),
+      "", DIV, "",
+      `When: ${freqLabel} at ${calTimeLabel} · Starting ${todayStr}`,
+      ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
+      "",
+      "Tap to log →",
+      shortLink,
+      "", DIV, "",
+      "No account needed. Your link above is all you need.",
+    ].join("\n");
+  }
+
+  const ok = await updateCalendarEvent(sessionUserId, myTokenRow.googleCalendarEventId, {
+    summary: newSummary,
+    description: newDescription,
+  });
+
+  if (!ok) { res.status(500).json({ error: "Could not update calendar event" }); return; }
+
+  res.json({ success: true });
 });
 
 // ─── POST /api/moments/:id/restore-calendar — creator restores deleted calendar event ───
