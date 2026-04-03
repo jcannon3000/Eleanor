@@ -409,7 +409,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 });
 
 // ─── POST /api/moments — plant a standalone shared moment ───────────────────
-const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "custom"]);
+const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "listening", "custom"]);
 const BCP_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer"]);
 
 const StandalonePlantSchema = z.object({
@@ -447,6 +447,14 @@ const StandalonePlantSchema = z.object({
   commitmentDuration: z.number().int().min(0).max(365).optional(),
   // Progressive goal fields
   commitmentSessionsGoal: z.number().int().min(1).max(365).nullable().optional(),
+  // Listening fields
+  listeningType: z.enum(["song", "album", "artist"]).optional(),
+  listeningTitle: z.string().max(200).optional(),
+  listeningArtist: z.string().max(200).optional(),
+  listeningSpotifyUri: z.string().max(500).optional(),
+  listeningAppleMusicUrl: z.string().max(500).optional(),
+  listeningArtworkUrl: z.string().max(500).optional(),
+  listeningManual: z.boolean().optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -460,7 +468,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth, commitmentDuration, commitmentSessionsGoal } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth, commitmentDuration, commitmentSessionsGoal, listeningType, listeningTitle, listeningArtist, listeningSpotifyUri, listeningAppleMusicUrl, listeningArtworkUrl, listeningManual } = parsed.data;
 
   // Compute commitment end date if a duration was provided
   const commitmentEndDate = (commitmentDuration && commitmentDuration > 0)
@@ -507,6 +515,13 @@ router.post("/moments", async (req, res): Promise<void> => {
     ...(commitmentDuration !== undefined ? { commitmentDuration } : {}),
     ...(commitmentEndDate ? { commitmentEndDate } : {}),
     ...(commitmentSessionsGoal !== undefined ? { commitmentSessionsGoal } : {}),
+    ...(listeningType !== undefined ? { listeningType } : {}),
+    ...(listeningTitle !== undefined ? { listeningTitle } : {}),
+    ...(listeningArtist !== undefined ? { listeningArtist } : {}),
+    ...(listeningSpotifyUri !== undefined ? { listeningSpotifyUri } : {}),
+    ...(listeningAppleMusicUrl !== undefined ? { listeningAppleMusicUrl } : {}),
+    ...(listeningArtworkUrl !== undefined ? { listeningArtworkUrl } : {}),
+    ...(listeningManual !== undefined ? { listeningManual } : {}),
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -605,6 +620,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     if (templateType === "intercession") return `🙏 ${name} with ${creatorFirstName}`;
     if (templateType === "contemplative") return `🕯️ ${name} with ${creatorFirstName}`;
     if (templateType === "fasting") return `🌿 ${name} with ${creatorFirstName}`;
+    if (templateType === "listening") return `🎵 ${name} with ${creatorFirstName}`;
     return `🌱 ${name} with ${creatorFirstName}`;
   }
 
@@ -699,6 +715,28 @@ router.post("/moments", async (req, res): Promise<void> => {
         ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
         "",
         "Tap when you're ready →",
+        shortLink,
+        "", DIV, "",
+        "No account needed. Your link above is all you need.",
+      ].join("\n");
+    }
+
+    if (templateType === "listening") {
+      const what = listeningType === "artist"
+        ? `the music of ${listeningArtist ?? listeningTitle ?? "an artist"}`
+        : listeningType === "album"
+          ? `"${listeningTitle ?? "an album"}" by ${listeningArtist ?? "an artist"}`
+          : `"${listeningTitle ?? "a song"}" by ${listeningArtist ?? "an artist"}`;
+      return [
+        `${invFirst} invited you to listen together.`,
+        "",
+        `On the same day, at the same time — you'll both listen to ${what}. Not just hearing it, but sharing the experience.`,
+        "", DIV, "",
+        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
+        `Who: ${memberListStr}`,
+        ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🎵`] : []),
+        "",
+        "Tap when you've listened →",
         shortLink,
         "", DIV, "",
         "No account needed. Your link above is all you need.",
@@ -1367,6 +1405,12 @@ router.get("/moment/:momentToken/:userToken", async (req, res): Promise<void> =>
       fastingDate: moment.fastingDate ?? null,
       fastingDay: moment.fastingDay ?? null,
       fastingDayOfMonth: moment.fastingDayOfMonth ?? null,
+      listeningType: (moment as Record<string, unknown>).listeningType ?? null,
+      listeningTitle: (moment as Record<string, unknown>).listeningTitle ?? null,
+      listeningArtist: (moment as Record<string, unknown>).listeningArtist ?? null,
+      listeningSpotifyUri: (moment as Record<string, unknown>).listeningSpotifyUri ?? null,
+      listeningAppleMusicUrl: (moment as Record<string, unknown>).listeningAppleMusicUrl ?? null,
+      listeningArtworkUrl: (moment as Record<string, unknown>).listeningArtworkUrl ?? null,
     },
     ritualName: ritual?.name ?? "",
     inviterName,

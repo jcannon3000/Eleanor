@@ -70,6 +70,12 @@ interface MomentDetail {
     commitmentGoalTier?: number | null;
     commitmentTendFreely?: boolean | null;
     frequencyDaysPerWeek?: number | null;
+    listeningType?: string | null;
+    listeningTitle?: string | null;
+    listeningArtist?: string | null;
+    listeningArtworkUrl?: string | null;
+    listeningSpotifyUri?: string | null;
+    listeningAppleMusicUrl?: string | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -355,6 +361,7 @@ export default function MomentDetail() {
   const isIntercession = moment.templateType === "intercession";
   const isContemplative = moment.templateType === "contemplative";
   const isFasting = moment.templateType === "fasting";
+  const isListening = moment.templateType === "listening";
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
   // Use the backend's computed windowOpen for all practices — it checks day-of-week + time window
   const isOpenNow = data.windowOpen;
@@ -365,7 +372,7 @@ export default function MomentDetail() {
     : null;
 
   // Label for action button — context-sensitive
-  const actionLabel = isIntercession ? "Pray 🙏" : "Log 🌿";
+  const actionLabel = isIntercession ? "Pray 🙏" : isListening ? "Listen 🎵" : "Log 🌿";
 
   // Intention display — for intercession, show intercessionTopic if it differs from the practice name
   const intercessionLabel = moment.intercessionTopic ?? moment.intention;
@@ -498,6 +505,26 @@ export default function MomentDetail() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Listening — artwork + info card */}
+        {isListening && (moment.listeningTitle || moment.listeningArtist) && (
+          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-4">
+            <div className="flex items-center gap-4">
+              {moment.listeningArtworkUrl && (
+                <img src={moment.listeningArtworkUrl} alt="Artwork" className="w-16 h-16 rounded-xl object-cover shadow-sm" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
+                  Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
+                </p>
+                <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle}</p>
+                {moment.listeningArtist && moment.listeningType !== "artist" && (
+                  <p className="text-xs text-[#4a6b50] mt-0.5">{moment.listeningArtist}</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

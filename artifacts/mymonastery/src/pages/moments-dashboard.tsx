@@ -65,6 +65,7 @@ const TEMPLATE_EMOJI: Record<string, string> = {
   breath: "🌬️",
   contemplative: "🌿",
   walk: "🚶",
+  listening: "🎵",
 };
 
 interface MomentData {
@@ -94,9 +95,11 @@ interface MomentData {
   frequencyType?: string | null;
   frequencyDaysPerWeek?: number | null;
   practiceDays?: string | null;
+  listeningTitle?: string | null;
+  listeningArtist?: string | null;
 }
 
-const SPIRITUAL_TEMPLATE_IDS_DASH = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "custom"]);
+const SPIRITUAL_TEMPLATE_IDS_DASH = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk", "listening", "custom"]);
 const BCP_TEMPLATE_IDS_DASH = new Set(["morning-prayer", "evening-prayer"]);
 
 // ─── BCP week tracking helper ─────────────────────────────────────────────────
@@ -198,7 +201,11 @@ function MomentCard({ moment }: { moment: MomentData }) {
           )}
 
           {/* Intention (skip for BCP — page ref is more useful) */}
-          {!isBcp && (
+          {!isBcp && moment.templateType === "listening" && moment.listeningTitle ? (
+            <p className="text-sm text-[#4a6b50] mb-2 line-clamp-1">
+              {moment.listeningTitle}{moment.listeningArtist ? ` · ${moment.listeningArtist}` : ""}
+            </p>
+          ) : !isBcp && (
             <p className="text-sm italic text-[#6b5c4a]/80 font-serif mb-2 line-clamp-1">"{moment.intention}"</p>
           )}
 

@@ -46,6 +46,14 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   commitmentSessionsLogged: integer("commitment_sessions_logged").notNull().default(0),
   commitmentGoalTier: integer("commitment_goal_tier").notNull().default(1),
   commitmentTendFreely: boolean("commitment_tend_freely").notNull().default(false),
+  // Listening practice fields
+  listeningType: text("listening_type"),             // song | album | artist
+  listeningTitle: text("listening_title"),
+  listeningArtist: text("listening_artist"),
+  listeningSpotifyUri: text("listening_spotify_uri"),
+  listeningAppleMusicUrl: text("listening_apple_music_url"),
+  listeningArtworkUrl: text("listening_artwork_url"),
+  listeningManual: boolean("listening_manual"),
 });
 
 export type SharedMoment = typeof sharedMomentsTable.$inferSelect;

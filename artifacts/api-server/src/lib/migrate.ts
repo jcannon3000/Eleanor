@@ -251,6 +251,15 @@ export async function migrate() {
     await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_goal_tier INTEGER NOT NULL DEFAULT 1`);
     await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_tend_freely BOOLEAN NOT NULL DEFAULT false`);
 
+    // Listening practice columns
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_type TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_title TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_artist TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_spotify_uri TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_apple_music_url TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_artwork_url TEXT`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS listening_manual BOOLEAN`);
+
     // Fix constraints that differ from old migration to current schema
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN ritual_id DROP NOT NULL`);
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN intention SET DEFAULT ''`);

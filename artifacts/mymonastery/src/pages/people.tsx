@@ -272,7 +272,7 @@ export default function People() {
                                       className="flex items-center justify-between py-1.5 group/row"
                                     >
                                       <span className="text-sm text-foreground/80 group-hover/row:text-foreground transition-colors">
-                                        {practice.templateType === "intercession" ? "🙏" : practice.templateType === "contemplative" ? "🕯️" : practice.templateType === "morning-prayer" ? "✨" : practice.templateType === "evening-prayer" ? "🌙" : practice.templateType === "fasting" ? "🌿" : "🌱"}{" "}
+                                        {practice.templateType === "intercession" ? "🙏" : practice.templateType === "contemplative" ? "🕯️" : practice.templateType === "morning-prayer" ? "✨" : practice.templateType === "evening-prayer" ? "🌙" : practice.templateType === "fasting" ? "🌿" : practice.templateType === "listening" ? "🎵" : "🌱"}{" "}
                                         {practice.name}
                                       </span>
                                       <span className={`text-xs ${practice.currentStreak >= 3 ? "animate-streak-glow" : ""}`} style={{ color: practice.currentStreak > 0 ? "#C17F24" : "#6B8F71" }}>
