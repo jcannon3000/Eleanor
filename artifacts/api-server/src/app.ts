@@ -71,8 +71,11 @@ app.use("/api", router);
 // Serve frontend static files in production
 const frontendDist = path.resolve(__dirname, "../../mymonastery/dist/public");
 if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
+  // Hashed assets get long cache; everything else (index.html) must revalidate
+  app.use("/assets", express.static(path.join(frontendDist, "assets"), { maxAge: "1y", immutable: true }));
+  app.use(express.static(frontendDist, { maxAge: 0 }));
   app.get("/{*path}", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 }
