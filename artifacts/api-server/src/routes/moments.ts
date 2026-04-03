@@ -592,7 +592,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     if (templateType === "intercession") return `🙏 ${name} with ${creatorFirstName}`;
     if (templateType === "contemplative") return `🕯️ ${name} with ${creatorFirstName}`;
     if (templateType === "fasting") return `🌿 ${name} with ${creatorFirstName}`;
-    if (templateType === "listening") return `🎵 Listening to ${listeningArtist ?? listeningTitle ?? name} with ${memberListStr}`;
+    if (templateType === "listening") return `🎵 Listening to ${listeningArtist ?? listeningTitle ?? name} together`;
     return `🌱 ${name} with ${creatorFirstName}`;
   }
 
