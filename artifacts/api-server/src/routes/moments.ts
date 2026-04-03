@@ -390,7 +390,6 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
       colorId: "2",
       reminders: [
         { method: "popup", minutes: 5 },
-        { method: "email", minutes: 1440 },
       ],
     }).catch(() => null);
 
