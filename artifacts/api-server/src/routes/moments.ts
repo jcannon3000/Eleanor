@@ -344,6 +344,10 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   const endDate = new Date(startDate.getTime() + 60 * 60_000);
 
   const organizerName = organizer.name ?? organizer.email ?? "Eleanor";
+  const creatorFirst = organizerName.split(" ")[0];
+  const tradMemberNames = uniqueMembers.map(m => m.name.split(" ")[0]).join(", ");
+  const tradGoalSessions = commitmentSessionsGoal ?? goalDays ?? null;
+  const tradDiv = "──────────────────────";
 
   // Calendar invites for non-organizer members only.
   // The organizer gets their own bell event — not a duplicate invite event.
@@ -352,23 +356,42 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
   for (const t of nonOrganizerTokens) {
     const shortLink = `${getFrontendUrl()}/m/${t.userToken}`;
+    const tradFreqLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
+    const tradStartDate = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    const tradTimeLabel = (() => {
+      const period = hh < 12 ? "AM" : "PM";
+      const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+      const minStr = String(mm).padStart(2, "0");
+      return minStr === "00" ? `${h12} ${period}` : `${h12}:${minStr} ${period}`;
+    })();
+
     const description = [
-      `${organizerName} invited you to practice together.`,
+      `${creatorFirst} invited you to practice together.`,
+      "",
       ...(intention ? [`"${intention}"`] : []),
+      "", tradDiv, "",
+      `When: ${tradFreqLabel} at ${tradTimeLabel} · Starting ${tradStartDate}`,
+      `Who: ${tradMemberNames}`,
+      ...(tradGoalSessions ? [`Goal: ${tradGoalSessions} sessions together 🌱`] : []),
       "",
-      "Tap to log:",
+      "Tap to log →",
       shortLink,
-      "",
-      "No login needed. 🌿",
+      "", tradDiv, "",
+      "No account needed. Your link above is all you need.",
     ].join("\n");
 
     const eventId = await createCalendarEvent(sessionUserId, {
-      summary: `🌿 ${name}`,
+      summary: `🌱 ${name} with ${creatorFirst}`,
       description,
       startDate,
       endDate,
       attendees: [t.email],
       recurrence: recurrenceRule,
+      colorId: "2",
+      reminders: [
+        { method: "popup", minutes: 5 },
+        { method: "email", minutes: 1440 },
+      ],
     }).catch(() => null);
 
     if (eventId) {
@@ -576,93 +599,127 @@ router.post("/moments", async (req, res): Promise<void> => {
     return minStr === "00" ? `${hour12} ${period}` : `${hour12}:${minStr} ${period}`;
   }
   const calTimeLabel = formatTimeForTitle(hhEff, mmEff);
+  const creatorFirstName = (organizer.name ?? organizer.email ?? "Eleanor").split(" ")[0];
   function buildEventTitle(): string {
-    if (templateType === "morning-prayer") return `🌅 Morning Prayer — ${calTimeLabel}`;
-    if (templateType === "evening-prayer") return `🌙 Evening Prayer — ${calTimeLabel}`;
-    if (templateType === "intercession") return `🙏 ${name} — ${calTimeLabel}`;
-    if (templateType === "contemplative") return `🕯️ ${name} — ${calTimeLabel}`;
-    if (templateType === "fasting") return `🌿 Fasting — ${fastingFrom ?? name}`;
-    return `🌿 ${name} — ${calTimeLabel}`;
+    if (templateType === "morning-prayer") return `✨ Morning Prayer with ${creatorFirstName}`;
+    if (templateType === "evening-prayer") return `🌙 Evening Prayer with ${creatorFirstName}`;
+    if (templateType === "intercession") return `🙏 ${name} with ${creatorFirstName}`;
+    if (templateType === "contemplative") return `🕯️ ${name} with ${creatorFirstName}`;
+    if (templateType === "fasting") return `🌿 ${name} with ${creatorFirstName}`;
+    return `🌱 ${name} with ${creatorFirstName}`;
   }
 
-  // ─── Build a personalised calendar description for each member ────────────
-  function buildDescription(memberToken: string, _memberName: string, inviterName: string, isOrganizer: boolean): string {
-    const shortLink = `${getFrontendUrl()}/m/${memberToken}`;
+  // ─── Warm, human calendar description for each member ─────────────────────
+  const DIV = "──────────────────────";
+  const memberNames = uniqueMembers.map(m => m.name.split(" ")[0]);
+  const memberListStr = memberNames.join(", ");
+  const goalSessions = commitmentSessionsGoal ?? goalDays ?? null;
+  function humanStartDate(): string {
+    const d = new Date();
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  }
+  const freqLabel = frequency === "daily" ? "Daily" : frequency === "weekly" ? "Weekly" : "Monthly";
 
-    if (isOrganizer) {
-      // Organizer gets a simpler, personal description
+  function buildDescription(memberToken: string, _memberName: string, inviterName: string, _isOrganizer: boolean): string {
+    const shortLink = `${getFrontendUrl()}/m/${memberToken}`;
+    const invFirst = inviterName.split(" ")[0];
+
+    if (templateType === "intercession") {
       const lines = [
-        `Your ${name} practice on Eleanor.`,
-        ...(intention ? [`"${intention}"`] : []),
+        `${invFirst} invited you to pray with them.`,
         "",
-        "Tap to log:",
-        shortLink,
       ];
+      if (intention) {
+        lines.push(`Every day for the next ${goalSessions ? `${goalSessions} sessions` : "while"}, ${invFirst} is praying for ${intention}. They want you alongside them.`);
+      }
+      lines.push("", DIV, "");
+      if (intention) {
+        lines.push("What you're praying for:", intention, "");
+      }
+      if (intercessionSource === "bcp" && intercessionFullText) {
+        const sentences = intercessionFullText.match(/[^.!?]+[.!?]+/g) ?? [];
+        const preview = sentences.slice(0, 2).join(" ").trim();
+        if (preview) {
+          lines.push("From the Book of Common Prayer:", preview, "...", "");
+        }
+      }
+      lines.push(DIV, "");
+      lines.push(`When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`);
+      lines.push(`Who: ${memberListStr}`);
+      if (goalSessions) lines.push(`Goal: ${goalSessions} days together 🌱`);
+      lines.push("", `Tap to pray →`, shortLink);
+      lines.push("", DIV, "");
+      lines.push("No account needed. Your link above is all you need.");
+      lines.push("Eleanor keeps the rhythm so you can focus on the prayer.");
       return lines.join("\n");
     }
 
     if (templateType === "morning-prayer") {
       return [
-        `${inviterName} invited you to pray Morning Prayer together.`,
-        "Morning Prayer Rite II · Book of Common Prayer · Page 75",
+        `${invFirst} invited you to pray the Daily Office together.`,
         "",
-        "Tap when you have prayed:",
+        `Each morning, ${invFirst} will be praying Morning Prayer from the Book of Common Prayer. They want you alongside them — wherever you are, at the same time of day, knowing the other is doing the same.`,
+        "", DIV, "",
+        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
+        `Who: ${memberListStr}`,
+        ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
+        "",
+        "Tap to pray →",
         shortLink,
-        "",
-        "No login needed. 🌿",
+        "", DIV, "",
+        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
     if (templateType === "evening-prayer") {
       return [
-        `${inviterName} invited you to pray Evening Prayer together.`,
-        "Evening Prayer Rite II · Book of Common Prayer · Page 115",
+        `${invFirst} invited you to pray the Daily Office together.`,
         "",
-        "Tap when you have prayed:",
+        `Each evening, ${invFirst} will be praying Evening Prayer from the Book of Common Prayer. They want you alongside them — wherever you are, at the same time of day, knowing the other is doing the same.`,
+        "", DIV, "",
+        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
+        `Who: ${memberListStr}`,
+        ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
+        "",
+        "Tap to pray →",
         shortLink,
-        "",
-        "No login needed. 🌿",
-      ].join("\n");
-    }
-
-    if (templateType === "intercession") {
-      const topic = intercessionTopic ?? intention;
-      const showIntention = !!(topic && topic.toLowerCase() !== name.toLowerCase());
-      return [
-        `${inviterName} invited you to pray together.`,
-        ...(showIntention ? [`Praying for: ${topic}`] : []),
-        "",
-        "Tap to pray:",
-        shortLink,
-        "",
-        "No login needed. 🌿",
+        "", DIV, "",
+        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
     if (templateType === "contemplative") {
-      const durLine = contemplativeDurationMinutes
-        ? `${contemplativeDurationMinutes} minutes · ${frequency}`
-        : frequency;
+      const durStr = contemplativeDurationMinutes ? `${contemplativeDurationMinutes} minutes of contemplative prayer` : "Contemplative prayer";
       return [
-        `${inviterName} invited you to sit together in stillness.`,
-        durLine,
+        `${invFirst} invited you to sit in silence together.`,
         "",
-        "Tap when you have sat:",
+        `${durStr}. Wherever you are, at the same time of day — knowing the other is present too.`,
+        "", DIV, "",
+        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
+        `Who: ${memberListStr}`,
+        ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
+        "",
+        "Tap when you're ready →",
         shortLink,
-        "",
-        "No login needed. 🌿",
+        "", DIV, "",
+        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
-    // All other practices
+    // Default / custom practice
     return [
-      `${inviterName} invited you to practice together.`,
-      scheduleLabel,
+      `${invFirst} invited you to practice together.`,
       "",
-      "Tap to log:",
+      ...(intention ? [`"${intention}"`] : []),
+      "", DIV, "",
+      `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
+      `Who: ${memberListStr}`,
+      ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
+      "",
+      "Tap to log →",
       shortLink,
-      "",
-      "No login needed. 🌿",
+      "", DIV, "",
+      "No account needed. Your link above is all you need.",
     ].join("\n");
   }
 
@@ -700,27 +757,25 @@ router.post("/moments", async (req, res): Promise<void> => {
     return [];
   }
 
-  function buildFastingDescription(memberToken: string, inviterName: string, isOrganizer: boolean): string {
+  function buildFastingDescription(memberToken: string, inviterName: string, _isOrganizer: boolean): string {
     const shortLink = `${getFrontendUrl()}/m/${memberToken}`;
-
-    if (isOrganizer) {
-      return [
-        `Your fasting practice on Eleanor.`,
-        ...(fastingIntention ? [`"${fastingIntention}"`] : []),
-        "",
-        "Tap to log:",
-        shortLink,
-      ].join("\n");
-    }
+    const invFirst = inviterName.split(" ")[0];
+    const fastFreqLabel = fastingFrequency === "weekly" ? "Weekly" : fastingFrequency === "monthly" ? "Monthly" : "Fasting day";
 
     return [
-      `${inviterName} invited you to fast together.`,
-      ...(fastingIntention ? [`Why we fast: ${fastingIntention}`] : []),
+      `${invFirst} invited you to fast together.`,
       "",
-      "Tap to mark that you are fasting:",
+      "A shared fast as a discipline — knowing someone else is keeping it alongside you changes everything.",
+      ...(fastingIntention ? ["", `Why we fast: ${fastingIntention}`] : []),
+      "", DIV, "",
+      `When: ${fastFreqLabel} · Starting ${humanStartDate()}`,
+      `Who: ${memberListStr}`,
+      ...(goalSessions ? [`Goal: ${goalSessions} fasts together 🌱`] : []),
+      "",
+      "Tap to log your fast →",
       shortLink,
-      "",
-      "No login needed. 🌿",
+      "", DIV, "",
+      "No account needed. Your link above is all you need.",
     ].join("\n");
   }
 
@@ -731,32 +786,36 @@ router.post("/moments", async (req, res): Promise<void> => {
     .filter(e => e !== organizer.email);
   let gcalCreated = false;
 
+  // Reminders: 5 min popup + 1 day email
+  const practiceReminders = [
+    { method: "popup", minutes: 5 },
+    { method: "email", minutes: 1440 },
+  ];
+
   try {
     const eventTitle = buildEventTitle();
-    const description = [
-      `${name} practice on Eleanor.`,
-      ...(intention ? [`"${intention}"`] : []),
-      "",
-      `${insertedTokens.length} ${insertedTokens.length === 1 ? "person" : "people"} practicing together.`,
-      "",
-      `Open Eleanor → ${getFrontendUrl()}/moments/${moment.id}`,
-    ].join("\n");
+    // Organizer gets their own personalised description too
+    const orgToken = insertedTokens.find(t => t.email === organizer.email);
+    const orgDescription = orgToken
+      ? buildDescription(orgToken.userToken, organizer.name ?? "You", organizerName, true)
+      : `Open Eleanor → ${getFrontendUrl()}/moments/${moment.id}`;
 
     if (isFasting) {
       const fastingDateStr = getFastingStartDateStr();
       const fastingRec = getFastingRecurrence();
       const fastingTitle = buildEventTitle();
+      const fastOrgDesc = orgToken
+        ? buildFastingDescription(orgToken.userToken, organizerName, true)
+        : orgDescription;
       const eventId = await createAllDayCalendarEvent(sessionUserId, {
         summary: fastingTitle,
-        description,
+        description: fastOrgDesc,
         dateStr: fastingDateStr,
         attendees: attendeeEmails,
         recurrence: fastingRec,
       }).catch(() => null);
 
       if (eventId) {
-        // Store event ID on the organizer's token
-        const orgToken = insertedTokens.find(t => t.email === organizer.email);
         if (orgToken) {
           await db.update(momentUserTokensTable)
             .set({ googleCalendarEventId: eventId })
@@ -767,17 +826,18 @@ router.post("/moments", async (req, res): Promise<void> => {
     } else {
       const eventId = await createCalendarEvent(sessionUserId, {
         summary: eventTitle,
-        description,
+        description: orgDescription,
         startDate,
         startLocalStr,
         endLocalStr,
         timeZone: tz,
         attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
         recurrence: recurrenceRule,
+        colorId: "2",
+        reminders: practiceReminders,
       }).catch(() => null);
 
       if (eventId) {
-        const orgToken = insertedTokens.find(t => t.email === organizer.email);
         if (orgToken) {
           await db.update(momentUserTokensTable)
             .set({ googleCalendarEventId: eventId })
