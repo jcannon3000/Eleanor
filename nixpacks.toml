@@ -1,11 +1,12 @@
 [variables]
 NIXPACKS_PNPM_VERSION = "10"
+NIXPACKS_NO_CACHE = "1"
 
 [phases.install]
 cmds = ["pnpm install --no-frozen-lockfile"]
 
 [phases.build]
-cmds = ["pnpm --filter @workspace/mymonastery run build", "pnpm --filter @workspace/api-server run build"]
+cmds = ["rm -rf artifacts/mymonastery/dist", "pnpm --filter @workspace/mymonastery run build", "pnpm --filter @workspace/api-server run build"]
 
 [start]
 cmd = "node ./artifacts/api-server/dist/index.mjs"
