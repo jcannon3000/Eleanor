@@ -87,7 +87,6 @@ export default function People() {
   if (authLoading || !user) return null;
 
   const sorted = people ? sortPeople(people, presentEmails) : [];
-  const prayerBanners = sorted.filter(p => p.activePrayerRequest);
 
   const container = {
     hidden: { opacity: 0 },
@@ -107,7 +106,7 @@ export default function People() {
             Your garden 🌿
           </h1>
           <p className="mt-3 text-base text-muted-foreground italic">
-            People tending things alongside you.
+            Stay close to your community.
           </p>
         </div>
 
@@ -140,30 +139,6 @@ export default function People() {
           </motion.div>
         ) : (
           <motion.div variants={container} initial="hidden" animate="show">
-            {/* ── Prayer request banners ─────────────────────── */}
-            {prayerBanners.length > 0 && (
-              <div className="mb-6 space-y-3">
-                {prayerBanners.map(person => (
-                  <motion.div key={`prayer-${person.email}`} variants={item}>
-                    <Link
-                      href="/dashboard"
-                      className="block rounded-xl px-5 py-4 border border-[#D4896A]/20"
-                      style={{ backgroundColor: "rgba(212,137,106,0.06)" }}
-                    >
-                      <p className="text-[15px] font-medium" style={{ color: "#D4896A" }}>
-                        <span className="animate-prayer-pulse inline-block">🙏</span> {person.name.split(" ")[0]} is asking for prayer
-                      </p>
-                      {person.activePrayerRequest && (
-                        <p className="text-[13px] mt-1 italic" style={{ color: "#D4896A", opacity: 0.75 }}>
-                          {truncate(person.activePrayerRequest.body, 80)}
-                        </p>
-                      )}
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
             {/* ── People list ────────────────────────────────── */}
             <div>
               {sorted.map((person, idx) => {
@@ -231,11 +206,16 @@ export default function People() {
                           </div>
                         )}
 
-                        {/* Line 3: Prayer request line */}
+                        {/* Line 3: Prayer request line — links to person detail */}
                         {person.activePrayerRequest && (
-                          <p className="mt-1.5 text-[13px] italic" style={{ color: "#D4896A" }}>
-                            🙏 Asking for prayer · {truncate(person.activePrayerRequest.body, 40)}
-                          </p>
+                          <Link
+                            href={`/people/${encodeURIComponent(person.email)}`}
+                            onClick={e => e.stopPropagation()}
+                            className="mt-1.5 text-[13px] italic block hover:opacity-70 transition-opacity"
+                            style={{ color: "#D4896A" }}
+                          >
+                            <span className="animate-prayer-pulse inline-block">🙏</span> Asking for prayer · {truncate(person.activePrayerRequest.body, 40)}
+                          </Link>
                         )}
 
                         {/* Line 3 alt: Inactive nudge */}
