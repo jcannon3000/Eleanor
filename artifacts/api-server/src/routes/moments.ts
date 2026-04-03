@@ -1913,6 +1913,68 @@ router.patch("/moments/:id", async (req, res): Promise<void> => {
   }
 
   await db.update(sharedMomentsTable).set(updates).where(eq(sharedMomentsTable.id, momentId));
+
+  // If schedule-related fields changed, re-sync Google Calendar events for all members
+  const needsCalSync = d.scheduledTime !== undefined || d.frequency !== undefined || d.dayOfWeek !== undefined;
+  if (needsCalSync) {
+    try {
+      const [updated] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+      const timezone = updated.timezone ?? "America/New_York";
+      const [hh, mm] = (updated.scheduledTime ?? "08:00").split(":").map(Number);
+      const { startLocalStr, endLocalStr } = buildLocalEventTimes(hh, mm, timezone, practiceEventDurationMins(updated.templateType));
+
+      const recurrence: string[] = [];
+      if (updated.frequency === "daily") {
+        recurrence.push("RRULE:FREQ=DAILY");
+      } else if (updated.frequency === "weekly" && updated.dayOfWeek) {
+        recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${updated.dayOfWeek}`);
+      } else if (updated.frequency === "weekly") {
+        recurrence.push("RRULE:FREQ=WEEKLY");
+      }
+
+      // Delete all existing calendar events
+      for (const member of allTokens) {
+        if (member.googleCalendarEventId) {
+          try { await deleteCalendarEvent(sessionUserId, member.googleCalendarEventId); } catch { /* best effort */ }
+          await db.update(momentUserTokensTable)
+            .set({ googleCalendarEventId: null, calendarConnected: false })
+            .where(eq(momentUserTokensTable.id, member.id));
+        }
+      }
+
+      // Create new group event on the requester's calendar with all members as attendees
+      const myTokenRow = allTokens.find(t => t.email === user.email);
+      const attendeeEmails = allTokens.map(m => m.email).filter(e => e !== user.email);
+      const newEventId = await createCalendarEvent(sessionUserId, {
+        summary: `🔔 ${updated.name}`,
+        description: [
+          `${updated.name} practice on Eleanor.`,
+          ...(updated.intention ? [`"${updated.intention}"`] : []),
+          "",
+          `${allTokens.length} ${allTokens.length === 1 ? "person" : "people"} practicing together.`,
+          "",
+          `Open Eleanor → ${getFrontendUrl()}/moments/${momentId}`,
+        ].join("\n"),
+        startDate: new Date(),
+        startLocalStr,
+        endLocalStr,
+        timeZone: timezone,
+        attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
+        recurrence: recurrence.length > 0 ? recurrence : undefined,
+      });
+
+      if (newEventId && myTokenRow) {
+        await db.update(momentUserTokensTable)
+          .set({ googleCalendarEventId: newEventId, calendarConnected: true })
+          .where(eq(momentUserTokensTable.id, myTokenRow.id));
+        console.info(`PATCH moment ${momentId}: recreated GCal event ${newEventId} at ${startLocalStr} ${timezone}`);
+      }
+    } catch (gcalErr) {
+      console.error(`PATCH moment ${momentId} GCal sync error:`, gcalErr);
+      // Non-fatal — DB update already succeeded
+    }
+  }
+
   res.json({ ok: true });
 });
 
