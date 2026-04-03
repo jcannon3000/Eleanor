@@ -8,7 +8,7 @@ import {
   useUpdateRitual,
   useDeleteRitual,
 } from "@workspace/api-client-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +63,16 @@ interface TimelineData {
   past: TimelineMeetup[];
   location: string | null;
   confirmedTime: string | null;
+  calendarEventMissing?: boolean;
+}
+
+interface TimeSuggestion {
+  id: number;
+  suggestedByEmail: string;
+  suggestedByName: string | null;
+  suggestedTime: string;
+  note: string | null;
+  createdAt: string;
 }
 
 function getStatusMeta(status: string) {
@@ -118,6 +128,12 @@ export default function RitualDetail() {
   const [calSyncNotifs, setCalSyncNotifs] = useState<Array<{ name: string; email: string }>>([]);
   const [calSyncedEmails, setCalSyncedEmails] = useState<Set<string>>(new Set());
   const [declinedEmails, setDeclinedEmails] = useState<Set<string>>(new Set());
+
+  // ── Suggest time state (non-creator members) ───────────────────────────────
+  const [showSuggestTime, setShowSuggestTime] = useState(false);
+  const [suggestDateTime, setSuggestDateTime] = useState("");
+  const [suggestNote, setSuggestNote] = useState("");
+  const [suggestSent, setSuggestSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -277,6 +293,43 @@ export default function RitualDetail() {
     }
   };
 
+  // ── Calendar restore ────────────────────────────────────────────────────────
+  const restoreCalendarMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/rituals/${ritualId}/restore-calendar`, {}),
+    onSuccess: () => {
+      toast({ title: "Calendar event restored 🗓️" });
+      fetchTimeline();
+    },
+    onError: () => toast({ variant: "destructive", title: "Could not restore calendar event" }),
+  });
+
+  // ── Time suggestions (creator view) ────────────────────────────────────────
+  const isOwner = !!(ritual && user && ritual.ownerId === user.id);
+
+  const { data: suggestionsData, refetch: refetchSuggestions } = useQuery<{ suggestions: TimeSuggestion[] }>({
+    queryKey: [`/api/rituals/${ritualId}/suggestions`],
+    queryFn: () => apiRequest("GET", `/api/rituals/${ritualId}/suggestions`),
+    enabled: isOwner && activeTab === "timeline",
+  });
+
+  const suggestTimeMutation = useMutation({
+    mutationFn: (payload: { suggestedTime: string; note?: string }) =>
+      apiRequest("POST", `/api/rituals/${ritualId}/suggest-time`, payload),
+    onSuccess: () => {
+      setSuggestSent(true);
+      setShowSuggestTime(false);
+      setSuggestDateTime("");
+      setSuggestNote("");
+    },
+    onError: () => toast({ variant: "destructive", title: "Could not send suggestion" }),
+  });
+
+  const dismissSuggestionMutation = useMutation({
+    mutationFn: (suggestionId: number) =>
+      apiRequest("DELETE", `/api/rituals/${ritualId}/suggestions/${suggestionId}`, {}),
+    onSuccess: () => refetchSuggestions(),
+  });
+
   if (isLoading) {
     return (
       <Layout>
@@ -427,6 +480,24 @@ export default function RitualDetail() {
                   </motion.div>
                 ))}
               </AnimatePresence>
+
+              {/* Calendar event removed banner — owner only */}
+              {isOwner && timeline?.calendarEventMissing && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-lg shrink-0">📅</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-amber-800">Your calendar event was removed</p>
+                    <p className="text-xs text-amber-700/70 mt-0.5">Eleanor can restore it to your Google Calendar.</p>
+                  </div>
+                  <button
+                    onClick={() => restoreCalendarMutation.mutate()}
+                    disabled={restoreCalendarMutation.isPending}
+                    className="shrink-0 text-xs font-medium text-amber-800 border border-amber-300 rounded-full px-3 py-1.5 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                  >
+                    {restoreCalendarMutation.isPending ? "Restoring…" : "Restore"}
+                  </button>
+                </div>
+              )}
 
               {/* Upcoming gathering */}
               {timelineLoading ? (
@@ -587,6 +658,109 @@ export default function RitualDetail() {
                   >
                     Schedule a gathering 🗓️
                   </Link>
+                </div>
+              )}
+
+              {/* Suggest a time — non-owner members */}
+              {!isOwner && ritual && (
+                <div className="bg-card border border-card-border rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-foreground">Suggest a time</p>
+                    {suggestSent && (
+                      <span className="text-xs text-[#6B8F71]">Suggestion sent ✓</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Propose an alternative time for {ritual.name} — the organizer will see it.
+                  </p>
+                  {showSuggestTime ? (
+                    <div className="space-y-2">
+                      <input
+                        type="datetime-local"
+                        value={suggestDateTime}
+                        onChange={e => setSuggestDateTime(e.target.value)}
+                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                      />
+                      <input
+                        type="text"
+                        value={suggestNote}
+                        onChange={e => setSuggestNote(e.target.value)}
+                        placeholder="Add a note (optional)"
+                        className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setShowSuggestTime(false); setSuggestDateTime(""); setSuggestNote(""); }}
+                          className="flex-1 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!suggestDateTime) return;
+                            suggestTimeMutation.mutate({
+                              suggestedTime: new Date(suggestDateTime).toISOString(),
+                              note: suggestNote.trim() || undefined,
+                            });
+                          }}
+                          disabled={!suggestDateTime || suggestTimeMutation.isPending}
+                          className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {suggestTimeMutation.isPending ? "Sending…" : "Send suggestion"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setShowSuggestTime(true); setSuggestSent(false); }}
+                      className="w-full py-2 rounded-xl border border-dashed border-primary/40 text-sm text-primary hover:bg-primary/5 transition-colors"
+                    >
+                      + Suggest a time
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Time suggestions — owner only */}
+              {isOwner && suggestionsData && suggestionsData.suggestions.length > 0 && (
+                <div className="bg-card border border-card-border rounded-2xl p-4">
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    Time suggestions from members
+                  </p>
+                  <div className="space-y-3">
+                    {suggestionsData.suggestions.map(s => (
+                      <div key={s.id} className="flex items-start gap-3 pb-3 border-b border-border/50 last:border-0 last:pb-0">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                          {(s.suggestedByName ?? s.suggestedByEmail).charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground">
+                            {s.suggestedByName ?? s.suggestedByEmail}
+                          </p>
+                          <p className="text-sm text-foreground mt-0.5">
+                            {new Date(s.suggestedTime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                            {" · "}
+                            {new Date(s.suggestedTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </p>
+                          {s.note && <p className="text-xs text-muted-foreground mt-0.5 italic">"{s.note}"</p>}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <Link
+                            href={`/ritual/${ritualId}/schedule`}
+                            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                          >
+                            Use this
+                          </Link>
+                          <button
+                            onClick={() => dismissSuggestionMutation.mutate(s.id)}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

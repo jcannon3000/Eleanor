@@ -7,7 +7,7 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent, getCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
 import { broadcastLog } from "../lib/ws";
 
@@ -993,6 +993,14 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     : null;
   const isCreator = myTokenRow[0]?.email.toLowerCase() === creatorToken?.email.toLowerCase();
 
+  // Check if the creator's calendar event was deleted
+  let calendarEventMissing = false;
+  const myEventId = myTokenRow[0]?.googleCalendarEventId;
+  if (isCreator && myEventId && myTokenRow[0]?.calendarConnected) {
+    const calEvent = await getCalendarEvent(sessionUserId, myEventId);
+    if (!calEvent) calendarEventMissing = true;
+  }
+
   // Personal streak: consecutive closed windows (newest first) where current user posted
   const myUserTokenValue = myTokenRow[0]?.userToken ?? null;
   const myPostDates = new Set(
@@ -1032,6 +1040,7 @@ router.get("/moments/:id", async (req, res): Promise<void> => {
     todayLogs,
     isCreator,
     myStreak,
+    calendarEventMissing,
   });
 });
 
@@ -2256,6 +2265,79 @@ router.post("/moments/cleanup-calendars", async (req, res): Promise<void> => {
     console.error("POST /moments/cleanup-calendars error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ─── POST /api/moments/:id/restore-calendar — creator restores deleted calendar event ───
+router.post("/moments/:id/restore-calendar", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  const allMembers = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+
+  const myTokenRow = allMembers.find(m => m.email.toLowerCase() === user.email.toLowerCase());
+  if (!myTokenRow) { res.status(403).json({ error: "Not a member of this practice" }); return; }
+
+  const creatorToken = allMembers.length > 0
+    ? allMembers.reduce((min, m) => m.id < min.id ? m : min, allMembers[0])
+    : null;
+  if (myTokenRow.email.toLowerCase() !== creatorToken?.email.toLowerCase()) {
+    res.status(403).json({ error: "Only the creator can restore the calendar event" }); return;
+  }
+
+  // Build a new calendar event using the moment's schedule
+  const tz = moment.timezone || "UTC";
+  const [h, m] = (moment.scheduledTime || "08:00").split(":").map(Number);
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setHours(h, m, 0, 0);
+  if (startDate < now) startDate.setDate(startDate.getDate() + 1);
+  const durationMins = 60;
+  const endDate = new Date(startDate.getTime() + durationMins * 60_000);
+
+  const recurrenceRule = moment.frequency === "daily"
+    ? ["RRULE:FREQ=DAILY"]
+    : moment.frequency === "weekly"
+    ? ["RRULE:FREQ=WEEKLY"]
+    : ["RRULE:FREQ=MONTHLY"];
+
+  const attendeeEmails = allMembers
+    .map(m => m.email)
+    .filter(e => e.toLowerCase() !== user.email.toLowerCase());
+
+  const eventId = await createCalendarEvent(sessionUserId, {
+    summary: `🌿 ${moment.name}`,
+    description: [
+      `${moment.name} practice on Eleanor — restored.`,
+      moment.intention ? `"${moment.intention}"` : "",
+      "",
+      `Open Eleanor → ${getFrontendUrl()}/moments/${momentId}`,
+    ].filter(Boolean).join("\n"),
+    startDate,
+    endDate,
+    timeZone: tz,
+    attendees: attendeeEmails.length > 0 ? attendeeEmails : undefined,
+    recurrence: recurrenceRule,
+    colorId: "2",
+    reminders: [{ method: "popup", minutes: 10 }],
+  });
+
+  if (!eventId) { res.status(500).json({ error: "Could not create calendar event" }); return; }
+
+  await db.update(momentUserTokensTable)
+    .set({ googleCalendarEventId: eventId, calendarConnected: true })
+    .where(eq(momentUserTokensTable.id, myTokenRow.id));
+
+  res.json({ success: true });
 });
 
 export default router;

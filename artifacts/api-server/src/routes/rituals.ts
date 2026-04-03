@@ -1,9 +1,9 @@
 import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
-import { eq, desc, or, sql } from "drizzle-orm";
+import { eq, desc, or, sql, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent } from "../lib/calendar";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable, ritualTimeSuggestionsTable } from "@workspace/db";
+import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent, getCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -610,6 +610,13 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
 
   const past = allMeetups.filter((m) => m.status !== "planned");
 
+  // Check if the creator's calendar event for the upcoming meetup was deleted
+  let calendarEventMissing = false;
+  if (upcoming?.googleCalendarEventId) {
+    const calEvent = await getCalendarEvent(sessionUserId, upcoming.googleCalendarEventId);
+    if (!calEvent) calendarEventMissing = true;
+  }
+
   res.json({
     upcoming: upcoming
       ? { ...upcoming, scheduledDate: upcoming.scheduledDate.toISOString() }
@@ -617,6 +624,7 @@ router.get("/rituals/:id/timeline", async (req, res): Promise<void> => {
     past: past.map((m) => ({ ...m, scheduledDate: m.scheduledDate.toISOString() })),
     location: ritual.location,
     confirmedTime: ritual.confirmedTime,
+    calendarEventMissing,
   });
 });
 
@@ -907,6 +915,135 @@ router.delete("/rituals/:id/participants/:email", async (req, res): Promise<void
   } catch { /* non-fatal */ }
 
   res.json({ success: true, participants: updated, removed: emailToRemove });
+});
+
+// ─── POST /api/rituals/:id/restore-calendar — owner restores deleted calendar event ───
+router.post("/rituals/:id/restore-calendar", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+  if (ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const [planned] = await db.select().from(meetupsTable)
+    .where(and(eq(meetupsTable.ritualId, id), eq(meetupsTable.status, "planned")));
+  if (!planned) { res.status(400).json({ error: "No upcoming gathering to restore" }); return; }
+
+  const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+  const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!organizer) { res.status(404).json({ error: "User not found" }); return; }
+
+  const eventStart = new Date(planned.scheduledDate);
+  const eventEnd = new Date(eventStart.getTime() + 60 * 60_000);
+  const attendeeEmails = participants.map(p => p.email).filter(e => e !== organizer.email);
+
+  const eventId = await createCalendarEvent(sessionUserId, {
+    summary: ritual.name,
+    description: [
+      `${ritual.name} — restored via Eleanor`,
+      ritual.intention ? `"${ritual.intention}"` : "",
+      "",
+      `View this tradition → ${getFrontendUrl()}/ritual/${id}`,
+    ].filter(Boolean).join("\n"),
+    startDate: eventStart,
+    endDate: eventEnd,
+    attendees: attendeeEmails,
+    colorId: "5",
+    status: ritual.confirmedTime ? "confirmed" : "tentative",
+    reminders: [
+      { method: "popup", minutes: 30 },
+    ],
+  });
+
+  if (!eventId) { res.status(500).json({ error: "Could not create calendar event" }); return; }
+
+  await db.update(meetupsTable)
+    .set({ googleCalendarEventId: eventId })
+    .where(eq(meetupsTable.id, planned.id));
+
+  res.json({ success: true });
+});
+
+// ─── POST /api/rituals/:id/suggest-time — participant suggests an alternative time ───
+router.post("/rituals/:id/suggest-time", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = z.object({
+    suggestedTime: z.string().min(1),
+    note: z.string().optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "suggestedTime is required" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Verify user is a participant (owner or listed participant)
+  const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+  const isMember = ritual.ownerId === sessionUserId
+    || participants.some(p => p.email.toLowerCase() === user.email.toLowerCase());
+  if (!isMember) { res.status(403).json({ error: "Not a member of this tradition" }); return; }
+
+  const [suggestion] = await db.insert(ritualTimeSuggestionsTable).values({
+    ritualId: id,
+    suggestedByEmail: user.email,
+    suggestedByName: user.name,
+    suggestedTime: parsed.data.suggestedTime,
+    note: parsed.data.note ?? null,
+  }).returning();
+
+  res.json(suggestion);
+});
+
+// ─── GET /api/rituals/:id/suggestions — owner views member time suggestions ───
+router.get("/rituals/:id/suggestions", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+  // Only the owner sees suggestions
+  if (ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const suggestions = await db.select()
+    .from(ritualTimeSuggestionsTable)
+    .where(eq(ritualTimeSuggestionsTable.ritualId, id))
+    .orderBy(desc(ritualTimeSuggestionsTable.createdAt));
+
+  res.json({ suggestions });
+});
+
+// ─── DELETE /api/rituals/:id/suggestions/:suggestionId — owner dismisses a suggestion ───
+router.delete("/rituals/:id/suggestions/:suggestionId", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const suggestionId = parseInt(req.params.suggestionId, 10);
+  if (isNaN(id) || isNaN(suggestionId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, id));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+  if (ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  await db.delete(ritualTimeSuggestionsTable)
+    .where(and(eq(ritualTimeSuggestionsTable.id, suggestionId), eq(ritualTimeSuggestionsTable.ritualId, id)));
+
+  res.json({ success: true });
 });
 
 export default router;

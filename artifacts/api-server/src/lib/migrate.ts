@@ -322,6 +322,19 @@ export async function migrate() {
     await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_music_snapshot TEXT`);
     await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_music_last_polled TIMESTAMPTZ`);
 
+    // Time suggestions from tradition members
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS ritual_time_suggestions (
+        id SERIAL PRIMARY KEY,
+        ritual_id INTEGER NOT NULL REFERENCES rituals(id) ON DELETE CASCADE,
+        suggested_by_email TEXT NOT NULL,
+        suggested_by_name TEXT,
+        suggested_time TEXT NOT NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns

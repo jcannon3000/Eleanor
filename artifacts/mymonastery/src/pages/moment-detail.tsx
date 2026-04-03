@@ -90,6 +90,7 @@ interface MomentDetail {
   minutesLeft: number;
   todayLogs: TodayLog[];
   isCreator: boolean;
+  calendarEventMissing?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -331,6 +332,13 @@ export default function MomentDetail() {
     },
   });
 
+  const restoreCalendarMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/moments/${id}/restore-calendar`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+    },
+  });
+
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const removeMemberMutation = useMutation({
     mutationFn: (email: string) =>
@@ -420,6 +428,24 @@ export default function MomentDetail() {
         >
           ← Your practices
         </Link>
+
+        {/* Calendar event removed banner — creator only */}
+        {isCreator && data.calendarEventMissing && (
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <span className="text-lg shrink-0">📅</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">Your calendar event was removed</p>
+              <p className="text-xs text-amber-700/70 mt-0.5">Eleanor can restore it to your Google Calendar.</p>
+            </div>
+            <button
+              onClick={() => restoreCalendarMutation.mutate()}
+              disabled={restoreCalendarMutation.isPending}
+              className="shrink-0 text-xs font-medium text-amber-800 border border-amber-300 rounded-full px-3 py-1.5 hover:bg-amber-100 transition-colors disabled:opacity-50"
+            >
+              {restoreCalendarMutation.isPending ? "Restoring…" : "Restore"}
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-5">
