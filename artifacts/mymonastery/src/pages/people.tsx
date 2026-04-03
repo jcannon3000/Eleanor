@@ -125,8 +125,15 @@ export default function People() {
                   }`}>
 
                     {/* Avatar */}
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-semibold flex-shrink-0 ${colorFor(person.email)}`}>
-                      {initials(person.name)}
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-semibold ${colorFor(person.email)}`}>
+                        {initials(person.name)}
+                      </div>
+                      {person.hasActivePrayerRequest && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-100 border-2 border-card flex items-center justify-center text-[10px]" title="Has an active prayer request">
+                          🙏
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -149,22 +156,36 @@ export default function People() {
                         </div>
                       </div>
 
-                      <div className="mt-1.5 space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {person.sharedCircleCount === 1
-                            ? "1 shared tradition"
-                            : `${person.sharedCircleCount} shared traditions`}
-                        </p>
+                      <div className="mt-1.5 space-y-1.5">
+                        {/* Shared practices with streaks */}
+                        {person.sharedPractices && person.sharedPractices.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {person.sharedPractices.map(practice => (
+                              <span key={practice.id} className="inline-flex items-center gap-1 text-xs bg-primary/8 text-primary/80 rounded-full px-2 py-0.5">
+                                {practice.templateType === "intercession" ? "🙏" : "🌿"}
+                                <span className="truncate max-w-[120px]">{practice.name}</span>
+                                {practice.currentStreak > 0 && (
+                                  <span className="font-semibold text-[#6B8F71]">🔥{practice.currentStreak}</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
-                            <Sprout size={11} />
-                            <span className="font-semibold text-foreground/70">{person.score ?? 0}</span> together
-                          </span>
-                          {person.maxSharedStreak ? (
-                            <span className="text-xs text-[#6B8F71] font-medium">
-                              🔥 {person.maxSharedStreak} streak
+                          {person.sharedCircleCount > 0 && (
+                            <span className="text-xs text-muted-foreground/60">
+                              {person.sharedCircleCount === 1
+                                ? "1 tradition"
+                                : `${person.sharedCircleCount} traditions`}
                             </span>
-                          ) : null}
+                          )}
+                          {person.score > 0 && (
+                            <span className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                              <Sprout size={11} />
+                              <span className="font-semibold text-foreground/70">{person.score}</span> together
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

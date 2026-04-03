@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 
+export interface PersonPracticeSummary {
+  id: number;
+  name: string;
+  currentStreak: number;
+  templateType: string | null;
+}
+
 export interface PersonSummary {
   name: string;
   email: string;
@@ -7,6 +14,8 @@ export interface PersonSummary {
   firstCircleDate: string;
   maxSharedStreak: number;
   score: number;
+  sharedPractices: PersonPracticeSummary[];
+  hasActivePrayerRequest: boolean;
 }
 
 export interface SharedMeetup {

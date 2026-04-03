@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, or, sql, inArray, and } from "drizzle-orm";
-import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable, momentWindowsTable } from "@workspace/db";
+import { db, ritualsTable, meetupsTable, usersTable, sharedMomentsTable, momentUserTokensTable, momentWindowsTable, prayerRequestsTable } from "@workspace/db";
 import { computeStreak } from "../lib/streak";
 
 const router: IRouter = Router();
@@ -90,11 +90,45 @@ router.get("/people", async (req, res): Promise<void> => {
     }
   }
 
+  // Build a set of all garden emails for prayer request lookup
+  const allGardenEmails = Array.from(map.keys());
+
+  // Batch-fetch active prayer requests for all garden members
+  // Active = not closed, not expired, not answered
+  const activePrayerMap = new Map<string, boolean>();
+  if (allGardenEmails.length > 0) {
+    // Get user IDs for garden emails
+    const gardenUsers = await db.select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable)
+      .where(inArray(usersTable.email, allGardenEmails));
+    const gardenUserIds = gardenUsers.map(u => u.id);
+    if (gardenUserIds.length > 0) {
+      const now = new Date();
+      const activeRequests = await db.select({
+        ownerId: prayerRequestsTable.ownerId,
+      }).from(prayerRequestsTable).where(
+        and(
+          inArray(prayerRequestsTable.ownerId, gardenUserIds),
+          eq(prayerRequestsTable.isAnswered, false),
+          sql`${prayerRequestsTable.closedAt} IS NULL`,
+          sql`(${prayerRequestsTable.expiresAt} IS NULL OR ${prayerRequestsTable.expiresAt} > ${now})`,
+        )
+      );
+      const ownerIdsWithPrayer = new Set(activeRequests.map(r => r.ownerId));
+      for (const u of gardenUsers) {
+        if (ownerIdsWithPrayer.has(u.id)) {
+          activePrayerMap.set(u.email, true);
+        }
+      }
+    }
+  }
+
   const peopleEnriched = await Promise.all(
     Array.from(map.values()).map(async (p) => {
       let maxStreak = 0;
       let score = 0;
       let sharedMomentIds: number[] = [];
+      let sharedPractices: Array<{ id: number; name: string; currentStreak: number; templateType: string | null }> = [];
 
       // Completed meetups across shared rituals
       if (p.sharedRitualIds.length > 0) {
@@ -118,10 +152,21 @@ router.get("/people", async (req, res): Promise<void> => {
 
         if (sharedMomentIds.length > 0) {
           const sharedMoments = await db
-            .select({ currentStreak: sharedMomentsTable.currentStreak })
+            .select({
+              id: sharedMomentsTable.id,
+              name: sharedMomentsTable.name,
+              currentStreak: sharedMomentsTable.currentStreak,
+              templateType: sharedMomentsTable.templateType,
+            })
             .from(sharedMomentsTable)
             .where(inArray(sharedMomentsTable.id, sharedMomentIds));
           maxStreak = Math.max(0, ...sharedMoments.map(m => m.currentStreak ?? 0));
+          sharedPractices = sharedMoments.map(m => ({
+            id: m.id,
+            name: m.name,
+            currentStreak: m.currentStreak ?? 0,
+            templateType: m.templateType,
+          }));
 
           // Bloom windows = shared practice sessions done together
           const bloomRows = await db
@@ -142,6 +187,8 @@ router.get("/people", async (req, res): Promise<void> => {
         firstCircleDate: p.firstCircleDate.toISOString(),
         maxSharedStreak: maxStreak,
         score,
+        sharedPractices,
+        hasActivePrayerRequest: activePrayerMap.get(p.email) ?? false,
       };
     })
   );
