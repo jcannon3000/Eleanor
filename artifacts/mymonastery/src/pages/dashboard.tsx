@@ -292,7 +292,7 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
               <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 hover:bg-[#5a7a60] transition-colors whitespace-nowrap shrink-0">
-                Show up →
+                {["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "") ? "Pray 🙏" : moment.templateType === "fasting" ? "Fast 🌿" : moment.templateType === "listening" ? "Listen 🎵" : "Show up →"}
               </span>
             </Link>
           )}
