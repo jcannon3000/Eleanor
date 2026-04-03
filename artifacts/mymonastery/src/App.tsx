@@ -54,6 +54,7 @@ import MomentsDashboard from "./pages/moments-dashboard";
 import MomentDetail from "./pages/moment-detail";
 import MomentJoin from "./pages/moment-join";
 import TraditionNew from "./pages/tradition-new";
+import AppleMusicAuth from "./pages/apple-music-auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +101,7 @@ function Router() {
       <Route path="/moment/:momentToken/:userToken" component={MomentPostPage} />
       <Route path="/people" component={People} />
       <Route path="/people/:email" component={PersonProfile} />
+      <Route path="/apple-music-auth" component={AppleMusicAuth} />
       <Route component={NotFound} />
     </Switch>
   );

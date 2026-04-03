@@ -251,45 +251,7 @@ export default function MomentDetail() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
-  const [amConnecting, setAmConnecting] = useState(false);
-  const [mkReady, setMkReady] = useState(false);
 
-  // Load MusicKit JS and pre-configure with developer token so authorize() works in the click handler
-  useEffect(() => {
-    let cancelled = false;
-    async function init() {
-      // Load script
-      const w = window as unknown as Record<string, unknown>;
-      if (!w["MusicKit"]) {
-        const existing = document.querySelector('script[src*="musickit"]');
-        if (!existing) {
-          const s = document.createElement("script");
-          s.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-          s.async = true;
-          document.head.appendChild(s);
-        }
-        // Wait for it
-        await new Promise<void>((resolve, reject) => {
-          let tries = 0;
-          const iv = setInterval(() => {
-            if (w["MusicKit"]) { clearInterval(iv); resolve(); }
-            else if (++tries > 100) { clearInterval(iv); reject(new Error("MusicKit timeout")); }
-          }, 200);
-        });
-      }
-      if (cancelled) return;
-      // Pre-configure
-      try {
-        const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
-        if (cancelled) return;
-        const MK = w["MusicKit"] as { configure: (opts: object) => Promise<void> };
-        await MK.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
-        if (!cancelled) setMkReady(true);
-      } catch { /* Apple Music not configured */ }
-    }
-    void init();
-    return () => { cancelled = true; };
-  }, []);
   // Bell editing removed — shared time, editable via Settings > Edit practice
   const [editingPractice, setEditingPractice] = useState(false);
   const [editName, setEditName] = useState("");
@@ -420,23 +382,9 @@ export default function MomentDetail() {
 
   const { moment, members, memberCount, myStreak, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
 
-  // Apple Music connect handler — authorize() must run synchronously in click handler for Safari popup
-  async function connectAppleMusic() {
-    setAmConnecting(true);
-    try {
-      const w = window as unknown as Record<string, unknown>;
-      const MK = w["MusicKit"] as {
-        getInstance: () => { authorize: () => Promise<string> };
-      };
-      // This opens the Apple popup — must be in the direct click path
-      const musicUserToken = await MK.getInstance().authorize();
-      await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
-      void refetchAmStatus();
-    } catch (err) {
-      console.error("Apple Music connect failed", err);
-    } finally {
-      setAmConnecting(false);
-    }
+  // Apple Music connect — navigate to dedicated auth page (works on iOS Safari)
+  function connectAppleMusic() {
+    setLocation(`/apple-music-auth?returnTo=${encodeURIComponent(`/moments/${id}`)}`);
   }
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
@@ -637,11 +585,10 @@ export default function MomentDetail() {
                 </p>
                 <button
                   onClick={connectAppleMusic}
-                  disabled={amConnecting || !mkReady}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm text-white transition-all disabled:opacity-60"
+                  className="w-full py-2.5 rounded-xl font-medium text-sm text-white transition-all"
                   style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
                 >
-                  {amConnecting ? "Connecting…" : !mkReady ? "Loading…" : "🎵 Connect Apple Music"}
+                  🎵 Connect Apple Music
                 </button>
               </div>
             )}
@@ -657,13 +604,13 @@ export default function MomentDetail() {
           >
             <div>
               <p className="text-sm font-semibold text-[#C17F24]">
-                {isIntercession ? "🙏 Open today · Pray together" : "🌿 Open today"}
+                {isIntercession ? "🙏 Open today · Pray together" : isListening ? "🎵 Listening today" : "🌿 Open today"}
               </p>
               <p className="text-xs text-[#C17F24]/70 mt-0.5">
-                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : "logged"}
+                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : isListening ? "listened" : "logged"}
               </p>
             </div>
-            {postUrl && (
+            {postUrl && !isListening && (
               <Link href={postUrl}>
                 <span className="text-sm font-medium text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors whitespace-nowrap">
                   {actionLabel}
