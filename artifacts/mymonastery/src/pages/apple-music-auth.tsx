@@ -3,23 +3,23 @@ import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 
 /**
- * Dedicated Apple Music auth page. Navigated to from moment-detail when user
- * taps "Connect Apple Music". Loads MusicKit, runs authorize(), saves token,
- * then navigates back. Works on iOS Safari where popups are blocked.
+ * Dedicated Apple Music auth page. MusicKit loads automatically, then the user
+ * taps a button to authorize — this keeps authorize() in a direct user gesture
+ * so Safari doesn't block it.
  */
 export default function AppleMusicAuth() {
-  const [status, setStatus] = useState<"loading" | "authorizing" | "saving" | "done" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "authorizing" | "saving" | "done" | "error">("loading");
   const [error, setError] = useState("");
   const [, setLocation] = useLocation();
   const search = useSearch();
   const returnTo = new URLSearchParams(search).get("returnTo") || "/moments";
 
+  // Phase 1: Load MusicKit JS and configure (no user gesture needed)
   useEffect(() => {
     let cancelled = false;
 
-    async function run() {
+    async function init() {
       try {
-        // 1. Load MusicKit JS
         const w = window as unknown as Record<string, unknown>;
         if (!w["MusicKit"]) {
           const s = document.createElement("script");
@@ -36,41 +36,44 @@ export default function AppleMusicAuth() {
         }
         if (cancelled) return;
 
-        // 2. Get developer token and configure
         const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
         if (cancelled) return;
 
-        const MK = w["MusicKit"] as {
-          configure: (opts: object) => Promise<void>;
-          getInstance: () => { authorize: () => Promise<string> };
-        };
+        const MK = w["MusicKit"] as { configure: (opts: object) => Promise<void> };
         await MK.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
-        if (cancelled) return;
-
-        // 3. Authorize — this is the main page action, not a popup
-        setStatus("authorizing");
-        const musicUserToken = await MK.getInstance().authorize();
-        if (cancelled) return;
-
-        // 4. Save to backend
-        setStatus("saving");
-        await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
-        if (cancelled) return;
-
-        // 5. Navigate back
-        setStatus("done");
-        setTimeout(() => setLocation(returnTo, { replace: true }), 800);
+        if (!cancelled) setStatus("ready");
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Authorization failed");
+          setError(err instanceof Error ? err.message : "Failed to load");
           setStatus("error");
         }
       }
     }
 
-    void run();
+    void init();
     return () => { cancelled = true; };
-  }, [returnTo, setLocation]);
+  }, []);
+
+  // Phase 2: User taps button → authorize() runs in direct click handler
+  async function handleAuthorize() {
+    setStatus("authorizing");
+    try {
+      const w = window as unknown as Record<string, unknown>;
+      const MK = w["MusicKit"] as {
+        getInstance: () => { authorize: () => Promise<string> };
+      };
+      const musicUserToken = await MK.getInstance().authorize();
+
+      setStatus("saving");
+      await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
+
+      setStatus("done");
+      setTimeout(() => setLocation(returnTo, { replace: true }), 800);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authorization failed");
+      setStatus("error");
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAF6F0] px-6">
@@ -81,10 +84,24 @@ export default function AppleMusicAuth() {
             <p className="text-[#2C1A0E] font-medium">Loading Apple Music...</p>
           </>
         )}
+        {status === "ready" && (
+          <>
+            <p className="text-2xl mb-4">🎵</p>
+            <p className="text-[#2C1A0E] font-medium mb-2">Ready to connect</p>
+            <p className="text-sm text-[#6b5c4a]/70 mb-6">Tap below to authorize Eleanor with your Apple Music account</p>
+            <button
+              onClick={handleAuthorize}
+              className="w-full py-3 rounded-xl font-medium text-sm text-white transition-all"
+              style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
+            >
+              Authorize Apple Music
+            </button>
+          </>
+        )}
         {status === "authorizing" && (
           <>
             <p className="text-2xl mb-3">🎵</p>
-            <p className="text-[#2C1A0E] font-medium">Connecting to Apple Music...</p>
+            <p className="text-[#2C1A0E] font-medium">Connecting...</p>
             <p className="text-sm text-[#6b5c4a]/70 mt-2">Follow the prompts to authorize</p>
           </>
         )}
