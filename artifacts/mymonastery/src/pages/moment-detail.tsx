@@ -384,7 +384,7 @@ export default function MomentDetail() {
 
   // Apple Music connect — navigate to dedicated auth page (works on iOS Safari)
   function connectAppleMusic() {
-    setLocation(`/apple-music-auth?returnTo=${encodeURIComponent(`/moments/${id}`)}`);
+    window.location.href = `/apple-music-auth?returnTo=${encodeURIComponent(`/moments/${id}`)}`;
   }
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
