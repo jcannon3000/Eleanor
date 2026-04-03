@@ -3,8 +3,10 @@ import { Router, type IRouter } from "express";
 import passport from "passport";
 import { Strategy as GoogleStrategy, type Profile } from "passport-google-oauth20";
 import { google } from "googleapis";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, emailLoginTokensTable } from "@workspace/db";
+import { eq, and, gt } from "drizzle-orm";
+import { randomBytes } from "crypto";
+import { sendMagicLinkEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -125,7 +127,10 @@ router.get("/auth/scheduler/setup", (_req, res) => {
   const url = oauth2.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: ["https://www.googleapis.com/auth/calendar"],
+    scope: [
+      "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/gmail.send",
+    ],
   });
   res.redirect(url);
 });
@@ -198,6 +203,122 @@ router.post("/auth/logout", (req, res, next) => {
     if (err) return next(err);
     req.session.destroy(() => {
       res.json({ ok: true });
+    });
+  });
+});
+
+// ─── Magic link (email) login ─────────────────────────────────────────────────
+
+// POST /api/auth/email/request
+// Body: { email, name? }
+// Checks if user exists; if not requires name. Sends magic link email.
+router.post("/auth/email/request", async (req, res): Promise<void> => {
+  const { email, name } = req.body as { email?: string; name?: string };
+
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "A valid email address is required." });
+    return;
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Check if user already exists
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
+
+  if (!existing) {
+    // New user — name is required
+    if (!name || typeof name !== "string" || name.trim().length < 1) {
+      res.json({ needsName: true });
+      return;
+    }
+  }
+
+  // Generate a secure random token
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  // Invalidate any existing unused tokens for this email first
+  await db
+    .delete(emailLoginTokensTable)
+    .where(eq(emailLoginTokensTable.email, normalizedEmail));
+
+  // Insert new token (store name so we can create the user on verify)
+  const storedName = name?.trim() ?? existing?.name ?? normalizedEmail.split("@")[0];
+  await db.insert(emailLoginTokensTable).values({
+    email: normalizedEmail,
+    name: storedName,
+    token,
+    expiresAt,
+  });
+
+  const apiBase = callbackURL.replace("/api/auth/google/callback", "");
+  const magicLink = `${apiBase}/api/auth/email/verify?token=${token}`;
+
+  const sent = await sendMagicLinkEmail(normalizedEmail, magicLink, !existing);
+
+  if (!sent) {
+    // In dev, log the link so it's usable without email
+    console.log(`[DEV] Magic link for ${normalizedEmail}: ${magicLink}`);
+  }
+
+  res.json({ ok: true, sent });
+});
+
+// GET /api/auth/email/verify?token=xxx
+router.get("/auth/email/verify", async (req, res): Promise<void> => {
+  const token = req.query.token as string;
+
+  if (!token) {
+    res.redirect(`${frontendURL}/?error=invalid_link`);
+    return;
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .select()
+    .from(emailLoginTokensTable)
+    .where(
+      and(
+        eq(emailLoginTokensTable.token, token),
+        gt(emailLoginTokensTable.expiresAt, now)
+      )
+    );
+
+  if (!row || row.usedAt) {
+    res.redirect(`${frontendURL}/?error=link_expired`);
+    return;
+  }
+
+  // Mark token as used
+  await db
+    .update(emailLoginTokensTable)
+    .set({ usedAt: now })
+    .where(eq(emailLoginTokensTable.id, row.id));
+
+  const normalizedEmail = row.email;
+
+  // Find or create the user
+  let [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
+
+  if (!user) {
+    const rawName = row.name ?? normalizedEmail.split("@")[0];
+    const capitalized = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+    [user] = await db
+      .insert(usersTable)
+      .values({ email: normalizedEmail, name: capitalized })
+      .returning();
+  }
+
+  // Log in
+  req.login(user, (err) => {
+    if (err) {
+      console.error("Login after magic link failed:", err);
+      res.redirect(`${frontendURL}/?error=auth_failed`);
+      return;
+    }
+    req.session.save(() => {
+      res.redirect(`${frontendURL}/dashboard`);
     });
   });
 });
