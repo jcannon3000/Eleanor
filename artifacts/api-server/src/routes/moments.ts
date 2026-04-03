@@ -336,7 +336,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   const creatorFirst = organizerName.split(" ")[0];
   const tradMemberNames = uniqueMembers.map(m => m.name.split(" ")[0]).join(", ");
   const tradGoalSessions = commitmentSessionsGoal ?? goalDays ?? null;
-  const tradDiv = "──────────────────────";
+  // (dividers removed — they render inline in email clients)
 
   // Calendar invites for non-organizer members only.
   // The organizer gets their own bell event — not a duplicate invite event.
@@ -356,17 +356,12 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
 
     const description = [
       `${creatorFirst} invited you to practice together.`,
+      `Open in Eleanor → ${shortLink}`,
       "",
-      ...(intention ? [`"${intention}"`] : []),
-      "", tradDiv, "",
+      ...(intention ? [`"${intention}"`, ""] : []),
       `When: ${tradFreqLabel} at ${tradTimeLabel} · Starting ${tradStartDate}`,
       `Who: ${tradMemberNames}`,
       ...(tradGoalSessions ? [`Goal: ${tradGoalSessions} sessions together 🌱`] : []),
-      "",
-      "Tap to log →",
-      shortLink,
-      "", tradDiv, "",
-      "No account needed. Your link above is all you need.",
     ].join("\n");
 
     const eventId = await createCalendarEvent(sessionUserId, {
@@ -630,6 +625,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     if (templateType === "intercession") {
       const lines: string[] = [];
       lines.push(`${invFirst} invited you to pray with them.`);
+      lines.push(`Open in Eleanor → ${shortLink}`);
       lines.push("");
       if (intention) {
         lines.push(`${invFirst} is praying for ${intention}${goalSessions ? ` — ${goalSessions} days together` : ""}. They want you alongside them.`);
@@ -637,40 +633,30 @@ router.post("/moments", async (req, res): Promise<void> => {
       }
       lines.push(`When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`);
       if (goalSessions) lines.push(`Goal: ${goalSessions} days together 🌱`);
-      lines.push("");
-      lines.push(`Tap to pray → ${shortLink}`);
-      lines.push("");
-      lines.push("No account needed. Your link above is all you need.");
       return lines.join("\n");
     }
 
     if (templateType === "morning-prayer") {
       return [
         `${invFirst} invited you to pray the Daily Office together.`,
+        `Open in Eleanor → ${shortLink}`,
         "",
         `Each morning, ${invFirst} will be praying Morning Prayer from the Book of Common Prayer. Wherever you are, at the same time of day — knowing the other is doing the same.`,
         "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
         ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
-        "",
-        `Tap to pray → ${shortLink}`,
-        "",
-        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
     if (templateType === "evening-prayer") {
       return [
         `${invFirst} invited you to pray the Daily Office together.`,
+        `Open in Eleanor → ${shortLink}`,
         "",
         `Each evening, ${invFirst} will be praying Evening Prayer from the Book of Common Prayer. Wherever you are, at the same time of day — knowing the other is doing the same.`,
         "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
         ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
-        "",
-        `Tap to pray → ${shortLink}`,
-        "",
-        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
@@ -678,15 +664,12 @@ router.post("/moments", async (req, res): Promise<void> => {
       const durStr = contemplativeDurationMinutes ? `${contemplativeDurationMinutes} minutes of silence together` : "A shared time of silence";
       return [
         `${invFirst} invited you to sit in silence together.`,
+        `Open in Eleanor → ${shortLink}`,
         "",
         `${durStr}. Wherever you are, at the same time of day — knowing the other is present too.`,
         "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
         ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
-        "",
-        `Tap when you're ready → ${shortLink}`,
-        "",
-        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
@@ -701,28 +684,22 @@ router.post("/moments", async (req, res): Promise<void> => {
         : `We're listening to ${what} together.`;
       return [
         headline,
+        `Open in Eleanor → ${shortLink}`,
         "",
         "Though you'll be in different places, you'll each listen — knowing the other is too. That's the whole thing.",
         "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-        "",
-        `Tap when you've listened → ${shortLink}`,
-        "",
-        "No account needed. Your link above is all you need.",
       ].join("\n");
     }
 
     // Default / custom practice
     return [
       `${invFirst} invited you to practice together.`,
+      `Open in Eleanor → ${shortLink}`,
       "",
       ...(intention ? [`"${intention}"`, ""] : []),
       `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
       ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
-      "",
-      `Tap to log → ${shortLink}`,
-      "",
-      "No account needed. Your link above is all you need.",
     ].join("\n");
   }
 
@@ -767,16 +744,13 @@ router.post("/moments", async (req, res): Promise<void> => {
 
     return [
       `${invFirst} invited you to fast together.`,
+      `Open in Eleanor → ${shortLink}`,
       "",
       "A shared fast as a discipline — knowing someone else is keeping it alongside you changes everything.",
       ...(fastingIntention ? ["", `Why we fast: ${fastingIntention}`] : []),
       "",
       `When: ${fastFreqLabel} · Starting ${humanStartDate()}`,
       ...(goalSessions ? [`Goal: ${goalSessions} fasts together 🌱`] : []),
-      "",
-      `Tap to log your fast → ${shortLink}`,
-      "",
-      "No account needed. Your link above is all you need.",
     ].join("\n");
   }
 
@@ -2339,28 +2313,22 @@ router.post("/moments/:id/refresh-calendar", async (req, res): Promise<void> => 
     newSummary = `🎵 Listening to ${listeningArtist ?? listeningTitle ?? moment.name} together`;
     newDescription = [
       headline,
+      `Open in Eleanor → ${shortLink}`,
       "",
       "Though you'll be in different places, you'll each listen — knowing the other is too. That's the whole thing.",
       "",
       `When: ${freqLabel} at ${calTimeLabel} · Starting ${todayStr}`,
-      "",
-      `Tap when you've listened → ${shortLink}`,
-      "",
-      "No account needed. Your link above is all you need.",
     ].join("\n");
   } else {
     // For non-listening practices, rebuild with current format (no member names)
     newSummary = `🌱 ${moment.name}`;
     newDescription = [
       `${invFirst} invited you to practice together.`,
+      `Open in Eleanor → ${shortLink}`,
       "",
       ...(moment.intention ? [`"${moment.intention}"`, ""] : []),
       `When: ${freqLabel} at ${calTimeLabel} · Starting ${todayStr}`,
       ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
-      "",
-      `Tap to log → ${shortLink}`,
-      "",
-      "No account needed. Your link above is all you need.",
     ].join("\n");
   }
 
