@@ -149,10 +149,10 @@ export async function pollAllListeningPractices(): Promise<void> {
           );
 
           for (const practice of practices) {
-            const matched = newTracks.some(t =>
+            const matchedTrack = newTracks.find(t =>
               trackMatches(t, practice.listening_type, practice.listening_title, practice.listening_artist)
             );
-            if (!matched) continue;
+            if (!matchedTrack) continue;
 
             // Today's date in the practice's timezone
             const todayDate = new Date().toLocaleDateString("en-CA", { timeZone: practice.timezone });
@@ -164,11 +164,12 @@ export async function pollAllListeningPractices(): Promise<void> {
             );
             if (existing.length > 0) continue;
 
-            // Auto-log
+            // Auto-log with track info
+            const trackLabel = `${matchedTrack.attributes.name} — ${matchedTrack.attributes.artistName}`;
             await client.query(
-              `INSERT INTO moment_posts (moment_id, window_date, user_token, guest_name, is_checkin, created_at)
-               VALUES ($1, $2, $3, $4, 1, NOW())`,
-              [practice.moment_id, todayDate, practice.user_token, practice.guest_name]
+              `INSERT INTO moment_posts (moment_id, window_date, user_token, guest_name, is_checkin, reflection_text, created_at)
+               VALUES ($1, $2, $3, $4, 1, $5, NOW())`,
+              [practice.moment_id, todayDate, practice.user_token, practice.guest_name, trackLabel]
             );
 
             // Update or insert window

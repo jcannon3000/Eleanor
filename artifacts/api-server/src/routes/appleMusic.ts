@@ -152,7 +152,7 @@ router.post("/apple-music/check-now/:momentId", async (req, res): Promise<void> 
         const pTitle = norm(practice.listening_title ?? "");
         const pArtist = norm(practice.listening_artist ?? "");
 
-        const matched = newTracks.some(t => {
+        const matchedTrack = newTracks.find(t => {
           const tName = norm(t.attributes.name);
           const tArtist = norm(t.attributes.artistName);
           const tAlbum = norm(t.attributes.albumName);
@@ -162,11 +162,12 @@ router.post("/apple-music/check-now/:momentId", async (req, res): Promise<void> 
           return false;
         });
 
-        if (matched) {
+        if (matchedTrack) {
+          const trackLabel = `${matchedTrack.attributes.name} — ${matchedTrack.attributes.artistName}`;
           await client.query(
-            `INSERT INTO moment_posts (moment_id, window_date, user_token, guest_name, is_checkin, created_at)
-             VALUES ($1, $2, $3, $4, 1, NOW())`,
-            [momentId, todayDate, member.user_token, member.guest_name]
+            `INSERT INTO moment_posts (moment_id, window_date, user_token, guest_name, is_checkin, reflection_text, created_at)
+             VALUES ($1, $2, $3, $4, 1, $5, NOW())`,
+            [momentId, todayDate, member.user_token, member.guest_name, trackLabel]
           );
           const { rows: win } = await client.query(
             `SELECT id FROM moment_windows WHERE moment_id = $1 AND window_date = $2`,

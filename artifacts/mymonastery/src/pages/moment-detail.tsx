@@ -887,7 +887,9 @@ export default function MomentDetail() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground/90">{firstName}</p>
                         {log.reflectionText && (
-                          <p className="text-xs text-muted-foreground italic truncate">"{log.reflectionText}"</p>
+                          <p className="text-xs text-muted-foreground italic truncate">
+                            {isListening ? `🎵 ${log.reflectionText}` : `"${log.reflectionText}"`}
+                          </p>
                         )}
                       </div>
                       <div className="shrink-0 text-right">
@@ -895,6 +897,8 @@ export default function MomentDetail() {
                           <p className="text-xs text-[#6B8F71] font-medium">
                             {isFasting
                               ? "Fasting · all day"
+                              : isListening
+                              ? `Listened · ${loggedTime}`
                               : ["intercession", "morning-prayer", "evening-prayer"].includes(moment.templateType ?? "")
                               ? `Prayed · ${loggedTime}`
                               : isContemplative
@@ -950,7 +954,9 @@ export default function MomentDetail() {
                                 <p className="text-xs font-semibold text-foreground/70 shrink-0 mt-0.5 w-16 truncate">{firstName}</p>
                                 <div className="flex-1 min-w-0">
                                   {post.reflectionText ? (
-                                    <p className="text-xs text-muted-foreground italic line-clamp-2">"{post.reflectionText}"</p>
+                                    <p className="text-xs text-muted-foreground italic line-clamp-2">
+                                      {isListening ? `🎵 ${post.reflectionText}` : `"${post.reflectionText}"`}
+                                    </p>
                                   ) : post.isCheckin ? (
                                     <p className="text-xs text-muted-foreground">
                                       {isFasting

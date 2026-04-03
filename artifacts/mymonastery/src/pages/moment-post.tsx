@@ -827,6 +827,9 @@ export default function MomentPostPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
               <div className="text-5xl mb-4">🎵</div>
               <h2 className="text-xl font-semibold text-[#2a402c] mb-2">Listened together</h2>
+              {myPost?.reflectionText && (
+                <p className="text-sm text-[#4a6b50] font-medium mb-1">🎵 {myPost.reflectionText}</p>
+              )}
               <p className="text-sm text-muted-foreground">Eleanor detected your listen and logged it for you.</p>
             </motion.div>
           ) : (
