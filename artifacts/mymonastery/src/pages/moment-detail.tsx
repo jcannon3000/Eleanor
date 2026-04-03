@@ -382,10 +382,7 @@ export default function MomentDetail() {
 
   const { moment, members, memberCount, myStreak, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
 
-  // Apple Music connect — navigate to dedicated auth page (works on iOS Safari)
-  function connectAppleMusic() {
-    window.location.href = `/apple-music-auth?returnTo=${encodeURIComponent(`/moments/${id}`)}`;
-  }
+  const appleMusicAuthUrl = `/apple-music-auth?returnTo=${encodeURIComponent(`/moments/${id}`)}`;
 
   const parsedPracticeDays = parsePracticeDays(moment.practiceDays);
   const isIntercession = moment.templateType === "intercession";
@@ -583,13 +580,13 @@ export default function MomentDetail() {
                 <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                   Connect your account and Eleanor will detect when you listen — no button needed.
                 </p>
-                <button
-                  onClick={connectAppleMusic}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm text-white transition-all"
+                <a
+                  href={appleMusicAuthUrl}
+                  className="block w-full py-2.5 rounded-xl font-medium text-sm text-white text-center transition-all"
                   style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
                 >
                   🎵 Connect Apple Music
-                </button>
+                </a>
               </div>
             )}
           </>
