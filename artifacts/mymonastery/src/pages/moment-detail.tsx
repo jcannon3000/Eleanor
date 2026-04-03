@@ -1040,7 +1040,7 @@ export default function MomentDetail() {
                         onChange={e => setEditScheduledTime(e.target.value)}
                         className="border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:border-[#6B8F71] focus:ring-2 focus:ring-[#6B8F71]/20"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Everyone can log ±2 hours around this time.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Everyone can log any time that day. 🌿</p>
                     </div>
                   )}
                   <div className="flex gap-3">

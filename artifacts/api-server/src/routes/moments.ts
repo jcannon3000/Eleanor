@@ -46,27 +46,10 @@ function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// ─── Is the posting window currently open? (timezone-aware) ─────────────────
-function isWindowOpen(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): boolean {
-  const tz = moment.timezone || "UTC";
-  const { hour, minute } = getCurrentTimeInTz(tz);
-  const currentMins = hour * 60 + minute;
-  const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const scheduledMins = h * 60 + m;
-  // Window is centered: ±half of windowMinutes around the scheduled time
-  // Minimum 240 min (±2 hours) for non-all-day practices
-  const effectiveWindow = moment.windowMinutes >= 1440 ? moment.windowMinutes : Math.max(240, moment.windowMinutes);
-  const halfWindow = Math.floor(effectiveWindow / 2);
-  const startMins = scheduledMins - halfWindow;
-  const endMins = scheduledMins + halfWindow;
-  // Handle day wrap (e.g. scheduled at 1:00 AM with 4-hour window)
-  if (startMins < 0) {
-    return currentMins >= (startMins + 1440) || currentMins < endMins;
-  }
-  if (endMins > 1440) {
-    return currentMins >= startMins || currentMins < (endMins - 1440);
-  }
-  return currentMins >= startMins && currentMins < endMins;
+// ─── Is the posting window currently open? — all-day for all practices ────────
+// Log any time on a practice day.
+function isWindowOpen(_moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): boolean {
+  return true;
 }
 
 // ─── Day-of-week check (timezone-aware) ──────────────────────────────────────
@@ -126,22 +109,11 @@ function isIntercessionWindowOpen(timeOfDay: string | null | undefined, timezone
   return hour >= range[0] && hour < range[1];
 }
 
-// ─── Minutes remaining in window (timezone-aware) ────────────────────────────
+// ─── Minutes remaining in window — returns time until end of day ─────────────
 function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number; timezone?: string | null }): number {
   const tz = moment.timezone || "UTC";
   const { hour, minute } = getCurrentTimeInTz(tz);
-  const currentMins = hour * 60 + minute;
-  const [h, m] = moment.scheduledTime.split(":").map(Number);
-  const scheduledMins = h * 60 + m;
-  const effectiveWindow = moment.windowMinutes >= 1440 ? moment.windowMinutes : Math.max(240, moment.windowMinutes);
-  const halfWindow = Math.floor(effectiveWindow / 2);
-  const endMins = scheduledMins + halfWindow;
-  if (endMins > 1440) {
-    return currentMins >= scheduledMins
-      ? Math.max(0, endMins - currentMins)
-      : Math.max(0, (endMins - 1440) - currentMins);
-  }
-  return Math.max(0, endMins - currentMins);
+  return Math.max(0, 1439 - (hour * 60 + minute));
 }
 
 // ─── Event duration by practice template ─────────────────────────────────────

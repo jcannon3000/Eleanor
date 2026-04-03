@@ -1856,7 +1856,7 @@ export default function MomentNew() {
                   </div>
 
                   <p className="text-xs text-[#6B8F71] italic">The reminder fires at this time for everyone. 🔔</p>
-                  <p className="text-xs text-muted-foreground/60">Everyone has a 2-hour window to log — life happens. 🌿</p>
+                  <p className="text-xs text-muted-foreground/60">You can log any time that day — the whole day counts. 🌿</p>
                 </div>
               )}
 
