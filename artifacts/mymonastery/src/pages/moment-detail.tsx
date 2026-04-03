@@ -411,7 +411,7 @@ export default function MomentDetail() {
 
   return (
     <Layout>
-      <div className="pb-20 max-w-2xl mx-auto">
+      <div className="pb-20 max-w-2xl mx-auto overflow-x-hidden">
 
         {/* Back */}
         <Link
@@ -537,10 +537,10 @@ export default function MomentDetail() {
 
         {/* Listening — artwork + info card */}
         {isListening && (moment.listeningTitle || moment.listeningArtist) && (
-          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-4">
+          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-4 overflow-hidden">
             <div className="flex items-center gap-4">
               {moment.listeningArtworkUrl && (
-                <img src={moment.listeningArtworkUrl} alt="Artwork" className="w-16 h-16 rounded-xl object-cover shadow-sm" />
+                <img src={moment.listeningArtworkUrl} alt="Artwork" className="w-16 h-16 shrink-0 rounded-xl object-cover shadow-sm" />
               )}
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
@@ -559,7 +559,7 @@ export default function MomentDetail() {
         {isListening && (
           <>
             {amStatus?.connected ? (
-              <div className="mb-5 flex items-center justify-between bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3">
+              <div className="mb-5 flex items-center justify-between bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3 overflow-hidden">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🎵</span>
                   <div>
@@ -575,7 +575,7 @@ export default function MomentDetail() {
                 </button>
               </div>
             ) : (
-              <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-4">
+              <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-4 overflow-hidden">
                 <p className="text-sm font-semibold text-foreground mb-1">Auto-log with Apple Music</p>
                 <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                   Connect your account and Eleanor will detect when you listen — no button needed.
