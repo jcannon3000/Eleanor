@@ -111,7 +111,7 @@ export default function People() {
           </p>
         </div>
 
-        <div className="mb-8 h-px bg-border/60" />
+        <div className="mb-8 h-px bg-border/60 animate-garden-shimmer rounded-full" />
 
         {isLoading ? (
           <div className="space-y-4">
@@ -151,7 +151,7 @@ export default function People() {
                       style={{ backgroundColor: "rgba(212,137,106,0.06)" }}
                     >
                       <p className="text-[15px] font-medium" style={{ color: "#D4896A" }}>
-                        🙏 {person.name.split(" ")[0]} is asking for prayer
+                        <span className="animate-prayer-pulse inline-block">🙏</span> {person.name.split(" ")[0]} is asking for prayer
                       </p>
                       {person.activePrayerRequest && (
                         <p className="text-[13px] mt-1 italic" style={{ color: "#D4896A", opacity: 0.75 }}>
@@ -194,7 +194,7 @@ export default function People() {
                     >
                       {/* Avatar */}
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-semibold flex-shrink-0"
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-semibold flex-shrink-0 ${isPresent ? "animate-avatar-breathe" : ""}`}
                         style={{ backgroundColor: color.bg, color: color.text }}
                       >
                         {initials(person.name)}
@@ -295,7 +295,7 @@ export default function People() {
                                         {practice.templateType === "intercession" ? "🙏" : practice.templateType === "contemplative" ? "🕯️" : practice.templateType === "morning-prayer" ? "✨" : practice.templateType === "evening-prayer" ? "🌙" : practice.templateType === "fasting" ? "🌿" : "🌱"}{" "}
                                         {practice.name}
                                       </span>
-                                      <span className="text-xs" style={{ color: "#6B8F71" }}>
+                                      <span className={`text-xs ${practice.currentStreak >= 3 ? "animate-streak-glow" : ""}`} style={{ color: practice.currentStreak > 0 ? "#C17F24" : "#6B8F71" }}>
                                         {practice.currentStreak > 0
                                           ? `🔥 ${practice.currentStreak} day${practice.currentStreak !== 1 ? "s" : ""}`
                                           : "🌱 Just beginning"}
@@ -333,7 +333,7 @@ export default function People() {
                                   Held in prayer
                                 </p>
                                 <div
-                                  className="rounded-lg p-3 border-l-2"
+                                  className="rounded-lg p-3 border-l-2 relative overflow-hidden"
                                   style={{
                                     backgroundColor: "rgba(212,137,106,0.04)",
                                     borderLeftColor: "#D4896A",
