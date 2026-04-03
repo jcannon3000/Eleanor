@@ -65,6 +65,11 @@ interface MomentDetail {
     fastingDayOfMonth?: number | null;
     commitmentDuration?: number | null;
     commitmentEndDate?: string | null;
+    commitmentSessionsGoal?: number | null;
+    commitmentSessionsLogged?: number | null;
+    commitmentGoalTier?: number | null;
+    commitmentTendFreely?: boolean | null;
+    frequencyDaysPerWeek?: number | null;
   };
   members: { name: string | null; email: string }[];
   memberCount: number;
@@ -96,6 +101,44 @@ const DAY_NAMES: Record<string, string> = {
 const DAY_DOW: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
 const SPIRITUAL_TEMPLATE_IDS = new Set(["morning-prayer", "evening-prayer", "intercession", "contemplative", "fasting", "custom"]);
+
+// ─── Progressive goal ladder ────────────────────────────────────────────────
+const GOAL_LADDERS: Record<string, number[]> = {
+  daily:  [7, 14, 30, 90],      // 7/week
+  "3x":   [12, 18, 36, 72],     // 3x/week
+  "2x":   [8, 12, 24, 48],      // 2x/week
+  weekly: [4, 8, 12, 24],       // 1x/week
+};
+
+function getGoalLadder(frequency: string, daysPerWeek?: number | null): number[] {
+  if (frequency === "daily") return GOAL_LADDERS.daily;
+  if (daysPerWeek && daysPerWeek >= 3) return GOAL_LADDERS["3x"];
+  if (daysPerWeek && daysPerWeek >= 2) return GOAL_LADDERS["2x"];
+  return GOAL_LADDERS.weekly;
+}
+
+function getNextGoalInLadder(ladder: number[], currentGoal: number): number | null {
+  const idx = ladder.indexOf(currentGoal);
+  if (idx === -1) {
+    // Find the next higher rung
+    const next = ladder.find(g => g > currentGoal);
+    return next ?? null;
+  }
+  return idx < ladder.length - 1 ? ladder[idx + 1] : null;
+}
+
+function goalLabel(sessions: number, frequency: string): string {
+  if (frequency === "daily") return `${sessions} days`;
+  return `${sessions} sessions`;
+}
+
+function nextGoalCard(nextGoal: number | null, frequency: string): { emoji: string; label: string; sub: string } | null {
+  if (!nextGoal) return { emoji: "✨", label: "No end date", sub: "This is just what you do now" };
+  if (nextGoal <= 14) return { emoji: "🌿", label: goalLabel(nextGoal, frequency), sub: "Keep the rhythm going" };
+  if (nextGoal <= 30) return { emoji: "🌸", label: goalLabel(nextGoal, frequency), sub: "A real season together" };
+  if (nextGoal <= 90) return { emoji: "🌳", label: goalLabel(nextGoal, frequency), sub: "Deep roots" };
+  return { emoji: "✨", label: goalLabel(nextGoal, frequency), sub: "This is just what you do now" };
+}
 
 function parsePracticeDays(raw: string | string[] | null | undefined): string[] | null {
   if (!raw) return null;
@@ -257,6 +300,16 @@ export default function MomentDetail() {
     },
   });
 
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+  const removeMemberMutation = useMutation({
+    mutationFn: (email: string) =>
+      apiRequest("DELETE", `/api/moments/${id}/members/${encodeURIComponent(email)}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      setRemovingEmail(null);
+    },
+  });
+
   // Bell mutation removed — time is edited via the practice edit form
 
   const editMutation = useMutation({
@@ -266,6 +319,15 @@ export default function MomentDetail() {
       qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
       qc.invalidateQueries({ queryKey: ["/api/moments"] });
       setEditingPractice(false);
+    },
+  });
+
+  const updateGoalMutation = useMutation({
+    mutationFn: (payload: { commitmentSessionsGoal: number | null; commitmentTendFreely?: boolean }) =>
+      apiRequest("PATCH", `/api/moments/${id}/goal`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      qc.invalidateQueries({ queryKey: ["/api/moments"] });
     },
   });
 
@@ -318,12 +380,12 @@ export default function MomentDetail() {
       <div className="pb-20 max-w-2xl mx-auto">
 
         {/* Back */}
-        <button
-          onClick={() => setLocation("/dashboard")}
+        <Link
+          href="/moments"
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-5 transition-colors"
         >
           ← Your practices
-        </button>
+        </Link>
 
         {/* Header */}
         <div className="mb-5">
@@ -516,62 +578,145 @@ export default function MomentDetail() {
           );
         })()}
 
-        {/* Commitment Display */}
+        {/* Progressive Goal Display */}
         {(() => {
-          const dur = moment.commitmentDuration ?? moment.goalDays ?? 0;
-          const endDate = moment.commitmentEndDate ?? null;
-          if (dur === 0 && !endDate) return null;
+          const sessionsGoal = moment.commitmentSessionsGoal ?? null;
+          const sessionsLogged = moment.commitmentSessionsLogged ?? 0;
+          const tendFreely = moment.commitmentTendFreely ?? false;
+          const freq = moment.frequency;
+          const daysPerWeek = moment.frequencyDaysPerWeek ?? null;
+          const ladder = getGoalLadder(freq, daysPerWeek);
+          const unitLabel = freq === "daily" ? "day" : "session";
+          const unitLabelPlural = freq === "daily" ? "days" : "sessions";
 
-          const commitmentLabel =
-            dur === 7  ? "🌱 One week together" :
-            dur === 14 ? "🌿 Two weeks together" :
-            dur === 30 ? "🌸 One month together" :
-            dur === 90 ? "🌳 Three months together" :
-            dur > 0    ? `${dur}-day commitment` :
-            null;
+          // Tend freely — minimal display
+          if (tendFreely) {
+            return (
+              <div className="mb-6 text-center py-3">
+                <p className="text-sm text-muted-foreground italic" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                  🌿 Tending freely · {sessionsLogged} {unitLabelPlural} together so far
+                </p>
+              </div>
+            );
+          }
 
-          if (!commitmentLabel) return null;
+          // No goal set (legacy practice or BCP without sessions goal)
+          if (!sessionsGoal) {
+            // Fall back to old goalDays display if available
+            const dur = moment.commitmentDuration ?? moment.goalDays ?? 0;
+            if (dur === 0) return null;
+            const daysDone = Math.min(moment.currentStreak, dur);
+            const progressPct = dur > 0 ? Math.min(100, (daysDone / dur) * 100) : 0;
+            return (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                    {dur}-day commitment
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {progressPct >= 100 ? "🌾 Complete" : progressPct < 50 ? "Taking root" : "Growing"}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                  <motion.div className="h-full bg-[#6B8F71] rounded-full"
+                    initial={{ width: 0 }} animate={{ width: `${daysDone > 0 ? Math.max(progressPct, 3) : 0}%` }}
+                    transition={{ duration: 0.6, ease: "easeOut" }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">{daysDone} day{daysDone === 1 ? "" : "s"} together so far</p>
+              </div>
+            );
+          }
 
-          const daysLeft = endDate
-            ? Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000))
-            : null;
-          const totalDays = dur;
-          // Use actual streak (optimistic) as days-done — bloom threshold = half the group
-          const bloomThreshold2 = Math.max(2, Math.ceil(memberCount / 2));
-          const todayBloomed2 = todayPostCount >= bloomThreshold2 && memberCount >= 2;
-          const daysDone = Math.min(
-            moment.currentStreak + (todayBloomed2 ? 1 : 0),
-            totalDays
-          );
-          const progressPct = totalDays > 0 ? Math.min(100, (daysDone / totalDays) * 100) : 0;
-          const progressLabel =
-            progressPct === 0   ? "Just planted" :
-            progressPct < 50    ? "Taking root" :
-            progressPct < 100   ? "Growing" :
-            "🌾 Complete";
+          const goalHit = sessionsLogged >= sessionsGoal;
+          const almostThere = !goalHit && (sessionsGoal - sessionsLogged) <= 3;
+          const remaining = Math.max(0, sessionsGoal - sessionsLogged);
+          const progressPct = Math.min(100, (sessionsLogged / sessionsGoal) * 100);
 
+          // Goal hit — celebration state + next goal nudge
+          if (goalHit) {
+            const nextGoal = getNextGoalInLadder(ladder, sessionsGoal);
+            const card = nextGoalCard(nextGoal, freq);
+            const isOngoing = !nextGoal;
+
+            return (
+              <div className="mb-6">
+                {/* Celebration */}
+                <div className="text-center py-4 mb-4">
+                  <p className="text-3xl mb-2">🌸</p>
+                  <p className="text-lg font-semibold text-[#2C1A0E]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                    You showed up {sessionsLogged} times together.
+                  </p>
+                  <p className="text-sm text-[#6B8F71] italic mt-1" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                    That's not nothing. That's a real thing you built.
+                  </p>
+                </div>
+
+                {/* Next goal nudge */}
+                {card && (
+                  <div className="bg-card border border-border/60 rounded-2xl p-5 mb-3">
+                    <p className="text-sm font-medium text-muted-foreground mb-3" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                      Ready to go further? 🌿
+                    </p>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-2xl">{card.emoji}</span>
+                      <div>
+                        <p className="font-semibold text-[#2C1A0E]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                          {card.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{card.sub}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => updateGoalMutation.mutate({
+                        commitmentSessionsGoal: isOngoing ? null : nextGoal,
+                        commitmentTendFreely: isOngoing,
+                      })}
+                      disabled={updateGoalMutation.isPending}
+                      className="w-full py-3 rounded-xl bg-[#6B8F71] text-white font-semibold text-sm transition-all hover:bg-[#5a7a60] disabled:opacity-50"
+                      style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                    >
+                      {updateGoalMutation.isPending ? "Setting..."
+                        : isOngoing ? "Keep going ✨"
+                        : `Set this as your next goal 🌿`}
+                    </button>
+                    {!isOngoing && (
+                      <button
+                        onClick={() => updateGoalMutation.mutate({ commitmentSessionsGoal: null, commitmentTendFreely: true })}
+                        className="w-full mt-2 py-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                        style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                      >
+                        Tend freely for now ✨
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Active goal — progress bar
+          const barColor = almostThere ? "#C17F24" : "#6B8F71";
           return (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-                  {commitmentLabel}
+                  {goalLabel(sessionsGoal, freq)} goal
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {daysLeft !== null && daysLeft > 0
-                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
-                    : progressLabel}
+                <span className={`text-xs ${almostThere ? "text-[#C17F24] font-medium" : "text-muted-foreground"}`}>
+                  {almostThere ? "Almost there 🌸" : `${remaining} to go 🌿`}
                 </span>
               </div>
               <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-[#6B8F71] rounded-full"
+                  className={`h-full rounded-full ${almostThere ? "animate-[goal-pulse_2s_ease-in-out_infinite]" : ""}`}
+                  style={{ backgroundColor: barColor }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${daysDone > 0 ? Math.max(progressPct, 3) : 0}%` }}
+                  animate={{ width: `${sessionsLogged > 0 ? Math.max(progressPct, 3) : 0}%` }}
                   transition={{ duration: 0.6, ease: "easeOut" }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
-                {daysDone} day{daysDone === 1 ? "" : "s"} together so far
+                {sessionsLogged} of {sessionsGoal} {unitLabelPlural} · {remaining} to go 🌿
               </p>
             </div>
           );
@@ -814,6 +959,59 @@ export default function MomentDetail() {
                     </button>
                   </div>
                 </motion.div>
+              )}
+
+              {/* Members — creator can remove */}
+              {isCreator && members.length > 1 && (
+                <div className="bg-card border border-border/60 rounded-2xl px-5 py-4">
+                  <p className="text-sm font-medium text-foreground mb-3">Members</p>
+                  <div className="space-y-2">
+                    {members.map(m => {
+                      const isMe = m.email.toLowerCase() === user?.email?.toLowerCase();
+                      const isRemoving = removingEmail === m.email;
+                      return (
+                        <div key={m.email} className="flex items-center justify-between py-1.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium shrink-0">
+                              {(m.name ?? m.email).charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm text-foreground truncate">{m.name ?? m.email}{isMe ? " (you)" : ""}</p>
+                              <p className="text-xs text-muted-foreground/60 truncate">{m.email}</p>
+                            </div>
+                          </div>
+                          {!isMe && (
+                            isRemoving ? (
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <button
+                                  onClick={() => removeMemberMutation.mutate(m.email)}
+                                  disabled={removeMemberMutation.isPending}
+                                  className="text-xs font-medium text-rose-600 hover:text-rose-700 transition-colors"
+                                >
+                                  {removeMemberMutation.isPending ? "Removing…" : "Confirm"}
+                                </button>
+                                <button
+                                  onClick={() => setRemovingEmail(null)}
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setRemovingEmail(m.email)}
+                                className="shrink-0 ml-2 text-xs text-muted-foreground/50 hover:text-rose-500 transition-colors px-2 py-1"
+                                title={`Remove ${m.name ?? m.email}`}
+                              >
+                                ✕
+                              </button>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
               {/* Non-creator: Leave only */}

@@ -1,6 +1,5 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import type { Ritual } from "@workspace/db";
-import { getFreeBusy } from "./calendar";
 
 interface AgentContext {
   ritual: Ritual & {
@@ -66,31 +65,20 @@ export async function getWelcomeMessage(ctx: AgentContext): Promise<string> {
 }
 
 export async function suggestMeetingTimes(
-  userId: number,
   ritual: Ritual & { participants: Array<{ name: string; email: string }> }
 ): Promise<string[]> {
   const now = new Date();
-  const twoWeeksOut = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const busySlots = await getFreeBusy(userId, now, twoWeeksOut);
 
-  const busyText = busySlots.length > 0
-    ? busySlots.map((s) => `${s.start} to ${s.end}`).join("\n")
-    : "No busy times found — calendar appears open.";
-
-  const prompt = `You are a scheduling assistant. Given the organizer's busy calendar windows and the ritual's preferences, suggest exactly 3 meeting times (1 primary + 2 alternates) over the next 14 days.
+  const prompt = `You are a scheduling assistant. Based on the ritual's preferences, suggest exactly 3 meeting times (1 primary + 2 alternates) over the next 14 days.
 
 Ritual details:
 - Name: ${ritual.name}
 - Frequency: ${ritual.frequency}
 - Day preference: ${ritual.dayPreference ?? "None specified"}
 
-Organizer busy windows (UTC):
-${busyText}
-
 Today is: ${now.toISOString()}
 
 Rules:
-- Avoid all busy windows
 - Honor day preference if specified (e.g. "Thursday evenings" = Thursday between 18:00-22:00 UTC)
 - Times should be between 09:00 and 22:00 UTC
 - Space the 3 suggestions across different days when possible

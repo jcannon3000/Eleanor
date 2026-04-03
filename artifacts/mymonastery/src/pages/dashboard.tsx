@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { Plus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useListRituals } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useGardenSocket } from "@/hooks/useGardenSocket";
+import { useGardenLogToasts } from "@/hooks/useGardenLogs";
 import { Layout } from "@/components/layout";
+import { PresenceBar } from "@/components/PresenceBar";
+import { GardenLogToasts } from "@/components/GardenLogToasts";
 import { PrayerSection } from "@/components/prayer-section";
 import { apiRequest } from "@/lib/queryClient";
 import { milestoneLabel, milestoneProgress } from "@/lib/utils";
@@ -155,6 +159,9 @@ interface MomentData {
   latestWindow: { status: string; postCount: number } | null;
   templateType?: string | null;
   goalDays?: number | null;
+  commitmentSessionsGoal?: number | null;
+  commitmentSessionsLogged?: number | null;
+  commitmentTendFreely?: boolean | null;
 }
 
 const SPIRITUAL_TEMPLATE_IDS_MAIN = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
@@ -168,12 +175,22 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
   const bloomThreshold = Math.max(2, Math.ceil(moment.memberCount / 2));
   const todayBloomed = moment.todayPostCount >= bloomThreshold && moment.memberCount >= 2;
   const effectiveStreak = moment.currentStreak + (todayBloomed && moment.currentStreak === 0 ? 1 : 0);
+  const sessionsGoal = moment.commitmentSessionsGoal ?? null;
+  const sessionsLogged = moment.commitmentSessionsLogged ?? 0;
+  const tendFreely = moment.commitmentTendFreely ?? false;
   const goalDays = moment.goalDays ?? 0;
-  const hasGoal = goalDays > 0;
-  const goalProgress = hasGoal ? Math.min(effectiveStreak, goalDays) / goalDays : 0;
-  const goalLabel = hasGoal ? `🌿 Day ${effectiveStreak} of ${goalDays}` : "";
-  const mLabel = hasGoal ? goalLabel : milestoneLabel(moment.currentStreak);
-  const mProgress = hasGoal ? goalProgress : milestoneProgress(moment.currentStreak);
+  // Prefer session-based goal; fall back to old goalDays
+  const hasSessionGoal = sessionsGoal !== null && sessionsGoal > 0 && !tendFreely;
+  const hasGoal = hasSessionGoal || goalDays > 0;
+  const mProgress = hasSessionGoal
+    ? Math.min(sessionsLogged / sessionsGoal, 1)
+    : goalDays > 0 ? Math.min(effectiveStreak, goalDays) / goalDays
+    : milestoneProgress(moment.currentStreak);
+  const mLabel = hasSessionGoal
+    ? (sessionsLogged >= sessionsGoal ? `🌸 Goal reached!` : `🌿 ${sessionsLogged} of ${sessionsGoal}`)
+    : tendFreely ? `🌿 Tending freely`
+    : goalDays > 0 ? `🌿 Day ${effectiveStreak} of ${goalDays}`
+    : milestoneLabel(moment.currentStreak);
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS_MAIN.has(moment.templateType ?? "");
 
   return (
@@ -351,6 +368,32 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Build garden member emails (from both practices and traditions) for presence filtering
+  const gardenEmails = useMemo(() => {
+    const emails = new Set<string>();
+    for (const m of momentsData?.moments ?? []) {
+      for (const member of m.members) {
+        if (member.email) emails.add(member.email);
+      }
+    }
+    for (const r of rituals ?? []) {
+      for (const p of (r.participants ?? []) as { email: string }[]) {
+        if (p.email) emails.add(p.email);
+      }
+    }
+    // Remove self
+    if (user?.email) emails.delete(user.email);
+    return emails;
+  }, [momentsData, rituals, user?.email]);
+
+  // Build moment IDs for log notification filtering
+  const userMomentIds = useMemo(() => {
+    return new Set((momentsData?.moments ?? []).map(m => m.id));
+  }, [momentsData]);
+
+  const { presentUsers, logEvents } = useGardenSocket(user, gardenEmails, userMomentIds);
+  const { visibleToasts } = useGardenLogToasts(logEvents);
+
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
   }, [user, authLoading, setLocation]);
@@ -415,6 +458,7 @@ export default function Dashboard() {
   const isEmpty = gatherings.length === 0 && moments.length === 0;
 
   return (
+    <>
     <Layout>
       <div className="flex flex-col w-full pb-24">
 
@@ -427,13 +471,10 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground mt-1">{thisWeekCount} thing{thisWeekCount !== 1 ? "s" : ""} happening this week</p>
             )}
           </div>
-          <Link
-            href="/moment/new"
-            className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-medium text-sm animate-glow-breathe hover:-translate-y-0.5 active:translate-y-0 transition-transform duration-300"
-          >
-            + New
-          </Link>
         </div>
+
+        {/* ── Presence bar ── */}
+        <PresenceBar users={presentUsers} />
 
         <div className="mt-3 mb-4 flex items-center gap-3">
           <Link href="/moments" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
@@ -567,5 +608,9 @@ export default function Dashboard() {
         <FAB />
       </div>
     </Layout>
+
+    {/* Garden log toast notifications */}
+    <GardenLogToasts toasts={visibleToasts} />
+    </>
   );
 }

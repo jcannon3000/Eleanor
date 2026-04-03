@@ -41,6 +41,11 @@ export const sharedMomentsTable = pgTable("shared_moments", {
   // Commitment fields
   commitmentDuration: integer("commitment_duration"),
   commitmentEndDate: text("commitment_end_date"),
+  // Progressive goal fields (Duolingo-style)
+  commitmentSessionsGoal: integer("commitment_sessions_goal"),
+  commitmentSessionsLogged: integer("commitment_sessions_logged").notNull().default(0),
+  commitmentGoalTier: integer("commitment_goal_tier").notNull().default(1),
+  commitmentTendFreely: boolean("commitment_tend_freely").notNull().default(false),
 });
 
 export type SharedMoment = typeof sharedMomentsTable.$inferSelect;

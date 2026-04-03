@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, ritualsTable, scheduleResponsesTable, schedulingResponsesTable } from "@workspace/db";
+import { db, ritualsTable, scheduleResponsesTable } from "@workspace/db";
 import { deriveStartDate } from "../lib/scheduleDate";
 import crypto from "crypto";
 
@@ -36,6 +36,12 @@ function generateProposedTimes(dayPreference: string, frequency: string): string
 }
 
 router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const sessionUserId = (req.user as { id: number }).id;
+
   const ritualId = parseInt(req.params.id, 10);
   if (isNaN(ritualId)) {
     res.status(400).json({ error: "Invalid ritual id" });
@@ -45,6 +51,11 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
   if (!ritual) {
     res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -66,6 +77,12 @@ router.get("/rituals/:id/suggested-times", async (req, res): Promise<void> => {
 });
 
 router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const sessionUserId = (req.user as { id: number }).id;
+
   const ritualId = parseInt(req.params.id, 10);
   if (isNaN(ritualId)) {
     res.status(400).json({ error: "Invalid ritual id" });
@@ -78,16 +95,22 @@ router.post("/rituals/:id/confirm-time", async (req, res): Promise<void> => {
     return;
   }
 
+  // Verify existence and ownership before updating
+  const [existing] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+  if (!existing) {
+    res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+  if (existing.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const [ritual] = await db
     .update(ritualsTable)
     .set({ confirmedTime })
     .where(eq(ritualsTable.id, ritualId))
     .returning();
-
-  if (!ritual) {
-    res.status(404).json({ error: "Ritual not found" });
-    return;
-  }
 
   res.json({ success: true, confirmedTime: ritual.confirmedTime });
 });
@@ -183,6 +206,12 @@ router.post("/schedule/:token/respond", async (req, res): Promise<void> => {
 });
 
 router.get("/rituals/:id/schedule-responses", async (req, res): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const sessionUserId = (req.user as { id: number }).id;
+
   const ritualId = parseInt(req.params.id, 10);
   if (isNaN(ritualId)) {
     res.status(400).json({ error: "Invalid ritual id" });
@@ -192,6 +221,11 @@ router.get("/rituals/:id/schedule-responses", async (req, res): Promise<void> =>
   const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
   if (!ritual) {
     res.status(404).json({ error: "Ritual not found" });
+    return;
+  }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

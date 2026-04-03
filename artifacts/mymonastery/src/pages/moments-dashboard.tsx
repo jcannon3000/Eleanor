@@ -88,6 +88,9 @@ interface MomentData {
   latestWindow: { status: string; postCount: number } | null;
   templateType?: string | null;
   goalDays?: number | null;
+  commitmentSessionsGoal?: number | null;
+  commitmentSessionsLogged?: number | null;
+  commitmentTendFreely?: boolean | null;
   frequencyType?: string | null;
   frequencyDaysPerWeek?: number | null;
   practiceDays?: string | null;
@@ -113,9 +116,17 @@ function MomentCard({ moment }: { moment: MomentData }) {
   const extraMembers = moment.members.length > 3 ? ` +${moment.members.length - 3}` : "";
   const nextWindow = !moment.windowOpen ? nextWindowDate(moment) : null;
   const templateEmoji = TEMPLATE_EMOJI[moment.templateType ?? "custom"] ?? "✨";
-  const hasGoal = (moment.goalDays ?? 0) > 0;
-  const mLabel = milestoneLabel(moment.currentStreak);
-  const mProgress = milestoneProgress(moment.currentStreak);
+  const sessionsGoal = moment.commitmentSessionsGoal ?? null;
+  const sessionsLogged = moment.commitmentSessionsLogged ?? 0;
+  const tendFreely = moment.commitmentTendFreely ?? false;
+  const hasSessionGoal = sessionsGoal !== null && sessionsGoal > 0 && !tendFreely;
+  const hasGoal = hasSessionGoal || (moment.goalDays ?? 0) > 0;
+  const mLabel = hasSessionGoal
+    ? (sessionsLogged >= sessionsGoal ? `🌸 Goal reached!` : `🌿 ${sessionsLogged} of ${sessionsGoal}`)
+    : milestoneLabel(moment.currentStreak);
+  const mProgress = hasSessionGoal
+    ? Math.min(sessionsLogged / sessionsGoal, 1)
+    : milestoneProgress(moment.currentStreak);
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS_DASH.has(moment.templateType ?? "");
   const isBcp = BCP_TEMPLATE_IDS_DASH.has(moment.templateType ?? "");
   const bcpPage = moment.templateType === "morning-prayer" ? "75" : "115";
@@ -275,9 +286,9 @@ export default function MomentsDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div>
-            <button onClick={() => setLocation("/dashboard")} className="text-xs text-muted-foreground hover:text-foreground mb-3 flex items-center gap-1 transition-colors">
+            <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground mb-3 flex items-center gap-1 transition-colors">
               ← Dashboard
-            </button>
+            </Link>
             <h1 className="text-2xl font-semibold text-foreground">Your practices 🌿</h1>
             <p className="text-sm text-muted-foreground italic mt-1">For the distance between gatherings</p>
           </div>

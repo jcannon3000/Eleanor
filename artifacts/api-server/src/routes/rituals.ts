@@ -2,8 +2,8 @@ import { getFrontendUrl } from "../lib/urls";
 import { Router, type IRouter } from "express";
 import { eq, desc, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { db, ritualsTable, meetupsTable, ritualMessagesTable, schedulingResponsesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "../lib/calendar";
+import { db, ritualsTable, meetupsTable, ritualMessagesTable, scheduleResponsesTable, inviteTokensTable, usersTable, momentUserTokensTable } from "@workspace/db";
+import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent } from "../lib/calendar";
 import {
   CreateRitualBody,
   ListRitualsResponse,
@@ -235,7 +235,6 @@ router.delete("/rituals/:id", async (req, res): Promise<void> => {
   // Delete all dependent records (tables without ON DELETE CASCADE in the actual DB)
   await db.delete(meetupsTable).where(eq(meetupsTable.ritualId, params.data.id));
   await db.delete(ritualMessagesTable).where(eq(ritualMessagesTable.ritualId, params.data.id));
-  await db.delete(schedulingResponsesTable).where(eq(schedulingResponsesTable.ritualId, params.data.id));
   await db.delete(scheduleResponsesTable).where(eq(scheduleResponsesTable.ritualId, params.data.id));
   await db.delete(inviteTokensTable).where(eq(inviteTokensTable.ritualId, params.data.id));
 
@@ -426,12 +425,12 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
   // Create invite tokens for each participant
   const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
   const appBase = getFrontendUrl();
+  const existingInvites = await db
+    .select()
+    .from(inviteTokensTable)
+    .where(eq(inviteTokensTable.ritualId, id));
   for (const p of participants) {
-    const existing = await db
-      .select()
-      .from(inviteTokensTable)
-      .where(eq(inviteTokensTable.ritualId, id));
-    const existingForEmail = existing.find((t) => t.email === p.email);
+    const existingForEmail = existingInvites.find((t) => t.email === p.email);
     if (!existingForEmail) {
       await db.insert(inviteTokensTable).values({ ritualId: id, email: p.email, name: p.name, token: randomUUID() });
     }
@@ -671,9 +670,9 @@ router.get("/rituals/:id/scheduling-summary", async (req, res): Promise<void> =>
 
   const responses = await db
     .select()
-    .from(schedulingResponsesTable)
-    .where(eq(schedulingResponsesTable.ritualId, id))
-    .orderBy(schedulingResponsesTable.createdAt);
+    .from(scheduleResponsesTable)
+    .where(eq(scheduleResponsesTable.ritualId, id))
+    .orderBy(scheduleResponsesTable.createdAt);
 
   res.json({ responses });
 });
@@ -839,11 +838,75 @@ router.post("/rituals/:id/invite", async (req, res): Promise<void> => {
       }
     }
 
+    // Add new members to existing calendar event
+    try {
+      const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
+      const plannedMeetup = meetups.find(m => m.status === "planned" && m.googleCalendarEventId);
+      if (plannedMeetup?.googleCalendarEventId) {
+        const newEmails = newParts.map(p => p.email);
+        await addAttendeesToCalendarEvent(sessionUserId, plannedMeetup.googleCalendarEventId, newEmails);
+      }
+    } catch { /* non-fatal */ }
+
     res.json({ participants: merged, added: newParts });
   } catch (err) {
     console.error("POST /api/rituals/:id/invite error:", err);
     if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ─── DELETE /api/rituals/:id/participants/:email — owner removes a member ─────
+router.delete("/rituals/:id/participants/:email", async (req, res): Promise<void> => {
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const ritualId = parseInt(req.params.id, 10);
+  if (isNaN(ritualId)) { res.status(400).json({ error: "Invalid ritual id" }); return; }
+
+  const emailToRemove = decodeURIComponent(req.params.email).toLowerCase();
+
+  const [ritual] = await db.select().from(ritualsTable).where(eq(ritualsTable.id, ritualId));
+  if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
+
+  if (ritual.ownerId !== sessionUserId) {
+    res.status(403).json({ error: "Only the owner can remove members" });
+    return;
+  }
+
+  // Can't remove yourself
+  const [owner] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (owner && owner.email.toLowerCase() === emailToRemove) {
+    res.status(400).json({ error: "Cannot remove yourself. Delete the tradition instead." });
+    return;
+  }
+
+  const participants = (ritual.participants as Array<{ name: string; email: string }>) ?? [];
+  const updated = participants.filter(p => p.email.toLowerCase() !== emailToRemove);
+  if (updated.length === participants.length) {
+    res.status(404).json({ error: "Member not found in this tradition" });
+    return;
+  }
+
+  // Update participants array
+  await db.update(ritualsTable).set({ participants: updated }).where(eq(ritualsTable.id, ritualId));
+
+  // Remove invite token
+  const tokens = await db.select().from(inviteTokensTable).where(eq(inviteTokensTable.ritualId, ritualId));
+  const tokenToRemove = tokens.find(t => t.email.toLowerCase() === emailToRemove);
+  if (tokenToRemove) {
+    await db.delete(inviteTokensTable).where(eq(inviteTokensTable.id, tokenToRemove.id));
+  }
+
+  // Remove from calendar event
+  try {
+    const meetups = await db.select().from(meetupsTable).where(eq(meetupsTable.ritualId, ritualId));
+    const plannedMeetup = meetups.find(m => m.status === "planned" && m.googleCalendarEventId);
+    if (plannedMeetup?.googleCalendarEventId) {
+      await removeAttendeesFromCalendarEvent(sessionUserId, plannedMeetup.googleCalendarEventId, [emailToRemove]);
+    }
+  } catch { /* non-fatal */ }
+
+  res.json({ success: true, participants: updated, removed: emailToRemove });
 });
 
 export default router;

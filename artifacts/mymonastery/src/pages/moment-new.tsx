@@ -582,6 +582,7 @@ export default function MomentNew() {
   const [scheduledAmPm, setScheduledAmPm] = useState<"AM" | "PM">("AM");
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay | null>(null);
   const [commitmentDays, setCommitmentDays] = useState(30);
+  const [commitmentSessionsGoal, setCommitmentSessionsGoal] = useState<number | null>(null);
   const [invitedPeople, setInvitedPeople] = useState<{ name: string; email: string }[]>([]);
   const [showInviteDisabledMsg, setShowInviteDisabledMsg] = useState(false);
 
@@ -831,7 +832,7 @@ export default function MomentNew() {
       if (templateId !== "intercession" && frequency === "weekly" && scheduledDays.length === 0) return false;
       return true;
     }
-    if (step === "commitment") return true;
+    if (step === "commitment") return commitmentSessionsGoal !== null;
     if (step === "invite") return invitedPeople.length > 0;
     return false;
   };
@@ -951,6 +952,7 @@ export default function MomentNew() {
         : undefined,
       goalDays: commitmentDays,
       commitmentDuration: commitmentDays,
+      commitmentSessionsGoal: commitmentSessionsGoal,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timeOfDay: undefined,
       participants: validParticipants,
@@ -984,12 +986,9 @@ export default function MomentNew() {
     const templateInfo = TEMPLATES.find(t => t.id === templateId);
     const [h, m] = scheduledTime.split(":").map(Number);
     const timeLabel = new Date(0, 0, 0, h, m).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    const commitmentLabel =
-      commitmentDays === 7  ? { emoji: "🌱", label: "1 week together" } :
-      commitmentDays === 14 ? { emoji: "🌿", label: "2 weeks together" } :
-      commitmentDays === 30 ? { emoji: "🌸", label: "1 month together" } :
-      commitmentDays === 90 ? { emoji: "🌳", label: "3 months together" } :
-      null;
+    const commitmentLabel = commitmentSessionsGoal
+      ? { emoji: "🌱", label: `${commitmentSessionsGoal} sessions together` }
+      : null;
     const todEmoji = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.emoji ?? "🌿";
     const todLabel = TIME_OF_DAY_OPTIONS.find(o => o.id === timeOfDay)?.label?.toLowerCase() ?? "morning";
 
@@ -1768,44 +1767,56 @@ export default function MomentNew() {
                 </div>
               )}
 
-              {/* ── Commitment ─────────────────────────────────────── */}
+              {/* ── Commitment (progressive goal picker) ─────────── */}
               {step === "commitment" && (() => {
-                const COMMITMENT_OPTIONS = [
-                  { days: 7,  emoji: "🌱", label: "One week",      sub: "A first tender step",       message: "One week together. Enough to find out what this practice asks of you." },
-                  { days: 14, emoji: "🌿", label: "Two weeks",     sub: "Finding your rhythm",        message: "Two weeks. Enough to feel the rhythm take hold." },
-                  { days: 30, emoji: "🌸", label: "One month",     sub: "A real season together",     message: "A month. This is where something real begins to grow.", badge: "Most chosen 🌿" },
-                  { days: 90, emoji: "🌳", label: "Three months",  sub: "A lasting commitment",       message: "Three months. A genuine season of shared practice." },
-                  { days: 0,  emoji: "✨", label: "No end date",   sub: "Tend it as long as you like", message: "Open-ended. The practice stays alive as long as you tend it." },
-                ];
+                const isFastingFlow = templateId === "fasting";
+                const timesPerWeek = frequency === "daily" ? 7
+                  : isFastingFlow ? 1
+                  : Math.max(1, scheduledDays.length);
+
+                type GoalOpt = { sessions: number; emoji: string; label: string; sub: string };
+                const goalOptions: GoalOpt[] =
+                  timesPerWeek >= 7   ? [
+                    { sessions: 7,  emoji: "🌱", label: "7 days",       sub: "One week · A first tender step" },
+                    { sessions: 14, emoji: "🌿", label: "14 days",      sub: "Two weeks · Finding your rhythm" },
+                  ] : timesPerWeek >= 3 ? [
+                    { sessions: 12, emoji: "🌱", label: "12 sessions",  sub: "One month · A first tender step" },
+                    { sessions: 18, emoji: "🌿", label: "18 sessions",  sub: "Six weeks · Finding your rhythm" },
+                  ] : timesPerWeek >= 2 ? [
+                    { sessions: 8,  emoji: "🌱", label: "8 sessions",   sub: "One month · A first tender step" },
+                    { sessions: 12, emoji: "🌿", label: "12 sessions",  sub: "Six weeks · Finding your rhythm" },
+                  ] : [
+                    { sessions: 4,  emoji: "🌱", label: "4 sessions",   sub: "One month · A first tender step" },
+                    { sessions: 8,  emoji: "🌿", label: "8 sessions",   sub: "Two months · Finding your rhythm" },
+                  ];
+
                 return (
                   <div className="flex-1 flex flex-col gap-4">
                     <div>
-                      <h2 className="text-[1.6rem] font-bold text-[#2C1A0E] leading-tight mb-1">
-                        How long will you commit together? 🌿
+                      <h2 className="text-[1.6rem] font-bold text-[#2C1A0E] leading-tight mb-1"
+                        style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                        What's your first goal? 🌱
                       </h2>
-                      <p className="text-sm text-muted-foreground italic">Choose a season. You can always renew.</p>
+                      <p className="text-sm text-muted-foreground italic">
+                        Start small. Eleanor will nudge you higher when you get there.
+                      </p>
                     </div>
                     <div className="space-y-2.5">
-                      {COMMITMENT_OPTIONS.map(opt => {
-                        const sel = commitmentDays === opt.days;
+                      {goalOptions.map(opt => {
+                        const sel = commitmentSessionsGoal === opt.sessions;
                         return (
                           <motion.button
-                            key={opt.days}
-                            onClick={() => setCommitmentDays(opt.days)}
+                            key={opt.sessions}
+                            onClick={() => setCommitmentSessionsGoal(opt.sessions)}
                             animate={{ y: sel ? -2 : 0 }}
                             transition={{ duration: 0.15 }}
                             className="relative w-full text-left rounded-2xl overflow-hidden transition-all duration-200"
                             style={{
-                              background: sel ? "#6B8F71" : opt.days === 0 ? "#FAF6F0" : "#EEF3EF",
-                              border: `1.5px solid ${sel ? "#6B8F71" : opt.days === 0 ? "rgba(0,0,0,0.06)" : "#c8dac9"}`,
+                              background: sel ? "#6B8F71" : "#EEF3EF",
+                              border: `1.5px solid ${sel ? "#6B8F71" : "#c8dac9"}`,
                               boxShadow: sel ? "0 4px 14px rgba(107,143,113,0.22)" : undefined,
                             }}
                           >
-                            {"badge" in opt && opt.badge && !sel && (
-                              <div className="absolute top-3 right-3 bg-[#C17F24] text-[#F5EDD8] text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-tight">
-                                {opt.badge}
-                              </div>
-                            )}
                             {sel && (
                               <motion.div
                                 initial={{ opacity: 0, scale: 0.6 }}
@@ -1816,7 +1827,8 @@ export default function MomentNew() {
                             <div className="flex items-center gap-4 px-5 py-4">
                               <span className="text-3xl leading-none shrink-0">{opt.emoji}</span>
                               <div className="flex-1 min-w-0">
-                                <p className={`font-bold text-[15px] leading-snug ${sel ? "text-[#F5EDD8]" : opt.days === 0 ? "text-muted-foreground" : "text-[#2C1A0E]"}`}>
+                                <p className={`font-bold text-[15px] leading-snug ${sel ? "text-[#F5EDD8]" : "text-[#2C1A0E]"}`}
+                                  style={{ fontFamily: "Space Grotesk, sans-serif" }}>
                                   {opt.label}
                                 </p>
                                 <p className={`text-xs mt-0.5 ${sel ? "text-[#F5EDD8]/75" : "text-muted-foreground"}`}>
@@ -1828,17 +1840,23 @@ export default function MomentNew() {
                         );
                       })}
                     </div>
+                    <p className="text-xs text-center text-muted-foreground/50 italic">
+                      Longer goals unlock when you get there. 🌿
+                    </p>
                     <AnimatePresence mode="wait">
-                      <motion.p
-                        key={commitmentDays}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        transition={{ duration: 0.2 }}
-                        className="text-sm text-center text-muted-foreground italic px-2 pb-1"
-                      >
-                        {COMMITMENT_OPTIONS.find(o => o.days === commitmentDays)?.message}
-                      </motion.p>
+                      {commitmentSessionsGoal && (
+                        <motion.p
+                          key={commitmentSessionsGoal}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -5 }}
+                          transition={{ duration: 0.2 }}
+                          className="text-sm text-center text-[#6B8F71] italic px-2"
+                          style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                        >
+                          {commitmentSessionsGoal} sessions together. A good place to begin. 🌱
+                        </motion.p>
+                      )}
                     </AnimatePresence>
                   </div>
                 );

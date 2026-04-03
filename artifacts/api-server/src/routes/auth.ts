@@ -10,6 +10,9 @@ const router: IRouter = Router();
 const GOOGLE_CONFIGURED =
   !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
 
+if (process.env["NODE_ENV"] === "production" && !process.env["GOOGLE_REDIRECT_URI"]) {
+  throw new Error("GOOGLE_REDIRECT_URI must be set in production");
+}
 const callbackURL = process.env["GOOGLE_REDIRECT_URI"] ?? "http://localhost:3001/api/auth/google/callback";
 const frontendURL = getFrontendUrl();
 
@@ -115,7 +118,7 @@ router.get("/auth/me", (req, res) => {
   }
   const u = req.user as {
     id: number; name: string; email: string; avatarUrl: string | null;
-    googleId: string | null;
+    googleId: string | null; showPresence: boolean;
   };
   res.json({
     id: u.id,
@@ -123,7 +126,20 @@ router.get("/auth/me", (req, res) => {
     email: u.email,
     avatarUrl: u.avatarUrl,
     googleId: u.googleId,
+    showPresence: u.showPresence,
   });
+});
+
+router.patch("/auth/me/presence", async (req, res): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userId = (req.user as { id: number }).id;
+  const { showPresence } = req.body;
+  if (typeof showPresence !== "boolean") {
+    res.status(400).json({ error: "showPresence must be a boolean" });
+    return;
+  }
+  await db.update(usersTable).set({ showPresence } as Record<string, unknown>).where(eq(usersTable.id, userId));
+  res.json({ showPresence });
 });
 
 router.post("/auth/logout", (req, res, next) => {

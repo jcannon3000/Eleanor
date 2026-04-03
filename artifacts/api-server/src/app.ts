@@ -14,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PgSession = connectPgSimple(session);
 
+if (process.env["NODE_ENV"] === "production" && !process.env["SESSION_SECRET"]) {
+  throw new Error("SESSION_SECRET must be set in production");
+}
+
 const app: Express = express();
 app.set("trust proxy", 1);
 

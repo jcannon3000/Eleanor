@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Sprout, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeople } from "@/hooks/usePeople";
+import { useGardenSocket } from "@/hooks/useGardenSocket";
 import { Layout } from "@/components/layout";
 
 function initials(name: string) {
@@ -35,6 +36,12 @@ export default function People() {
   const { data: people, isLoading } = usePeople(user?.id);
   const highlightEmail = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "").get("highlight") ?? null;
   const highlightRef = useRef<HTMLDivElement | null>(null);
+
+  // Presence: build garden emails from people list
+  const gardenEmails = useMemo(() => new Set((people ?? []).map(p => p.email)), [people]);
+  const emptyMomentIds = useMemo(() => new Set<number>(), []);
+  const { presentUsers } = useGardenSocket(user, gardenEmails, emptyMomentIds);
+  const presentEmails = useMemo(() => new Set(presentUsers.map(u => u.email)), [presentUsers]);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
@@ -124,8 +131,18 @@ export default function People() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-serif text-lg text-foreground group-hover:text-primary transition-colors truncate">
+                        <h3 className="font-serif text-lg text-foreground group-hover:text-primary transition-colors truncate flex items-center gap-1.5">
                           {person.name}
+                          {presentEmails.has(person.email) && (
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: "#6B8F71",
+                                animation: "presence-dot-pulse 2s ease-in-out infinite",
+                              }}
+                              title={`In their garden right now \u{1F33F}`}
+                            />
+                          )}
                         </h3>
                         <div className="w-7 h-7 rounded-full bg-secondary group-hover:bg-primary flex items-center justify-center text-muted-foreground group-hover:text-primary-foreground transition-colors flex-shrink-0 mt-0.5">
                           <ArrowRight size={14} />

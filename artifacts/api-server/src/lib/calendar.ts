@@ -65,7 +65,6 @@ export async function createCalendarEvent(
 
   const defaultReminders = [
     { method: "popup", minutes: 10 },
-    { method: "email", minutes: 60 },
   ];
 
   try {
@@ -152,33 +151,6 @@ export async function deleteCalendarEvent(userId: number, eventId: string): Prom
   }
 }
 
-export async function getFreeBusy(
-  userId: number,
-  timeMin: Date,
-  timeMax: Date
-): Promise<Array<{ start: string; end: string }>> {
-  const auth = await getAuthedClient(userId);
-  if (!auth) return [];
-
-  const calendar = google.calendar({ version: "v3", auth });
-
-  try {
-    const res = await calendar.freebusy.query({
-      requestBody: {
-        timeMin: timeMin.toISOString(),
-        timeMax: timeMax.toISOString(),
-        items: [{ id: "primary" }],
-      },
-    });
-    const busySlots = res.data.calendars?.["primary"]?.busy ?? [];
-    return busySlots
-      .filter((s) => s.start && s.end)
-      .map((s) => ({ start: s.start as string, end: s.end as string }));
-  } catch (err) {
-    console.error("Free/busy query failed:", err);
-    return [];
-  }
-}
 
 export async function updateCalendarEvent(
   userId: number,
@@ -308,34 +280,29 @@ export async function addAttendeesToCalendarEvent(
   }
 }
 
-export async function searchContacts(userId: number, query: string): Promise<Array<{ name: string; email: string }>> {
+export async function removeAttendeesFromCalendarEvent(
+  userId: number,
+  eventId: string,
+  emailsToRemove: string[]
+): Promise<boolean> {
   const auth = await getAuthedClient(userId);
-  if (!auth) return [];
+  if (!auth) return false;
 
-  const people = google.people({ version: "v1", auth });
-
+  const calendar = google.calendar({ version: "v3", auth });
   try {
-    const res = await people.people.searchContacts({
-      query,
-      readMask: "names,emailAddresses",
-      pageSize: 10,
+    const existing = await calendar.events.get({ calendarId: "primary", eventId });
+    const currentAttendees = existing.data.attendees ?? [];
+    const removeSet = new Set(emailsToRemove.map(e => e.toLowerCase()));
+    const filtered = currentAttendees.filter(a => !removeSet.has((a.email ?? "").toLowerCase()));
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId,
+      sendUpdates: "all",
+      requestBody: { attendees: filtered },
     });
-
-    const results: Array<{ name: string; email: string }> = [];
-    for (const person of res.data.results ?? []) {
-      const p = person.person;
-      if (!p) continue;
-      const name = p.names?.[0]?.displayName ?? "";
-      for (const emailObj of p.emailAddresses ?? []) {
-        const email = emailObj.value ?? "";
-        if (email) {
-          results.push({ name, email });
-        }
-      }
-    }
-    return results;
-  } catch (err) {
-    console.error("Contacts search failed:", err);
-    return [];
+    return true;
+  } catch {
+    return false;
   }
 }
+

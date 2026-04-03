@@ -3,8 +3,9 @@
   "configurations": [
     {
       "name": "mymonastery",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "mymonastery", "dev"],
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["node_modules/.bin/vite", "--config", "vite.config.ts", "--host", "0.0.0.0"],
+      "cwd": "/Users/jeremycannon/Documents/Eleanor/Eleanor/artifacts/mymonastery",
       "port": 5173
     }
   ]

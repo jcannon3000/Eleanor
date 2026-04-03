@@ -10,7 +10,7 @@ type Participant = { name: string; email: string };
 // Helper: get all rituals where the user is owner OR participant
 async function getUserRituals(userId: number) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-  if (!user) return { user: null, rituals: [] };
+  if (!user) return { user: null, rituals: [] as (typeof ritualsTable.$inferSelect)[] };
   const rituals = await db.select().from(ritualsTable).where(
     or(
       eq(ritualsTable.ownerId, userId),

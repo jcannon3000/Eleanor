@@ -6,7 +6,7 @@ import { ritualsTable } from "./rituals";
 export const meetupsTable = pgTable("meetups", {
   id: serial("id").primaryKey(),
   ritualId: integer("ritual_id").notNull().references(() => ritualsTable.id, { onDelete: "cascade" }),
-  scheduledDate: timestamp("scheduled_date", { withTimezone: true }).notNull(),
+  scheduledDate: text("scheduled_date").notNull(),
   status: text("status").notNull().default("planned"),
   notes: text("notes"),
   googleCalendarEventId: text("google_calendar_event_id"),

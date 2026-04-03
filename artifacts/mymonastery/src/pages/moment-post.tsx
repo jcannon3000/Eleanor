@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useLocation } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
@@ -407,26 +407,6 @@ function IntercessionPrayerPage({
                 />
                 <p className="text-xs text-[#6b5c4a]/40 mt-1.5 italic text-center">optional</p>
               </div>
-              {/* Error state — shown when the post request failed */}
-              {postFailed && (
-                <p className="text-center text-sm text-red-600 mb-3">
-                  Couldn't save — check your connection and try again.
-                </p>
-              )}
-              {/* Amen button — amber pulse on tap, then "🙏 Amen" text */}
-              <motion.button
-                onClick={handleAmen}
-                disabled={isPraying}
-                animate={amenPulse && !postFailed ? { backgroundColor: ["#2C1A0E", "#B45309", "#2C1A0E"] } : { backgroundColor: "#2C1A0E" }}
-                transition={{ duration: 0.3 }}
-                className="w-full py-5 rounded-2xl text-[#F5EDD8] text-lg font-bold hover:opacity-90 disabled:opacity-40"
-                style={{ fontFamily: "Space Grotesk, sans-serif" }}
-              >
-                {isPraying ? "Marking…" : postFailed ? "Try again 🙏" : "Amen 🙏"}
-              </motion.button>
-              <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
-                Tapping Amen marks that you have prayed this together.
-              </p>
             </>
           )
         ) : (
@@ -438,6 +418,32 @@ function IntercessionPrayerPage({
           </div>
         )}
       </div>
+
+      {/* Fixed bottom Amen button */}
+      {canPray && !alreadyPosted && confirmStep === "prayer" && (
+        <div className="fixed bottom-0 left-0 right-0 bg-[#F5EDD8] border-t border-[#c9b99a]/30 px-5 pb-[env(safe-area-inset-bottom)] z-50">
+          <div className="max-w-md mx-auto py-4">
+            {postFailed && (
+              <p className="text-center text-sm text-red-600 mb-2">
+                Couldn't save — check your connection and try again.
+              </p>
+            )}
+            <motion.button
+              onClick={handleAmen}
+              disabled={isPraying}
+              animate={amenPulse && !postFailed ? { backgroundColor: ["#2C1A0E", "#B45309", "#2C1A0E"] } : { backgroundColor: "#2C1A0E" }}
+              transition={{ duration: 0.3 }}
+              className="w-full py-5 rounded-2xl text-[#F5EDD8] text-lg font-bold hover:opacity-90 disabled:opacity-40"
+              style={{ fontFamily: "Space Grotesk, sans-serif" }}
+            >
+              {isPraying ? "Marking…" : postFailed ? "Try again 🙏" : "Amen 🙏"}
+            </motion.button>
+            <p className="text-center text-xs text-[#6b5c4a]/40 mt-3 font-serif italic">
+              Tapping Amen marks that you have prayed this together.
+            </p>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 
@@ -779,11 +785,11 @@ export default function MomentPostPage() {
     const fastingConfirmed = posted || alreadyPosted;
     return (
       <div className="min-h-screen bg-[#F2F7F2] flex flex-col">
-        <div className="flex-1 flex flex-col px-6 pt-10 pb-8 max-w-md mx-auto w-full">
+        <div className="flex-1 flex flex-col px-6 pt-10 pb-28 max-w-md mx-auto w-full">
           {/* Back */}
-          <button onClick={() => setLocation(`/moments/${moment.id}`)} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-8 text-sm transition-colors">
+          <Link href={`/moments/${moment.id}`} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-8 text-sm transition-colors">
             ← Back
-          </button>
+          </Link>
 
           {/* Header */}
           <div className="mb-7">
@@ -832,8 +838,14 @@ export default function MomentPostPage() {
                   className="w-full px-4 py-3 rounded-2xl border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white/80 resize-none text-sm leading-relaxed"
                 />
               </div>
+            </div>
+          )}
+        </div>
 
-              {/* Check-in button */}
+        {/* Fixed bottom button */}
+        {!fastingConfirmed && (
+          <div className="fixed bottom-0 left-0 right-0 bg-[#F2F7F2] border-t border-[#6B8F71]/20 px-6 pb-[env(safe-area-inset-bottom)] z-50">
+            <div className="max-w-md mx-auto py-4">
               {postMutation.isError && (
                 <p className="text-center text-sm text-red-600 mb-2">Couldn't save — tap to try again.</p>
               )}
@@ -845,8 +857,8 @@ export default function MomentPostPage() {
                 {postMutation.isPending ? "Logging…" : postMutation.isError ? "Try again ✓" : "✓ I am keeping the fast"}
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -894,41 +906,44 @@ export default function MomentPostPage() {
             </div>
           </div>
 
-          {/* Bottom: logged state or log button */}
-          <AnimatePresence mode="wait">
-            {alreadyPosted ? (
-              <motion.div key="prayed" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="text-center py-6">
-                <p className="text-lg font-bold text-[#F7F0E6] mb-1">🌿 You prayed today.</p>
-                <p className="text-[#F7F0E6]/50 text-sm">
-                  {actualTodayCount} of {actualMemberCount} prayed {officeName} today.
-                </p>
-                <p className="font-serif italic text-[#F7F0E6]/40 text-xs leading-relaxed mt-4">
-                  {isMorning
-                    ? '"Let my prayer be set forth in thy sight as incense." — Psalm 141'
-                    : '"O gracious Light, pure brightness of the everliving Father." — Phos Hilaron'}
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div key="log" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <button
-                  onClick={() => postMutation.mutate({ isCheckin: true })}
-                  disabled={postMutation.isPending}
-                  className="w-full py-5 rounded-2xl text-[#2C1810] text-lg font-bold transition-all active:scale-95 disabled:opacity-40"
-                  style={{ background: accentColor }}
-                >
-                  {postMutation.isPending
-                    ? "Marking..."
-                    : isMorning ? "I prayed Morning Prayer 🌿" : "I prayed Evening Prayer 🌿"
-                  }
-                </button>
-                <p className="text-center text-xs text-[#F7F0E6]/30 mt-3 font-serif italic">
-                  Tap after you pray. Takes 15–20 minutes.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Logged state */}
+          {alreadyPosted && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className="text-center py-6">
+              <p className="text-lg font-bold text-[#F7F0E6] mb-1">🌿 You prayed today.</p>
+              <p className="text-[#F7F0E6]/50 text-sm">
+                {actualTodayCount} of {actualMemberCount} prayed {officeName} today.
+              </p>
+              <p className="font-serif italic text-[#F7F0E6]/40 text-xs leading-relaxed mt-4">
+                {isMorning
+                  ? '"Let my prayer be set forth in thy sight as incense." — Psalm 141'
+                  : '"O gracious Light, pure brightness of the everliving Father." — Phos Hilaron'}
+              </p>
+            </motion.div>
+          )}
         </div>
+
+        {/* Fixed bottom log button */}
+        {!alreadyPosted && !posted && (
+          <div className="fixed bottom-0 left-0 right-0 px-5 pb-[env(safe-area-inset-bottom)] z-50" style={{ background: bgColor, borderTop: `1px solid rgba(247,240,230,0.12)` }}>
+            <div className="max-w-md mx-auto py-4">
+              <button
+                onClick={() => postMutation.mutate({ isCheckin: true })}
+                disabled={postMutation.isPending}
+                className="w-full py-5 rounded-2xl text-[#2C1810] text-lg font-bold transition-all active:scale-95 disabled:opacity-40"
+                style={{ background: accentColor }}
+              >
+                {postMutation.isPending
+                  ? "Marking..."
+                  : isMorning ? "I prayed Morning Prayer 🌿" : "I prayed Evening Prayer 🌿"
+                }
+              </button>
+              <p className="text-center text-xs text-[#F7F0E6]/30 mt-3 font-serif italic">
+                Tap after you pray. Takes 15–20 minutes.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -939,12 +954,12 @@ export default function MomentPostPage() {
       <div className="max-w-md mx-auto px-4 py-8 pb-24">
 
         {/* Back */}
-        <button
-          onClick={() => setLocation(`/moments/${moment.id}`)}
+        <Link
+          href={`/moments/${moment.id}`}
           className="text-sm text-[#6b5c4a] hover:text-[#2C1A0E] inline-flex items-center gap-1 mb-6 transition-colors"
         >
           ← Back
-        </button>
+        </Link>
 
         {/* Header */}
         <div className="text-center mb-8">
@@ -1046,10 +1061,16 @@ export default function MomentPostPage() {
                 <p className="text-sm text-[#6b5c4a] italic mb-2">{actualTodayCount} of {actualMemberCount} here with you</p>
               </div>
             )}
+          </div>
+        )}
+      </div>
 
-            {/* Submit */}
+      {/* Fixed bottom submit button */}
+      {!alreadyPosted && effectiveWindowOpen && !posted && (
+        <div className="fixed bottom-0 left-0 right-0 bg-[#F5EDD8] border-t border-[#c9b99a]/30 px-4 pb-[env(safe-area-inset-bottom)] z-50">
+          <div className="max-w-md mx-auto py-4">
             {postMutation.isError && (
-              <p className="text-center text-sm text-red-600">Couldn't save — tap to try again.</p>
+              <p className="text-center text-sm text-red-600 mb-2">Couldn't save — tap to try again.</p>
             )}
             <button onClick={() => handleSubmit()}
               disabled={!canSubmit() || postMutation.isPending}
@@ -1057,8 +1078,8 @@ export default function MomentPostPage() {
               {postMutation.isPending ? "Practicing..." : postMutation.isError ? "Try again 🌿" : "I practiced 🌿"}
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

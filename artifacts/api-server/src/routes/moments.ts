@@ -7,8 +7,9 @@ import {
   sharedMomentsTable, momentUserTokensTable, momentPostsTable, momentWindowsTable,
   momentCalendarEventsTable, momentRenewalsTable,
 } from "@workspace/db";
-import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent } from "../lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, createAllDayCalendarEvent, addAttendeesToCalendarEvent, removeAttendeesFromCalendarEvent } from "../lib/calendar";
 import crypto from "crypto";
+import { broadcastLog } from "../lib/ws";
 
 const router: IRouter = Router();
 
@@ -218,8 +219,13 @@ async function evaluateWindow(momentId: number, windowDate: string) {
       // Reset streak after goal completion so the next cycle starts fresh
       const nextStreak = goalHit ? 0 : newStreak;
       const nextState = goalHit ? "active" : newState;
+      // Increment progressive session counter
+      const newSessionsLogged = ((moment as Record<string, unknown>).commitmentSessionsLogged as number ?? 0) + 1;
       await db.update(sharedMomentsTable)
-        .set({ currentStreak: nextStreak, longestStreak: newLongest, totalBlooms: newBlooms, state: nextState })
+        .set({
+          currentStreak: nextStreak, longestStreak: newLongest, totalBlooms: newBlooms, state: nextState,
+          commitmentSessionsLogged: newSessionsLogged,
+        } as Record<string, unknown>)
         .where(eq(sharedMomentsTable.id, momentId));
     }
   } else if (status === "wither") {
@@ -256,6 +262,7 @@ const PlantSchema = z.object({
   frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
   goalDays: z.number().int().min(1).max(365).default(30),
+  commitmentSessionsGoal: z.number().int().min(1).max(365).nullable().optional(),
 });
 
 router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
@@ -272,7 +279,7 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
   if (!ritual) { res.status(404).json({ error: "Ritual not found" }); return; }
   if (ritual.ownerId !== sessionUserId) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, goalDays } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, frequency, scheduledTime, goalDays, commitmentSessionsGoal } = parsed.data;
 
   const momentToken = generateToken();
 
@@ -287,7 +294,9 @@ router.post("/rituals/:id/moments", async (req, res): Promise<void> => {
     goalDays,
     momentToken,
     windowMinutes: 240,
-  }).returning();
+    ...(commitmentSessionsGoal !== undefined ? { commitmentSessionsGoal } : {}),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any).returning();
 
   // Get the organizer's info
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -414,6 +423,8 @@ const StandalonePlantSchema = z.object({
   fastingDayOfMonth: z.number().int().min(1).max(31).optional(),
   // Commitment fields
   commitmentDuration: z.number().int().min(0).max(365).optional(),
+  // Progressive goal fields
+  commitmentSessionsGoal: z.number().int().min(1).max(365).nullable().optional(),
 });
 
 router.post("/moments", async (req, res): Promise<void> => {
@@ -427,7 +438,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() }); return;
   }
 
-  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth, commitmentDuration } = parsed.data;
+  const { name, intention, loggingType, reflectionPrompt, templateType, intercessionTopic, intercessionSource, intercessionFullText, frequency, scheduledTime, dayOfWeek, goalDays, timezone, timeOfDay, participants, frequencyType, frequencyDaysPerWeek, practiceDays, ritualId: providedRitualId, contemplativeDurationMinutes, fastingFrom, fastingIntention, fastingFrequency, fastingDate, fastingDay, fastingDayOfMonth, commitmentDuration, commitmentSessionsGoal } = parsed.data;
 
   // Compute commitment end date if a duration was provided
   const commitmentEndDate = (commitmentDuration && commitmentDuration > 0)
@@ -473,6 +484,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     ...(fastingDayOfMonth !== undefined ? { fastingDayOfMonth } : {}),
     ...(commitmentDuration !== undefined ? { commitmentDuration } : {}),
     ...(commitmentEndDate ? { commitmentEndDate } : {}),
+    ...(commitmentSessionsGoal !== undefined ? { commitmentSessionsGoal } : {}),
   }).returning();
 
   const [organizer] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
@@ -1066,6 +1078,63 @@ router.post("/moments/:id/invite", async (req, res): Promise<void> => {
   res.json({ added: newPeople.length, people: newPeople });
 });
 
+// ─── DELETE /api/moments/:id/members/:email — creator removes a member ────────
+router.delete("/moments/:id/members/:email", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const emailToRemove = decodeURIComponent(req.params.email).toLowerCase();
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  // Verify caller is the creator (lowest token ID)
+  const allMembers = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+  if (allMembers.length === 0) { res.status(404).json({ error: "Practice not found" }); return; }
+
+  const creatorToken = allMembers.reduce((min, m) => m.id < min.id ? m : min, allMembers[0]);
+  if (creatorToken.email.toLowerCase() !== user.email.toLowerCase()) {
+    res.status(403).json({ error: "Only the creator can remove members" });
+    return;
+  }
+
+  // Can't remove yourself (use delete practice instead)
+  if (emailToRemove === user.email.toLowerCase()) {
+    res.status(400).json({ error: "Cannot remove yourself. Delete the practice instead." });
+    return;
+  }
+
+  const memberToRemove = allMembers.find(m => m.email.toLowerCase() === emailToRemove);
+  if (!memberToRemove) {
+    res.status(404).json({ error: "Member not found in this practice" });
+    return;
+  }
+
+  // Remove from calendar event
+  try {
+    if (creatorToken.googleCalendarEventId) {
+      const [organizer] = await db.select().from(usersTable)
+        .where(eq(usersTable.email, creatorToken.email));
+      if (organizer?.googleAccessToken) {
+        await removeAttendeesFromCalendarEvent(organizer.id, creatorToken.googleCalendarEventId, [emailToRemove]);
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  // Delete their token row
+  await db.delete(momentUserTokensTable)
+    .where(and(
+      eq(momentUserTokensTable.momentId, momentId),
+      eq(momentUserTokensTable.email, memberToRemove.email),
+    ));
+
+  res.json({ success: true, removed: emailToRemove });
+});
+
 // ─── POST /api/moments/:id/seed-post — creator plants an example post ────────
 const SeedPostSchema = z.object({
   photoUrl: z.string().url().optional(),
@@ -1327,6 +1396,21 @@ router.post("/moment/:momentToken/:userToken/post", async (req, res): Promise<vo
       todayPostCount: allTodayPosts.length,
       memberCount,
     });
+
+    // Broadcast log notification to connected clients (only for new posts, not updates)
+    if (!myExisting) {
+      const latestPost = await db.select().from(momentPostsTable)
+        .where(and(eq(momentPostsTable.momentId, moment.id), eq(momentPostsTable.userToken, userToken)))
+        .limit(1);
+      broadcastLog({
+        momentId: moment.id,
+        postId: latestPost[0]?.id ?? 0,
+        momentName: moment.name,
+        templateType: moment.templateType,
+        guestName,
+        userEmail: userTokenRow.email,
+      });
+    }
 
     // Evaluate window: either the window has closed, OR 50% of group has logged (bloom condition met)
     const windowIsStillOpen = isWindowOpen(moment);
@@ -1726,6 +1810,54 @@ router.patch("/moments/:id", async (req, res): Promise<void> => {
   }
 
   await db.update(sharedMomentsTable).set(updates).where(eq(sharedMomentsTable.id, momentId));
+  res.json({ ok: true });
+});
+
+// ─── PATCH /api/moments/:id/goal — update progressive goal ─────────────────
+const UpdateGoalSchema = z.object({
+  commitmentSessionsGoal: z.number().int().min(1).max(365).nullable(),
+  commitmentTendFreely: z.boolean().optional(),
+});
+
+router.patch("/moments/:id/goal", async (req, res): Promise<void> => {
+  const momentId = parseInt(req.params.id, 10);
+  if (isNaN(momentId)) { res.status(400).json({ error: "Invalid moment id" }); return; }
+
+  const sessionUserId = req.user ? (req.user as { id: number }).id : null;
+  if (!sessionUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, sessionUserId));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const [moment] = await db.select().from(sharedMomentsTable).where(eq(sharedMomentsTable.id, momentId));
+  if (!moment) { res.status(404).json({ error: "Moment not found" }); return; }
+
+  const allTokens = await db.select().from(momentUserTokensTable)
+    .where(eq(momentUserTokensTable.momentId, momentId));
+  const isMember = allTokens.some(t => t.email === user.email);
+  if (!isMember) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const parsed = UpdateGoalSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Validation failed" }); return; }
+
+  const updates: Record<string, unknown> = {};
+
+  if (parsed.data.commitmentTendFreely) {
+    // "Tend freely" — clear the goal, mark tend-freely
+    updates.commitmentSessionsGoal = null;
+    updates.commitmentTendFreely = true;
+  } else if (parsed.data.commitmentSessionsGoal !== null) {
+    // Setting a new goal — increment tier, reset sessions logged, set new goal
+    updates.commitmentSessionsGoal = parsed.data.commitmentSessionsGoal;
+    updates.commitmentSessionsLogged = 0;
+    updates.commitmentGoalTier = (((moment as Record<string, unknown>).commitmentGoalTier as number) ?? 1) + 1;
+    updates.commitmentTendFreely = false;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(sharedMomentsTable).set(updates as Record<string, unknown>).where(eq(sharedMomentsTable.id, momentId));
+  }
+
   res.json({ ok: true });
 });
 

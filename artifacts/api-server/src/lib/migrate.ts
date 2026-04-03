@@ -43,7 +43,7 @@ export async function migrate() {
         day_preference TEXT,
         participants JSONB NOT NULL DEFAULT '[]',
         intention TEXT,
-        owner_id INTEGER NOT NULL REFERENCES users(id),
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         location TEXT,
         proposed_times JSONB NOT NULL DEFAULT '[]',
         confirmed_time TEXT,
@@ -221,10 +221,10 @@ export async function migrate() {
 
       CREATE TABLE IF NOT EXISTS moment_posts (
         id SERIAL PRIMARY KEY,
-        moment_id INTEGER NOT NULL REFERENCES shared_moments(id),
+        moment_id INTEGER NOT NULL REFERENCES shared_moments(id) ON DELETE CASCADE,
         window_date TEXT NOT NULL,
         user_token TEXT NOT NULL,
-        guest_name TEXT,
+        guest_name TEXT NOT NULL,
         photo_url TEXT,
         reflection_text TEXT,
         is_checkin INTEGER NOT NULL DEFAULT 0,
@@ -233,7 +233,7 @@ export async function migrate() {
 
       CREATE TABLE IF NOT EXISTS moment_windows (
         id SERIAL PRIMARY KEY,
-        moment_id INTEGER NOT NULL REFERENCES shared_moments(id),
+        moment_id INTEGER NOT NULL REFERENCES shared_moments(id) ON DELETE CASCADE,
         window_date TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'wither',
         post_count INTEGER NOT NULL DEFAULT 0,
@@ -242,11 +242,31 @@ export async function migrate() {
       );
     `);
 
+    // Presence preference
+    await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS show_presence BOOLEAN NOT NULL DEFAULT true`);
+
+    // Progressive goal columns (Duolingo-style commitment system)
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_sessions_goal INTEGER`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_sessions_logged INTEGER NOT NULL DEFAULT 0`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_goal_tier INTEGER NOT NULL DEFAULT 1`);
+    await run(client, `ALTER TABLE shared_moments ADD COLUMN IF NOT EXISTS commitment_tend_freely BOOLEAN NOT NULL DEFAULT false`);
+
     // Fix constraints that differ from old migration to current schema
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN ritual_id DROP NOT NULL`);
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN intention SET DEFAULT ''`);
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET DEFAULT 30`);
     await run(client, `ALTER TABLE shared_moments ALTER COLUMN goal_days SET NOT NULL`);
+
+    // Fix missing ON DELETE CASCADE on existing FK constraints (safe to re-run)
+    await run(client, `ALTER TABLE rituals DROP CONSTRAINT IF EXISTS rituals_owner_id_fkey`);
+    await run(client, `ALTER TABLE rituals ADD CONSTRAINT rituals_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE`);
+    await run(client, `ALTER TABLE moment_posts DROP CONSTRAINT IF EXISTS moment_posts_moment_id_fkey`);
+    await run(client, `ALTER TABLE moment_posts ADD CONSTRAINT moment_posts_moment_id_fkey FOREIGN KEY (moment_id) REFERENCES shared_moments(id) ON DELETE CASCADE`);
+    await run(client, `ALTER TABLE moment_windows DROP CONSTRAINT IF EXISTS moment_windows_moment_id_fkey`);
+    await run(client, `ALTER TABLE moment_windows ADD CONSTRAINT moment_windows_moment_id_fkey FOREIGN KEY (moment_id) REFERENCES shared_moments(id) ON DELETE CASCADE`);
+    // Fix guest_name NOT NULL on existing rows (backfill then add constraint)
+    await run(client, `UPDATE moment_posts SET guest_name = 'Unknown' WHERE guest_name IS NULL`);
+    await run(client, `ALTER TABLE moment_posts ALTER COLUMN guest_name SET NOT NULL`);
 
     // ── Prayer tables ────────────────────────────────────────────────────────
     await run(client, `

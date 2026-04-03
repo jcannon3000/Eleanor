@@ -66,6 +66,7 @@ export default function MomentPlant() {
   const [frequency, setFrequency] = useState<Frequency>("weekly");
   const [scheduledTime, setScheduledTime] = useState("08:00");
   const [goalDays, setGoalDays] = useState(30);
+  const [commitmentSessionsGoal, setCommitmentSessionsGoal] = useState<number | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -99,7 +100,7 @@ export default function MomentPlant() {
       return true;
     }
     if (step === 3) return scheduledTime.length === 5;
-    if (step === 4) return goalDays >= 1;
+    if (step === 4) return commitmentSessionsGoal !== null;
     return true;
   };
 
@@ -112,6 +113,7 @@ export default function MomentPlant() {
       frequency,
       scheduledTime,
       goalDays,
+      commitmentSessionsGoal,
     });
   }
 
@@ -342,49 +344,87 @@ export default function MomentPlant() {
             </motion.div>
           )}
 
-          {/* Step 4: Goal */}
-          {step === 4 && (
-            <motion.div key="step-goal" variants={stepVariants} initial="initial" animate="animate" exit="exit">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Set a goal for your tradition 🌱</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                How many days do you want to tend this moment together?
-              </p>
+          {/* Step 4: Goal (progressive) */}
+          {step === 4 && (() => {
+            type GoalOpt = { sessions: number; emoji: string; label: string; sub: string };
+            const goalOptions: GoalOpt[] =
+              frequency === "daily" ? [
+                { sessions: 7,  emoji: "🌱", label: "7 days",      sub: "One week · A first tender step" },
+                { sessions: 14, emoji: "🌿", label: "14 days",     sub: "Two weeks · Finding your rhythm" },
+              ] : [
+                { sessions: 4,  emoji: "🌱", label: "4 sessions",  sub: "One month · A first tender step" },
+                { sessions: 8,  emoji: "🌿", label: "8 sessions",  sub: "Two months · Finding your rhythm" },
+              ];
 
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                {[7, 14, 30, 60, 90, 100].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setGoalDays(d)}
-                    className={clsx(
-                      "py-4 rounded-2xl border-2 text-center transition-all",
-                      goalDays === d
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:border-primary/30"
-                    )}
-                  >
-                    <p className={clsx("text-2xl font-semibold", goalDays === d ? "text-primary" : "text-foreground")}>
-                      {d}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">days</p>
-                  </button>
-                ))}
-              </div>
+            return (
+              <motion.div key="step-goal" variants={stepVariants} initial="initial" animate="animate" exit="exit">
+                <h2 className="text-xl font-semibold text-foreground mb-1" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                  What's your first goal? 🌱
+                </h2>
+                <p className="text-sm text-muted-foreground italic mb-6">
+                  Start small. Eleanor will nudge you higher when you get there.
+                </p>
 
-              <div className="bg-card border border-border rounded-2xl p-4">
-                <p className="text-sm font-medium text-foreground mb-1">Your moment summary</p>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>🌿 <span className="text-foreground font-medium">{name}</span></p>
-                  <p className="italic pl-4 text-xs leading-relaxed">{intention}</p>
-                  <p>
-                    {LOGGING_OPTIONS.find(o => o.type === loggingType)?.icon}{" "}
-                    {LOGGING_OPTIONS.find(o => o.type === loggingType)?.label}
-                    {reflectionPrompt && ` · "${reflectionPrompt}"`}
-                  </p>
-                  <p>🗓️ {frequency.charAt(0).toUpperCase() + frequency.slice(1)} at {scheduledTime} · {goalDays} days</p>
+                <div className="space-y-2.5 mb-4">
+                  {goalOptions.map(opt => {
+                    const sel = commitmentSessionsGoal === opt.sessions;
+                    return (
+                      <button
+                        key={opt.sessions}
+                        onClick={() => setCommitmentSessionsGoal(opt.sessions)}
+                        className="relative w-full text-left rounded-2xl overflow-hidden transition-all duration-200"
+                        style={{
+                          background: sel ? "#6B8F71" : "#EEF3EF",
+                          border: `1.5px solid ${sel ? "#6B8F71" : "#c8dac9"}`,
+                          boxShadow: sel ? "0 4px 14px rgba(107,143,113,0.22)" : undefined,
+                        }}
+                      >
+                        {sel && (
+                          <span className="absolute top-3 right-3 text-[#F5EDD8] font-bold text-base">✓</span>
+                        )}
+                        <div className="flex items-center gap-4 px-5 py-4">
+                          <span className="text-3xl leading-none shrink-0">{opt.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-bold text-[15px] leading-snug ${sel ? "text-[#F5EDD8]" : "text-[#2C1A0E]"}`}
+                              style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                              {opt.label}
+                            </p>
+                            <p className={`text-xs mt-0.5 ${sel ? "text-[#F5EDD8]/75" : "text-muted-foreground"}`}>
+                              {opt.sub}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            </motion.div>
-          )}
+
+                <p className="text-xs text-center text-muted-foreground/50 italic mb-5">
+                  Longer goals unlock when you get there. 🌿
+                </p>
+
+                {commitmentSessionsGoal && (
+                  <p className="text-sm text-center text-[#6B8F71] italic" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                    {commitmentSessionsGoal} sessions together. A good place to begin. 🌱
+                  </p>
+                )}
+
+                <div className="bg-card border border-border rounded-2xl p-4 mt-5">
+                  <p className="text-sm font-medium text-foreground mb-1">Your moment summary</p>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>🌿 <span className="text-foreground font-medium">{name}</span></p>
+                    <p className="italic pl-4 text-xs leading-relaxed">{intention}</p>
+                    <p>
+                      {LOGGING_OPTIONS.find(o => o.type === loggingType)?.icon}{" "}
+                      {LOGGING_OPTIONS.find(o => o.type === loggingType)?.label}
+                      {reflectionPrompt && ` · "${reflectionPrompt}"`}
+                    </p>
+                    <p>🗓️ {frequency.charAt(0).toUpperCase() + frequency.slice(1)} at {scheduledTime}{commitmentSessionsGoal ? ` · ${commitmentSessionsGoal} sessions` : ""}</p>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
 
         {/* Navigation */}

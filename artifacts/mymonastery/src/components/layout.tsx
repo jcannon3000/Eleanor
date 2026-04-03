@@ -2,13 +2,26 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth, useLogout } from "@/hooks/useAuth";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { LogOut, ChevronDown, Sprout, Users, LayoutDashboard, Plus } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const logout = useLogout();
+  const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [location] = useLocation();
+
+  const presenceToggle = useMutation({
+    mutationFn: (showPresence: boolean) =>
+      apiRequest("PATCH", "/api/auth/me/presence", { showPresence }),
+    onSuccess: (_data, showPresence) => {
+      queryClient.setQueryData(["/api/auth/me"], (prev: typeof user) =>
+        prev ? { ...prev, showPresence } : prev
+      );
+    },
+  });
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -70,8 +83,17 @@ export function Layout({ children }: { children: ReactNode }) {
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </div>
                   <button
+                    onClick={() => presenceToggle.mutate(!user.showPresence)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                  >
+                    <span>Show when I'm here {"\u{1F33F}"}</span>
+                    <div className={`w-8 h-[18px] rounded-full transition-colors relative ${user.showPresence ? "bg-[#6B8F71]" : "bg-border"}`}>
+                      <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${user.showPresence ? "left-[16px]" : "left-[2px]"}`} />
+                    </div>
+                  </button>
+                  <button
                     onClick={() => { setMenuOpen(false); logout(); }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors border-t border-border/30"
                   >
                     <LogOut size={14} />
                     Sign out

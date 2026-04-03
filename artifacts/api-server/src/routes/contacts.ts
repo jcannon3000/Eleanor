@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, inArray } from "drizzle-orm";
 import { db, ritualsTable, usersTable, momentUserTokensTable } from "@workspace/db";
-import { searchContacts } from "../lib/calendar";
 
 const router: IRouter = Router();
 
@@ -20,10 +19,7 @@ router.get("/contacts/search", async (req, res): Promise<void> => {
   const userId = (req.user as { id: number }).id;
   const lq = q.toLowerCase();
 
-  // ── 1. Google Contacts (may be empty if user hasn't connected) ────────────
-  const googleResults = await searchContacts(userId, q);
-
-  // ── 2. Members from existing traditions (rituals) ─────────────────────────
+  // ── 1. Members from existing traditions (rituals) ─────────────────────────
   const rituals = await db.select({ participants: ritualsTable.participants })
     .from(ritualsTable)
     .where(eq(ritualsTable.ownerId, userId));
@@ -36,7 +32,7 @@ router.get("/contacts/search", async (req, res): Promise<void> => {
     }
   }
 
-  // ── 3. Members from existing practices (moments) ──────────────────────────
+  // ── 2. Members from existing practices (moments) ──────────────────────────
   const [userRow] = await db.select({ email: usersTable.email })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
@@ -61,7 +57,7 @@ router.get("/contacts/search", async (req, res): Promise<void> => {
     }
   }
 
-  // ── 4. Merge, deduplicate, and filter by query ────────────────────────────
+  // ── 3. Merge, deduplicate, and filter by query ────────────────────────────
   const seen = new Set<string>();
   const merged: Array<{ name: string; email: string }> = [];
 
@@ -74,8 +70,6 @@ router.get("/contacts/search", async (req, res): Promise<void> => {
     }
   };
 
-  // Google results first (highest relevance), then ritual members, then moment members
-  for (const p of googleResults) addIfMatch(p);
   for (const p of ritualMembers) addIfMatch(p);
   for (const p of momentMembers) addIfMatch(p);
 

@@ -85,6 +85,9 @@ export default function RitualDetail() {
   const deleteMutation = useDeleteRitual();
   const updateMutation = useUpdateRitual();
 
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+  const [removingPending, setRemovingPending] = useState(false);
+
   const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [isEditing, setIsEditing] = useState(false);
 
@@ -796,6 +799,68 @@ export default function RitualDetail() {
                   </button>
                 )}
               </div>
+
+              {/* Members — owner can remove */}
+              {user?.id === ritual.ownerId && ritual.participants.length > 1 && (
+                <div className="pt-6 border-t border-border/40">
+                  <h3 className="text-sm font-medium text-foreground mb-3">Members</h3>
+                  <div className="space-y-2">
+                    {ritual.participants.map((p: { name: string; email: string }) => {
+                      const isMe = p.email.toLowerCase() === user?.email?.toLowerCase();
+                      const isRemoving = removingEmail === p.email;
+                      return (
+                        <div key={p.email} className="flex items-center justify-between py-1.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium shrink-0">
+                              {p.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm text-foreground truncate">{p.name}{isMe ? " (you)" : ""}</p>
+                              <p className="text-xs text-muted-foreground/60 truncate">{p.email}</p>
+                            </div>
+                          </div>
+                          {!isMe && (
+                            isRemoving ? (
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <button
+                                  onClick={async () => {
+                                    setRemovingPending(true);
+                                    try {
+                                      await apiRequest("DELETE", `/api/rituals/${ritualId}/participants/${encodeURIComponent(p.email)}`);
+                                      queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
+                                      queryClient.invalidateQueries({ queryKey: ["/api/rituals"] });
+                                      setRemovingEmail(null);
+                                    } catch { /* ignore */ }
+                                    setRemovingPending(false);
+                                  }}
+                                  disabled={removingPending}
+                                  className="text-xs font-medium text-rose-600 hover:text-rose-700 transition-colors"
+                                >
+                                  {removingPending ? "Removing…" : "Confirm"}
+                                </button>
+                                <button
+                                  onClick={() => setRemovingEmail(null)}
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setRemovingEmail(p.email)}
+                                className="shrink-0 ml-2 text-xs text-muted-foreground/50 hover:text-rose-500 transition-colors px-2 py-1"
+                                title={`Remove ${p.name}`}
+                              >
+                                ✕
+                              </button>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {user?.id === ritual.ownerId && (
                 <div className="pt-8 border-t border-destructive/20">

@@ -11,7 +11,7 @@ export const ritualsTable = pgTable("rituals", {
   dayPreference: text("day_preference"),
   participants: jsonb("participants").notNull().default([]),
   intention: text("intention"),
-  ownerId: integer("owner_id").notNull().references(() => usersTable.id),
+  ownerId: integer("owner_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   location: text("location"),
   proposedTimes: jsonb("proposed_times").notNull().default([]),
   confirmedTime: text("confirmed_time"),

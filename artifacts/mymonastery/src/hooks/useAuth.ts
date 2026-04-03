@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   avatarUrl: string | null;
   googleId: string | null;
+  showPresence: boolean;
 }
 
 async function fetchMe(): Promise<AuthUser | null> {

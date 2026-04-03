@@ -1,6 +1,8 @@
+import { createServer } from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { migrate } from "./lib/migrate";
+import { attachWebSocketServer } from "./lib/ws";
 
 const rawPort = process.env["PORT"] ?? "3001";
 const port = Number(rawPort);
@@ -11,11 +13,10 @@ if (Number.isNaN(port) || port <= 0) {
 
 migrate()
   .then(() => {
-    app.listen(port, (err) => {
-      if (err) {
-        logger.error({ err }, "Error listening on port");
-        process.exit(1);
-      }
+    const server = createServer(app);
+    attachWebSocketServer(server);
+
+    server.listen(port, () => {
       logger.info({ port }, "Server listening");
     });
   })
