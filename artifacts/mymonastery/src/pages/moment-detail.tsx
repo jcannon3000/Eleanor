@@ -876,10 +876,11 @@ export default function MomentDetail() {
             </div>
           )}
 
-          {/* RECENT — last 5 windows with at least one post */}
+          {/* RECENT — last 5 windows with at least one post, excluding today */}
           {(() => {
+            const todayStr = new Date().toISOString().slice(0, 10);
             const recentWindows = [...windows]
-              .filter(w => w.posts.length > 0)
+              .filter(w => w.posts.length > 0 && w.windowDate !== todayStr)
               .sort((a, b) => b.windowDate.localeCompare(a.windowDate))
               .slice(0, 5);
             if (recentWindows.length === 0) return (
