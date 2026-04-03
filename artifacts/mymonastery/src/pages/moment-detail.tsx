@@ -252,18 +252,43 @@ export default function MomentDetail() {
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
   const [amConnecting, setAmConnecting] = useState(false);
-  const [mkLoaded, setMkLoaded] = useState(false);
+  const [mkReady, setMkReady] = useState(false);
 
-  // Load MusicKit JS dynamically
+  // Load MusicKit JS and pre-configure with developer token so authorize() works in the click handler
   useEffect(() => {
-    if ((window as unknown as Record<string, unknown>)["MusicKit"]) { setMkLoaded(true); return; }
-    const existing = document.querySelector('script[src*="musickit"]');
-    if (existing) { existing.addEventListener("load", () => setMkLoaded(true)); return; }
-    const s = document.createElement("script");
-    s.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
-    s.async = true;
-    s.onload = () => setMkLoaded(true);
-    document.head.appendChild(s);
+    let cancelled = false;
+    async function init() {
+      // Load script
+      const w = window as unknown as Record<string, unknown>;
+      if (!w["MusicKit"]) {
+        const existing = document.querySelector('script[src*="musickit"]');
+        if (!existing) {
+          const s = document.createElement("script");
+          s.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
+          s.async = true;
+          document.head.appendChild(s);
+        }
+        // Wait for it
+        await new Promise<void>((resolve, reject) => {
+          let tries = 0;
+          const iv = setInterval(() => {
+            if (w["MusicKit"]) { clearInterval(iv); resolve(); }
+            else if (++tries > 100) { clearInterval(iv); reject(new Error("MusicKit timeout")); }
+          }, 200);
+        });
+      }
+      if (cancelled) return;
+      // Pre-configure
+      try {
+        const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
+        if (cancelled) return;
+        const MK = w["MusicKit"] as { configure: (opts: object) => Promise<void> };
+        await MK.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
+        if (!cancelled) setMkReady(true);
+      } catch { /* Apple Music not configured */ }
+    }
+    void init();
+    return () => { cancelled = true; };
   }, []);
   // Bell editing removed — shared time, editable via Settings > Edit practice
   const [editingPractice, setEditingPractice] = useState(false);
@@ -395,27 +420,15 @@ export default function MomentDetail() {
 
   const { moment, members, memberCount, myStreak, myUserToken, myPersonalTime, myPersonalTimezone, windows, seedPosts, todayPostCount, todayLogs, isCreator } = data;
 
-  // Apple Music connect handler
+  // Apple Music connect handler — authorize() must run synchronously in click handler for Safari popup
   async function connectAppleMusic() {
     setAmConnecting(true);
     try {
-      const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
       const w = window as unknown as Record<string, unknown>;
-      // Wait for MusicKit to be available
-      if (!w["MusicKit"]) {
-        await new Promise<void>((resolve, reject) => {
-          let tries = 0;
-          const iv = setInterval(() => {
-            if (w["MusicKit"]) { clearInterval(iv); resolve(); }
-            else if (++tries > 50) { clearInterval(iv); reject(new Error("MusicKit did not load")); }
-          }, 200);
-        });
-      }
       const MK = w["MusicKit"] as {
-        configure: (opts: object) => Promise<void>;
         getInstance: () => { authorize: () => Promise<string> };
       };
-      await MK.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
+      // This opens the Apple popup — must be in the direct click path
       const musicUserToken = await MK.getInstance().authorize();
       await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
       void refetchAmStatus();
@@ -624,11 +637,11 @@ export default function MomentDetail() {
                 </p>
                 <button
                   onClick={connectAppleMusic}
-                  disabled={amConnecting}
+                  disabled={amConnecting || !mkReady}
                   className="w-full py-2.5 rounded-xl font-medium text-sm text-white transition-all disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
                 >
-                  {amConnecting ? "Connecting…" : "🎵 Connect Apple Music"}
+                  {amConnecting ? "Connecting…" : !mkReady ? "Loading…" : "🎵 Connect Apple Music"}
                 </button>
               </div>
             )}
