@@ -436,30 +436,6 @@ export default function MomentDetail() {
           ← Your practices
         </Link>
 
-        {/* Sync calendar event banner — creator has an event but it may have old format */}
-        {isCreator && data.myGoogleCalendarEventId && !data.calendarEventMissing && (
-          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/30 rounded-2xl px-4 py-3 flex items-center gap-3">
-            <span className="text-lg shrink-0">📅</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[#2a402c]">
-                {calRefreshed ? "Calendar event updated ✓" : "Update your calendar event"}
-              </p>
-              <p className="text-xs text-[#4a6b50]/70 mt-0.5">
-                {calRefreshed ? "Title and description refreshed." : "Refresh the event to remove names and use the latest format."}
-              </p>
-            </div>
-            {!calRefreshed && (
-              <button
-                onClick={() => refreshCalendarMutation.mutate()}
-                disabled={refreshCalendarMutation.isPending}
-                className="shrink-0 text-xs font-medium text-[#4a6b50] border border-[#6B8F71]/40 rounded-full px-3 py-1.5 hover:bg-[#6B8F71]/10 transition-colors disabled:opacity-50"
-              >
-                {refreshCalendarMutation.isPending ? "Updating…" : "Update"}
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Calendar event removed banner — creator only */}
         {isCreator && data.calendarEventMissing && (
           <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
