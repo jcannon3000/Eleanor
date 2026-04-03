@@ -670,6 +670,8 @@ export default function MomentNew() {
     setListeningArtworkUrl(result.artworkUrl);
     setListeningSearchQuery("");
     setListeningSearchResults([]);
+    // Auto-set the practice name
+    setName(`Listening to ${result.name} together`);
   }
 
   // Rotating fasting examples
@@ -1002,11 +1004,12 @@ export default function MomentNew() {
     const isFasting = templateId === "fasting";
     const isListening = templateId === "listening";
 
-    // Listening: derive name from what they're listening to
-    const listeningName = isListening ? `${listeningTitle.trim()} · ${listeningArtist.trim()}` : "";
-
     // Fasting: derive name/intention/scheduling from fasting-specific fields
-    const finalName = isListening ? (name.trim() || `Listening Together 🎵`) : isFasting ? `Fasting from ${fastingFrom.trim()}` : name.trim();
+    const finalName = isListening
+      ? (name.trim() || `Listening to ${listeningTitle.trim()} together`)
+      : isFasting
+      ? `Fasting from ${fastingFrom.trim()}`
+      : name.trim();
     const finalIntention = isFasting ? fastingIntention.trim() : intention.trim();
 
     // Fasting frequency/day mapping
