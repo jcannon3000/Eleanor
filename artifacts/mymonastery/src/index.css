@@ -129,16 +129,14 @@
     @apply border-border;
   }
 
-  html, body, #root {
-    overflow-x: hidden;
-    width: 100%;
-    max-width: 100%;
-    -webkit-overflow-scrolling: touch;
+  html {
+    overflow: clip;
   }
 
-  /* Prevent iOS Safari from expanding viewport due to positioned elements */
-  body {
-    position: relative;
+  body, #root {
+    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
   }
 
   body {
