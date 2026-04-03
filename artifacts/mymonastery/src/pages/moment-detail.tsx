@@ -926,11 +926,14 @@ export default function MomentDetail() {
               .filter(w => w.posts.length > 0 && w.windowDate !== todayStr)
               .sort((a, b) => b.windowDate.localeCompare(a.windowDate))
               .slice(0, 5);
-            if (recentWindows.length === 0) return (
+            const todayWindow = windows.find(w => w.windowDate === todayStr);
+            const todayHasPosts = todayWindow && todayWindow.posts.length > 0;
+            if (recentWindows.length === 0 && !todayHasPosts) return (
               <p className="text-xs text-muted-foreground/50 italic text-center py-4">
                 No practice sessions yet — be the first to log 🌿
               </p>
             );
+            if (recentWindows.length === 0) return null;
             return (
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70 mb-2">Recent</p>
