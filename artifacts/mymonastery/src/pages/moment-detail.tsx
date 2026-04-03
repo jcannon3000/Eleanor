@@ -424,7 +424,7 @@ export default function MomentDetail() {
         {/* Header */}
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-semibold text-foreground mb-1">{moment.name}</h1>
+            <h1 className="text-2xl font-semibold text-foreground mb-1 min-w-0 break-words">{moment.name}</h1>
             <button
               onClick={() => setShowInvite(true)}
               className="shrink-0 mt-0.5 text-xs font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-3 py-1.5 hover:bg-[#6B8F71]/8 transition-colors whitespace-nowrap"
