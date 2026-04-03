@@ -535,68 +535,96 @@ export default function MomentDetail() {
           </div>
         )}
 
-        {/* Listening — artwork + info card */}
-        {isListening && (moment.listeningTitle || moment.listeningArtist) && (
-          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
-            {moment.listeningArtworkUrl ? (
-              <img
-                src={moment.listeningArtworkUrl}
-                alt=""
-                width={56}
-                height={56}
-                className="rounded-xl object-cover shadow-sm"
-                style={{ width: 56, height: 56, minWidth: 56, maxWidth: 56 }}
-              />
-            ) : (
-              <span className="text-xl mt-0.5">🎵</span>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
-                Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
-              </p>
-              <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle ?? moment.listeningArtist}</p>
-              {moment.listeningArtist && moment.listeningType !== "artist" && (
-                <p className="text-xs text-[#4a6b50] mt-0.5 truncate">{moment.listeningArtist}</p>
-              )}
+        {/* Listening — rich artwork card */}
+        {isListening && (moment.listeningTitle || moment.listeningArtist) && (() => {
+          const listenTitle = moment.listeningTitle ?? moment.listeningArtist ?? "";
+          const listenArtist = moment.listeningArtist ?? "";
+          const isArtistOnly = moment.listeningType === "artist";
+          const isSong = moment.listeningType === "song";
+          const needsTicker = isSong && listenTitle.length > 25;
+          const hasListenedToday = todayPostCount > 0;
+          const tickerDuration = `${Math.max(6, listenTitle.length * 0.22)}s`;
+          return (
+            <div className="mb-5 relative rounded-2xl overflow-hidden bg-[#FAF6F0] border border-[#6B8F71]/20 shadow-sm">
+              {/* Left accent bar */}
+              <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#6B8F71] z-10" />
+              {/* Artwork */}
+              <div className="relative" style={{ height: 140 }}>
+                {moment.listeningArtworkUrl ? (
+                  <img src={moment.listeningArtworkUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #6B8F71 0%, #4a6b50 100%)" }}>
+                    <span style={{ fontSize: 48 }}>🎵</span>
+                  </div>
+                )}
+                {/* Bottom fade */}
+                <div className="absolute bottom-0 left-0 right-0 h-12 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(250,246,240,0.92), transparent)" }} />
+                {/* Active pulse dot */}
+                {hasListenedToday && (
+                  <div className="listening-pulse-dot absolute top-3 right-3 w-2 h-2 rounded-full bg-[#6B8F71]" />
+                )}
+              </div>
+              {/* Info row */}
+              <div className="flex items-center gap-3 px-4 pl-5 py-3">
+                <div className="flex-1 min-w-0">
+                  {needsTicker ? (
+                    <div className="overflow-hidden">
+                      <p className="listening-ticker text-sm font-semibold text-[#2C1A0E] whitespace-nowrap" style={{ animationDuration: tickerDuration }}>
+                        {listenTitle}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-semibold text-[#2C1A0E] truncate">{listenTitle}</p>
+                  )}
+                  {!isArtistOnly && listenArtist && (
+                    <p className="text-xs text-[#6B8F71] mt-0.5 truncate">{listenArtist}</p>
+                  )}
+                  {isArtistOnly && (
+                    <p className="text-xs text-[#6B8F71]/70 mt-0.5">Artist</p>
+                  )}
+                </div>
+                {amStatus?.connected && moment.listeningAppleMusicUrl && (
+                  <a
+                    href={moment.listeningAppleMusicUrl}
+                    className="shrink-0 text-xs font-medium text-[#6B8F71] border border-[#6B8F71]/40 rounded-full px-3 py-1.5 bg-[#FAF6F0] hover:bg-[#6B8F71]/8 transition-colors whitespace-nowrap"
+                  >
+                    Open 🎵
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Apple Music connection — listening practices only */}
         {isListening && (
           amStatus?.connected ? (
-            <div className="mb-5 bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3 flex items-start gap-3">
-              <span className="text-xl mt-0.5">🎵</span>
+            <div className="mb-5 bg-[#6B8F71]/8 border-l-[3px] border-[#6B8F71] rounded-r-2xl rounded-l-sm px-4 py-3 flex items-center gap-3">
+              <span className="text-lg">🎵</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-[#a02030]">Apple Music connected</p>
-                <p className="text-xs text-[#a02030]/60 mt-0.5">Eleanor will auto-log when you listen</p>
+                <p className="text-sm font-semibold text-[#2C1A0E]">Apple Music connected</p>
+                <p className="text-xs text-[#6B8F71] mt-0.5">Eleanor will auto-log when you listen</p>
               </div>
               <button
                 onClick={() => amDisconnectMutation.mutate()}
-                className="text-xs text-[#a02030]/50 hover:text-[#a02030] transition-colors mt-1"
+                className="text-xs text-[#6B8F71]/60 hover:text-[#6B8F71] transition-colors shrink-0"
               >
                 Disconnect
               </button>
             </div>
           ) : (
-            <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-3">
-              <p className="text-sm font-semibold text-foreground mb-1">Auto-log with Apple Music</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Connect your account to auto-detect listens.
-              </p>
-              <a
-                href={appleMusicAuthUrl}
-                className="block py-2.5 rounded-xl font-medium text-sm text-white text-center"
-                style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
-              >
-                Connect Apple Music
+            <div className="mb-5 bg-[#FAF6F0] border border-dashed border-[#6B8F71]/40 rounded-2xl px-4 py-3">
+              <p className="text-sm text-[#2C1A0E] mb-0.5">Connect Apple Music to auto-log your listening 🎵</p>
+              <p className="text-xs text-muted-foreground mb-2">Or log manually — Eleanor works either way 🌿</p>
+              <a href={appleMusicAuthUrl} className="text-xs font-medium text-[#6B8F71] hover:underline">
+                Connect →
               </a>
             </div>
           )
         )}
 
-        {/* Open Now Banner — only when actually open */}
-        {isOpenNow ? (
+        {/* Open Now Banner — skip for listening (info lives in log timeline) */}
+        {!isListening && isOpenNow ? (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -604,13 +632,13 @@ export default function MomentDetail() {
           >
             <div>
               <p className="text-sm font-semibold text-[#C17F24]">
-                {isIntercession ? "🙏 Open today · Pray together" : isListening ? "🎵 Listening today" : "🌿 Open today"}
+                {isIntercession ? "🙏 Open today · Pray together" : "🌿 Open today"}
               </p>
               <p className="text-xs text-[#C17F24]/70 mt-0.5">
-                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : isListening ? "listened" : "logged"}
+                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : "logged"}
               </p>
             </div>
-            {postUrl && !isListening && (
+            {postUrl && (
               <Link href={postUrl}>
                 <span className="text-sm font-medium text-white bg-[#6B8F71] rounded-full px-4 py-2 hover:bg-[#5a7a60] transition-colors whitespace-nowrap">
                   {actionLabel}
@@ -618,7 +646,7 @@ export default function MomentDetail() {
               </Link>
             )}
           </motion.div>
-        ) : (
+        ) : !isOpenNow ? (
           /* Not open: next-practice card */
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -643,30 +671,27 @@ export default function MomentDetail() {
               <span className="text-2xl" aria-hidden>🌿</span>
             )}
           </motion.div>
-        )}
+        ) : null}
 
-        {/* Stats: Your streak / Group streak / Group best */}
+        {/* Stats: Current streak / Best streak / Blooms */}
         {(() => {
           const bloomThreshold = Math.max(2, Math.ceil(memberCount / 2));
           const todayBloomed = todayPostCount >= bloomThreshold && memberCount >= 2;
           const groupStreak = todayBloomed && moment.currentStreak === 0 ? 1 : moment.currentStreak;
           const groupBest = Math.max(groupStreak, moment.longestStreak);
-          // Personal: if I've logged today and myStreak is 0, show optimistic 1
-          const iLoggedToday = todayPostCount >= 1; // approximate — server sets myStreak accurately
-          const displayMyStreak = myStreak > 0 ? myStreak : (iLoggedToday ? 1 : 0);
           return (
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">{displayMyStreak}</p>
-                <p className="text-xs text-muted-foreground mt-1">🙏 Your streak</p>
-              </div>
-              <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
                 <p className="text-2xl font-bold text-foreground">{groupStreak}</p>
-                <p className="text-xs text-muted-foreground mt-1">🔥 Group streak</p>
+                <p className="text-xs text-muted-foreground mt-1">🔥 Current streak</p>
               </div>
               <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
                 <p className="text-2xl font-bold text-foreground">{groupBest}</p>
-                <p className="text-xs text-muted-foreground mt-1">⭐ Group best</p>
+                <p className="text-xs text-muted-foreground mt-1">⭐ Best streak</p>
+              </div>
+              <div className="bg-card border border-border/60 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-foreground">{moment.totalBlooms}</p>
+                <p className="text-xs text-muted-foreground mt-1">🌸 Blooms</p>
               </div>
             </div>
           );
@@ -846,9 +871,19 @@ export default function MomentDetail() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground/90">{firstName}</p>
-                        {log.reflectionText && (
+                        {(log.reflectionText || (isListening && log.loggedAt)) && (
                           <p className="text-xs text-muted-foreground italic truncate">
-                            {isListening ? `🎵 ${log.reflectionText}` : `"${log.reflectionText}"`}
+                            {isListening
+                              ? (() => {
+                                  const t = log.reflectionText ?? "";
+                                  // Raw track ID: all digits, or no spaces and >12 chars
+                                  const isRawId = /^\d+$/.test(t) || (t.length > 12 && !/\s/.test(t));
+                                  const label = (!t || isRawId)
+                                    ? (moment.listeningType === "artist" ? "🎵 Listened today" : `🎵 ${moment.listeningTitle ?? "Listened today"}`)
+                                    : `🎵 ${t}`;
+                                  return label;
+                                })()
+                              : `"${log.reflectionText}"`}
                           </p>
                         )}
                       </div>
@@ -913,9 +948,17 @@ export default function MomentDetail() {
                               <div key={i} className="flex items-start gap-3 px-4 py-2.5">
                                 <p className="text-xs font-semibold text-foreground/70 shrink-0 mt-0.5 w-16 truncate">{firstName}</p>
                                 <div className="flex-1 min-w-0">
-                                  {post.reflectionText ? (
+                                  {(post.reflectionText || isListening) ? (
                                     <p className="text-xs text-muted-foreground italic line-clamp-2">
-                                      {isListening ? `🎵 ${post.reflectionText}` : `"${post.reflectionText}"`}
+                                      {isListening
+                                        ? (() => {
+                                            const t = post.reflectionText ?? "";
+                                            const isRawId = /^\d+$/.test(t) || (t.length > 12 && !/\s/.test(t));
+                                            return (!t || isRawId)
+                                              ? (moment.listeningType === "artist" ? "🎵 Listened" : `🎵 ${moment.listeningTitle ?? "Listened"}`)
+                                              : `🎵 ${t}`;
+                                          })()
+                                        : `"${post.reflectionText}"`}
                                     </p>
                                   ) : post.isCheckin ? (
                                     <p className="text-xs text-muted-foreground">

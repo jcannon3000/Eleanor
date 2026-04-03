@@ -630,6 +630,7 @@ export default function MomentNew() {
   const [listeningTitle, setListeningTitle] = useState("");
   const [listeningArtist, setListeningArtist] = useState("");
   const [listeningArtworkUrl, setListeningArtworkUrl] = useState("");
+  const [listeningAppleMusicId, setListeningAppleMusicId] = useState("");
   const [listeningSearchQuery, setListeningSearchQuery] = useState("");
   const [listeningSearchResults, setListeningSearchResults] = useState<Array<{ id: string; name: string; artistName: string; artworkUrl: string }>>([]);
   const [listeningSearching, setListeningSearching] = useState(false);
@@ -664,10 +665,11 @@ export default function MomentNew() {
     }, 400);
   }
 
-  function selectListeningResult(result: { name: string; artistName: string; artworkUrl: string }) {
+  function selectListeningResult(result: { id: string; name: string; artistName: string; artworkUrl: string }) {
     setListeningTitle(result.name);
     setListeningArtist(listeningType === "artist" ? result.name : result.artistName);
     setListeningArtworkUrl(result.artworkUrl);
+    setListeningAppleMusicId(result.id);
     setListeningSearchQuery("");
     setListeningSearchResults([]);
     // Auto-set the practice name
@@ -1058,6 +1060,9 @@ export default function MomentNew() {
       listeningTitle: isListening ? listeningTitle.trim() || undefined : undefined,
       listeningArtist: isListening ? (listeningType === "artist" ? listeningTitle.trim() : listeningArtist.trim()) || undefined : undefined,
       listeningArtworkUrl: isListening && listeningArtworkUrl ? listeningArtworkUrl : undefined,
+      listeningAppleMusicUrl: isListening && listeningAppleMusicId
+        ? `https://music.apple.com/us/${listeningType === "artist" ? "artist" : listeningType === "album" ? "album" : "song"}/${listeningAppleMusicId}`
+        : undefined,
     });
   }
 
@@ -2029,7 +2034,7 @@ export default function MomentNew() {
                   <div className="flex gap-1 mb-5 bg-secondary/60 rounded-xl p-1">
                     {(["song", "album", "artist"] as const).map(type => (
                       <button key={type}
-                        onClick={() => { setListeningType(type); setListeningTitle(""); setListeningArtist(""); setListeningArtworkUrl(""); setListeningSearchQuery(""); setListeningSearchResults([]); }}
+                        onClick={() => { setListeningType(type); setListeningTitle(""); setListeningArtist(""); setListeningArtworkUrl(""); setListeningAppleMusicId(""); setListeningSearchQuery(""); setListeningSearchResults([]); }}
                         className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
                           listeningType === type
                             ? "bg-background text-foreground shadow-sm"
@@ -2057,7 +2062,7 @@ export default function MomentNew() {
                           )}
                         </div>
                         <button
-                          onClick={() => { setListeningTitle(""); setListeningArtist(""); setListeningArtworkUrl(""); }}
+                          onClick={() => { setListeningTitle(""); setListeningArtist(""); setListeningArtworkUrl(""); setListeningAppleMusicId(""); }}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                         >
                           Change
