@@ -118,7 +118,7 @@ function minutesRemaining(moment: { scheduledTime: string; windowMinutes: number
 
 // ─── Event duration by practice template ─────────────────────────────────────
 function practiceEventDurationMins(templateType: string | null | undefined): number {
-  if (templateType === "intercession") return 5;
+  if (templateType === "intercession" || templateType === "listening") return 5;
   if (templateType === "morning-prayer" || templateType === "evening-prayer" || templateType === "contemplative") return 20;
   return 60;
 }
@@ -592,7 +592,7 @@ router.post("/moments", async (req, res): Promise<void> => {
     if (templateType === "intercession") return `🙏 ${name} with ${creatorFirstName}`;
     if (templateType === "contemplative") return `🕯️ ${name} with ${creatorFirstName}`;
     if (templateType === "fasting") return `🌿 ${name} with ${creatorFirstName}`;
-    if (templateType === "listening") return `🎵 ${name} with ${creatorFirstName}`;
+    if (templateType === "listening") return `🎵 Listening to ${listeningArtist ?? listeningTitle ?? name} with ${memberListStr}`;
     return `🌱 ${name} with ${creatorFirstName}`;
   }
 
@@ -695,21 +695,22 @@ router.post("/moments", async (req, res): Promise<void> => {
 
     if (templateType === "listening") {
       const what = listeningType === "artist"
-        ? `the music of ${listeningArtist ?? listeningTitle ?? "an artist"}`
+        ? `${listeningArtist ?? listeningTitle ?? "an artist"}`
         : listeningType === "album"
-          ? `"${listeningTitle ?? "an album"}" by ${listeningArtist ?? "an artist"}`
-          : `"${listeningTitle ?? "a song"}" by ${listeningArtist ?? "an artist"}`;
+          ? `${listeningTitle ?? "an album"} by ${listeningArtist ?? "an artist"}`
+          : `${listeningTitle ?? "a song"} by ${listeningArtist ?? "an artist"}`;
+      const headline = goalSessions
+        ? `${memberListStr} are listening to ${what} together — ${goalSessions} days, building a streak.`
+        : `${memberListStr} are listening to ${what} together.`;
       return [
-        `${invFirst} invited you to listen together.`,
+        headline,
         "",
-        `On the same day, at the same time — you'll both listen to ${what}. Not just hearing it, but sharing the experience.`,
-        "", DIV, "",
-        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-        `Who: ${memberListStr}`,
-        ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🎵`] : []),
+        "Though you'll be in different places, you'll each listen — knowing the other is too. That's the whole thing.",
         "",
         "Tap when you've listened →",
         shortLink,
+        "", DIV, "",
+        `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
         "", DIV, "",
         "No account needed. Your link above is all you need.",
       ].join("\n");
