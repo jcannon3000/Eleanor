@@ -632,7 +632,6 @@ router.post("/moments", async (req, res): Promise<void> => {
       }
       lines.push(DIV, "");
       lines.push(`When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`);
-      lines.push(`Who: ${memberListStr}`);
       if (goalSessions) lines.push(`Goal: ${goalSessions} days together 🌱`);
       lines.push("", `Tap to pray →`, shortLink);
       lines.push("", DIV, "");
@@ -648,8 +647,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         `Each morning, ${invFirst} will be praying Morning Prayer from the Book of Common Prayer. They want you alongside them — wherever you are, at the same time of day, knowing the other is doing the same.`,
         "", DIV, "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-        `Who: ${memberListStr}`,
-        ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
+          ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
         "",
         "Tap to pray →",
         shortLink,
@@ -665,8 +663,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         `Each evening, ${invFirst} will be praying Evening Prayer from the Book of Common Prayer. They want you alongside them — wherever you are, at the same time of day, knowing the other is doing the same.`,
         "", DIV, "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-        `Who: ${memberListStr}`,
-        ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
+          ...(goalSessions ? [`Goal: ${goalSessions} days together 🌱`] : []),
         "",
         "Tap to pray →",
         shortLink,
@@ -683,8 +680,7 @@ router.post("/moments", async (req, res): Promise<void> => {
         `${durStr}. Wherever you are, at the same time of day — knowing the other is present too.`,
         "", DIV, "",
         `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-        `Who: ${memberListStr}`,
-        ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
+          ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
         "",
         "Tap when you're ready →",
         shortLink,
@@ -700,8 +696,8 @@ router.post("/moments", async (req, res): Promise<void> => {
           ? `${listeningTitle ?? "an album"} by ${listeningArtist ?? "an artist"}`
           : `${listeningTitle ?? "a song"} by ${listeningArtist ?? "an artist"}`;
       const headline = goalSessions
-        ? `${memberListStr} are listening to ${what} together — ${goalSessions} days, building a streak.`
-        : `${memberListStr} are listening to ${what} together.`;
+        ? `We're listening to ${what} together — ${goalSessions} days, building a streak.`
+        : `We're listening to ${what} together.`;
       return [
         headline,
         "",
@@ -723,7 +719,6 @@ router.post("/moments", async (req, res): Promise<void> => {
       ...(intention ? [`"${intention}"`] : []),
       "", DIV, "",
       `When: ${freqLabel} at ${calTimeLabel} · Starting ${humanStartDate()}`,
-      `Who: ${memberListStr}`,
       ...(goalSessions ? [`Goal: ${goalSessions} sessions together 🌱`] : []),
       "",
       "Tap to log →",
@@ -779,7 +774,6 @@ router.post("/moments", async (req, res): Promise<void> => {
       ...(fastingIntention ? ["", `Why we fast: ${fastingIntention}`] : []),
       "", DIV, "",
       `When: ${fastFreqLabel} · Starting ${humanStartDate()}`,
-      `Who: ${memberListStr}`,
       ...(goalSessions ? [`Goal: ${goalSessions} fasts together 🌱`] : []),
       "",
       "Tap to log your fast →",
