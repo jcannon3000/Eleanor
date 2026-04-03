@@ -1781,8 +1781,8 @@ export default function MomentNew() {
               {step === "schedule" && (
                 <div className="space-y-6 flex-1">
                   <div>
-                    <h2 className="text-2xl font-semibold mb-1">When should the bell ring? 🔔</h2>
-                    <p className="text-sm text-muted-foreground">Everyone in the practice gets the bell at this time.</p>
+                    <h2 className="text-2xl font-semibold mb-1">When do you want to be reminded? 🔔</h2>
+                    <p className="text-sm text-muted-foreground">Eleanor will send a calendar reminder to everyone at this time each day. One tap and you're in the practice.</p>
                   </div>
 
                   {/* Frequency */}
@@ -1792,7 +1792,7 @@ export default function MomentNew() {
                       {(["daily", "weekly"] as Frequency[]).map(f => (
                         <button key={f} onClick={() => { setFrequency(f); setScheduledDays([]); }}
                           className={`flex-1 py-3 rounded-xl border-2 font-medium text-sm capitalize transition-all ${frequency === f ? "border-[#6B8F71] bg-[#6B8F71]/5 text-[#4a6b50]" : "border-border hover:border-[#6B8F71]/30 text-foreground"}`}>
-                          {f === "daily" ? "📅 Daily" : "🗓 Weekly"}
+                          {f === "daily" ? "Every day" : "Once a week"}
                         </button>
                       ))}
                     </div>
@@ -1855,7 +1855,8 @@ export default function MomentNew() {
                     ))}
                   </div>
 
-                  <p className="text-xs text-muted-foreground/60 italic">Everyone can log ±2 hours around this time.</p>
+                  <p className="text-xs text-[#6B8F71] italic">The reminder fires at this time for everyone. 🔔</p>
+                  <p className="text-xs text-muted-foreground/60">Everyone has a 2-hour window to log — life happens. 🌿</p>
                 </div>
               )}
 
