@@ -535,17 +535,28 @@ export default function MomentDetail() {
           </div>
         )}
 
-        {/* Listening — info card (same pattern as fasting/contemplative) */}
+        {/* Listening — artwork + info card */}
         {isListening && (moment.listeningTitle || moment.listeningArtist) && (
           <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
-            <span className="text-xl mt-0.5">🎵</span>
-            <div>
+            {moment.listeningArtworkUrl ? (
+              <img
+                src={moment.listeningArtworkUrl}
+                alt=""
+                width={56}
+                height={56}
+                className="rounded-xl object-cover shadow-sm"
+                style={{ width: 56, height: 56, minWidth: 56, maxWidth: 56 }}
+              />
+            ) : (
+              <span className="text-xl mt-0.5">🎵</span>
+            )}
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
                 Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
               </p>
-              <p className="text-sm text-[#3a5a40]">{moment.listeningTitle ?? moment.listeningArtist}</p>
+              <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle ?? moment.listeningArtist}</p>
               {moment.listeningArtist && moment.listeningType !== "artist" && (
-                <p className="text-xs text-[#4a6b50] mt-0.5">{moment.listeningArtist}</p>
+                <p className="text-xs text-[#4a6b50] mt-0.5 truncate">{moment.listeningArtist}</p>
               )}
             </div>
           </div>
