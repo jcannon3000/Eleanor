@@ -535,61 +535,53 @@ export default function MomentDetail() {
           </div>
         )}
 
-        {/* Listening — artwork + info card */}
+        {/* Listening — info card (same pattern as fasting/contemplative) */}
         {isListening && (moment.listeningTitle || moment.listeningArtist) && (
-          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-4 overflow-hidden">
-            <div className="flex items-center gap-4">
-              {moment.listeningArtworkUrl && (
-                <img src={moment.listeningArtworkUrl} alt="Artwork" className="w-16 h-16 shrink-0 rounded-xl object-cover shadow-sm" />
+          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
+            <span className="text-xl mt-0.5">🎵</span>
+            <div>
+              <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
+                Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
+              </p>
+              <p className="text-sm text-[#3a5a40]">{moment.listeningTitle ?? moment.listeningArtist}</p>
+              {moment.listeningArtist && moment.listeningType !== "artist" && (
+                <p className="text-xs text-[#4a6b50] mt-0.5">{moment.listeningArtist}</p>
               )}
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
-                  Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
-                </p>
-                <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle}</p>
-                {moment.listeningArtist && moment.listeningType !== "artist" && (
-                  <p className="text-xs text-[#4a6b50] mt-0.5">{moment.listeningArtist}</p>
-                )}
-              </div>
             </div>
           </div>
         )}
 
         {/* Apple Music connection — listening practices only */}
         {isListening && (
-          <>
-            {amStatus?.connected ? (
-              <div className="mb-5 flex items-center justify-between bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3 overflow-hidden">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🎵</span>
-                  <div>
-                    <p className="text-sm font-semibold text-[#a02030]">Apple Music connected</p>
-                    <p className="text-xs text-[#a02030]/60 mt-0.5">Eleanor will auto-log when you listen</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => amDisconnectMutation.mutate()}
-                  className="text-xs text-[#a02030]/50 hover:text-[#a02030] transition-colors"
-                >
-                  Disconnect
-                </button>
+          amStatus?.connected ? (
+            <div className="mb-5 bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3 flex items-start gap-3">
+              <span className="text-xl mt-0.5">🎵</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#a02030]">Apple Music connected</p>
+                <p className="text-xs text-[#a02030]/60 mt-0.5">Eleanor will auto-log when you listen</p>
               </div>
-            ) : (
-              <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-4 overflow-hidden">
-                <p className="text-sm font-semibold text-foreground mb-1">Auto-log with Apple Music</p>
-                <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                  Connect your account and Eleanor will detect when you listen — no button needed.
-                </p>
-                <a
-                  href={appleMusicAuthUrl}
-                  className="block w-full py-2.5 rounded-xl font-medium text-sm text-white text-center transition-all"
-                  style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
-                >
-                  🎵 Connect Apple Music
-                </a>
-              </div>
-            )}
-          </>
+              <button
+                onClick={() => amDisconnectMutation.mutate()}
+                className="text-xs text-[#a02030]/50 hover:text-[#a02030] transition-colors mt-1"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <div className="mb-5 bg-white border border-[#FC3C44]/20 rounded-2xl px-4 py-3">
+              <p className="text-sm font-semibold text-foreground mb-1">Auto-log with Apple Music</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Connect your account to auto-detect listens.
+              </p>
+              <a
+                href={appleMusicAuthUrl}
+                className="block py-2.5 rounded-xl font-medium text-sm text-white text-center"
+                style={{ background: "linear-gradient(135deg, #FC3C44 0%, #fa233b 100%)" }}
+              >
+                Connect Apple Music
+              </a>
+            </div>
+          )
         )}
 
         {/* Open Now Banner — only when actually open */}
