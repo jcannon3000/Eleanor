@@ -398,6 +398,34 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     ? new Date(Math.min(...sharedRituals.map(r => r.createdAt.getTime()))).toISOString()
     : null;
 
+  // Fetch active prayer request for this person
+  let activePrayerRequest: { id: number; body: string; createdAt: string; expiresAt: string | null } | null = null;
+  const [personUser] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+  if (personUser) {
+    const now = new Date();
+    const [req] = await db.select({
+      id: prayerRequestsTable.id,
+      body: prayerRequestsTable.body,
+      createdAt: prayerRequestsTable.createdAt,
+      expiresAt: prayerRequestsTable.expiresAt,
+    }).from(prayerRequestsTable).where(
+      and(
+        eq(prayerRequestsTable.ownerId, personUser.id),
+        eq(prayerRequestsTable.isAnswered, false),
+        isNull(prayerRequestsTable.closedAt),
+        or(isNull(prayerRequestsTable.expiresAt), gt(prayerRequestsTable.expiresAt, now)),
+      )
+    ).orderBy(desc(prayerRequestsTable.createdAt)).limit(1);
+    if (req) {
+      activePrayerRequest = {
+        id: req.id,
+        body: req.body,
+        createdAt: req.createdAt.toISOString(),
+        expiresAt: req.expiresAt?.toISOString() ?? null,
+      };
+    }
+  }
+
   res.json({
     name: personName,
     email,
@@ -413,6 +441,7 @@ router.get("/people/:email", async (req, res): Promise<void> => {
     },
     sharedRituals: enriched,
     sharedPractices,
+    activePrayerRequest,
   });
 });
 

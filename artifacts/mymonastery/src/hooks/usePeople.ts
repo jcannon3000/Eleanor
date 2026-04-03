@@ -68,6 +68,13 @@ export interface SharedPractice {
   createdAt: string;
 }
 
+export interface PersonProfilePrayerRequest {
+  id: number;
+  body: string;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
 export interface PersonProfile {
   name: string;
   email: string;
@@ -83,6 +90,7 @@ export interface PersonProfile {
   };
   sharedRituals: SharedRitual[];
   sharedPractices: SharedPractice[];
+  activePrayerRequest: PersonProfilePrayerRequest | null;
 }
 
 export function usePeople(ownerId: number | undefined) {
