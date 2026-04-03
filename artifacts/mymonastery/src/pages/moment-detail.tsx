@@ -411,7 +411,7 @@ export default function MomentDetail() {
 
   return (
     <Layout>
-      <div className="pb-20 max-w-2xl mx-auto overflow-x-hidden">
+      <div className="pb-20 max-w-2xl mx-auto">
 
         {/* Back */}
         <Link
