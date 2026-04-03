@@ -162,6 +162,8 @@ interface MomentData {
   commitmentSessionsGoal?: number | null;
   commitmentSessionsLogged?: number | null;
   commitmentTendFreely?: boolean | null;
+  listeningTitle?: string | null;
+  listeningArtist?: string | null;
 }
 
 const SPIRITUAL_TEMPLATE_IDS_MAIN = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
@@ -236,7 +238,11 @@ function SharedMomentCard({ moment, dim, pinned }: { moment: MomentData; dim: bo
 
         {/* Time / status line */}
         {pinned ? (
-          isSpiritual ? (
+          moment.templateType === "listening" ? (
+            <p className="text-sm text-[#4a6b50] mt-1 mb-2 line-clamp-1">
+              A {moment.frequency === "daily" ? "daily" : "weekly"} practice of listening to <span className="font-medium">{moment.listeningTitle ?? moment.listeningArtist ?? "music"}</span> together
+            </p>
+          ) : isSpiritual ? (
             <p className="text-sm text-[#6B8F71] font-medium mt-1 mb-2">
               {moment.todayPostCount} of {moment.memberCount} practiced today
             </p>
