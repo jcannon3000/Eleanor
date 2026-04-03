@@ -7,6 +7,17 @@ export interface PersonPracticeSummary {
   templateType: string | null;
 }
 
+export interface PersonTraditionSummary {
+  id: number;
+  name: string;
+}
+
+export interface PersonPrayerRequest {
+  id: number;
+  body: string;
+  createdAt: string;
+}
+
 export interface PersonSummary {
   name: string;
   email: string;
@@ -15,7 +26,9 @@ export interface PersonSummary {
   maxSharedStreak: number;
   score: number;
   sharedPractices: PersonPracticeSummary[];
-  hasActivePrayerRequest: boolean;
+  sharedTraditions: PersonTraditionSummary[];
+  lastActiveDate: string;
+  activePrayerRequest: PersonPrayerRequest | null;
 }
 
 export interface SharedMeetup {
