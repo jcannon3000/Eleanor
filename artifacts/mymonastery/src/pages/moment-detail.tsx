@@ -535,32 +535,42 @@ export default function MomentDetail() {
           </div>
         )}
 
-        {/* Listening — artwork + info card */}
-        {isListening && (moment.listeningTitle || moment.listeningArtist) && (
-          <div className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3">
-            {moment.listeningArtworkUrl ? (
-              <img
-                src={moment.listeningArtworkUrl}
-                alt=""
-                width={56}
-                height={56}
-                className="rounded-xl object-cover shadow-sm"
-                style={{ width: 56, height: 56, minWidth: 56, maxWidth: 56 }}
-              />
-            ) : (
-              <span className="text-xl mt-0.5">🎵</span>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
-                Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
-              </p>
-              <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle ?? moment.listeningArtist}</p>
-              {moment.listeningArtist && moment.listeningType !== "artist" && (
-                <p className="text-xs text-[#4a6b50] mt-0.5 truncate">{moment.listeningArtist}</p>
+        {/* Listening — artwork + info card (tappable → Apple Music) */}
+        {isListening && (moment.listeningTitle || moment.listeningArtist) && (() => {
+          const searchTerm = encodeURIComponent(moment.listeningTitle ?? moment.listeningArtist ?? "");
+          const appleMusicUrl = moment.listeningAppleMusicUrl ?? `https://music.apple.com/search?term=${searchTerm}`;
+          return (
+            <a
+              href={appleMusicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-5 bg-[#F0F8F0] border border-[#6B8F71]/25 rounded-2xl px-4 py-3 flex items-start gap-3 active:opacity-70 transition-opacity"
+            >
+              {moment.listeningArtworkUrl ? (
+                <img
+                  src={moment.listeningArtworkUrl}
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="rounded-xl object-cover shadow-sm"
+                  style={{ width: 56, height: 56, minWidth: 56, maxWidth: 56 }}
+                />
+              ) : (
+                <span className="text-xl mt-0.5">🎵</span>
               )}
-            </div>
-          </div>
-        )}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-[#4a6b50] uppercase tracking-wider mb-0.5">
+                  Listening to {moment.listeningType === "album" ? "an album" : moment.listeningType === "artist" ? "an artist" : "a song"}
+                </p>
+                <p className="text-sm font-semibold text-[#2a402c] truncate">{moment.listeningTitle ?? moment.listeningArtist}</p>
+                {moment.listeningArtist && moment.listeningType !== "artist" && (
+                  <p className="text-xs text-[#4a6b50] mt-0.5 truncate">{moment.listeningArtist}</p>
+                )}
+              </div>
+              <span className="text-xs text-[#6B8F71]/60 shrink-0 mt-0.5">↗</span>
+            </a>
+          );
+        })()}
 
         {/* Apple Music connection — listening practices only */}
         {isListening && (
