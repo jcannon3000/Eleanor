@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
@@ -271,11 +271,32 @@ function MomentCard({ moment }: { moment: MomentData }) {
 export default function MomentsDashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["/api/moments"],
     queryFn: () => apiRequest<{ moments: MomentData[] }>("GET", "/api/moments"),
     enabled: !!user,
   });
+
+  // On-demand Apple Music check for listening practices where someone hasn't logged
+  const amCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!data || amCheckedRef.current) return;
+    amCheckedRef.current = true;
+    const listening = (data.moments ?? []).filter(
+      m => m.templateType === "listening" && m.todayPostCount < m.memberCount
+    );
+    if (listening.length === 0) return;
+    Promise.all(
+      listening.map(m =>
+        apiRequest<{ newLogs: number }>("POST", `/api/apple-music/check-now/${m.id}`, {}).catch(() => ({ newLogs: 0 }))
+      )
+    ).then(results => {
+      if (results.some(r => r.newLogs > 0)) {
+        qc.invalidateQueries({ queryKey: ["/api/moments"] });
+      }
+    });
+  }, [data, qc]);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/");
