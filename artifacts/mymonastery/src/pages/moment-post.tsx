@@ -787,17 +787,15 @@ export default function MomentPostPage() {
     );
   }
 
-  // ── Listening — artwork, deep link, check-in ────────────────────────────────
+  // ── Listening — auto-detected, no manual log ─────────────────────────────────
   if (moment.templateType === "listening") {
-    const listenConfirmed = posted || alreadyPosted;
+    const listenDetected = posted || alreadyPosted;
     const hasArtwork = !!moment.listeningArtworkUrl;
-    const spotifyUri = moment.listeningSpotifyUri;
-    const appleMusicUrl = moment.listeningAppleMusicUrl;
     const typeLabel = moment.listeningType === "album" ? "album" : moment.listeningType === "artist" ? "artist" : "song";
 
     return (
       <div className="min-h-screen bg-[#F2F7F2] flex flex-col">
-        <div className="flex-1 flex flex-col px-6 pt-10 pb-28 max-w-md mx-auto w-full">
+        <div className="flex-1 flex flex-col px-6 pt-10 pb-12 max-w-md mx-auto w-full">
           {/* Back */}
           <Link href={`/moments/${moment.id}`} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mb-8 text-sm transition-colors">
             ← Back
@@ -823,79 +821,29 @@ export default function MomentPostPage() {
             {moment.listeningArtist && (
               <p className="text-sm text-[#4a6b50] mt-1">{moment.listeningArtist}</p>
             )}
-
-            {/* Deep link buttons */}
-            <div className="flex gap-3 justify-center mt-4">
-              {spotifyUri && (
-                <a
-                  href={spotifyUri}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1DB954]/10 text-[#1DB954] rounded-full text-sm font-medium hover:bg-[#1DB954]/20 transition-colors"
-                >
-                  🎧 Open in Spotify
-                </a>
-              )}
-              {appleMusicUrl && (
-                <a
-                  href={appleMusicUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#FC3C44]/10 text-[#FC3C44] rounded-full text-sm font-medium hover:bg-[#FC3C44]/20 transition-colors"
-                >
-                  🎵 Apple Music
-                </a>
-              )}
-            </div>
           </div>
 
-          {listenConfirmed ? (
+          {listenDetected ? (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
               <div className="text-5xl mb-4">🎵</div>
               <h2 className="text-xl font-semibold text-[#2a402c] mb-2">Listened together</h2>
-              <p className="text-sm text-muted-foreground mb-6">You shared this moment today.</p>
-              {myPost?.reflectionText && (
-                <div className="bg-white/70 border border-[#6B8F71]/25 rounded-2xl px-4 py-3 text-sm text-[#3a5a40] italic w-full text-left">
-                  "{myPost.reflectionText}"
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">Eleanor detected your listen and logged it for you.</p>
             </motion.div>
           ) : (
-            <div className="flex-1 flex flex-col">
-              {/* Optional reflection */}
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-[#2a402c] mb-2">
-                  {moment.reflectionPrompt ?? "What did you notice while listening?"}
-                </label>
-                <textarea
-                  value={reflection}
-                  onChange={e => setReflection(e.target.value)}
-                  rows={3}
-                  placeholder="A feeling, a line that stuck out, a memory…"
-                  className="w-full px-4 py-3 rounded-2xl border border-border focus:border-[#6B8F71] focus:ring-1 focus:ring-[#6B8F71] outline-none bg-white/80 resize-none text-sm leading-relaxed"
-                />
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="bg-white/60 border border-[#6B8F71]/20 rounded-2xl px-5 py-6 w-full">
+                <p className="text-sm font-semibold text-[#2a402c] mb-2">Waiting for your listen</p>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  Play this {typeLabel} on Apple Music. Eleanor checks every few hours and will auto-log when it detects you've listened.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-xs text-[#6B8F71]">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#6B8F71] animate-pulse" />
+                  Listening for activity
+                </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* Fixed bottom button */}
-        {!listenConfirmed && (
-          <div className="fixed bottom-0 left-0 right-0 bg-[#F2F7F2] border-t border-[#6B8F71]/20 px-6 pb-[env(safe-area-inset-bottom)] z-50">
-            <div className="max-w-md mx-auto py-4">
-              {postMutation.isError && (
-                <p className="text-center text-sm text-red-600 mb-2">Couldn't save — tap to try again.</p>
-              )}
-              <button
-                onClick={() => postMutation.mutate({ isCheckin: true, reflectionText: reflection.trim() || undefined })}
-                disabled={postMutation.isPending}
-                className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base tracking-wide hover:bg-[#5a7a60] transition-all disabled:opacity-60"
-              >
-                {postMutation.isPending ? "Logging…" : postMutation.isError ? "Try again 🎵" : "🎵 We listened together"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     );
   }

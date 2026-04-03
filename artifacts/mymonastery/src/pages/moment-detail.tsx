@@ -252,6 +252,19 @@ export default function MomentDetail() {
   const [showInvite, setShowInvite] = useState(false);
   const [invitePeople, setInvitePeople] = useState<{ name: string; email: string }[]>([]);
   const [amConnecting, setAmConnecting] = useState(false);
+  const [mkLoaded, setMkLoaded] = useState(false);
+
+  // Load MusicKit JS dynamically
+  useEffect(() => {
+    if ((window as unknown as Record<string, unknown>)["MusicKit"]) { setMkLoaded(true); return; }
+    const existing = document.querySelector('script[src*="musickit"]');
+    if (existing) { existing.addEventListener("load", () => setMkLoaded(true)); return; }
+    const s = document.createElement("script");
+    s.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
+    s.async = true;
+    s.onload = () => setMkLoaded(true);
+    document.head.appendChild(s);
+  }, []);
   // Bell editing removed — shared time, editable via Settings > Edit practice
   const [editingPractice, setEditingPractice] = useState(false);
   const [editName, setEditName] = useState("");
@@ -276,6 +289,19 @@ export default function MomentDetail() {
     mutationFn: () => apiRequest("DELETE", "/api/apple-music/disconnect", {}),
     onSuccess: () => { void refetchAmStatus(); },
   });
+
+  // On-demand Apple Music check: when a listening practice loads, check all members' history
+  const [amChecked, setAmChecked] = useState(false);
+  useEffect(() => {
+    if (!data || amChecked) return;
+    if (data.moment.templateType !== "listening") return;
+    setAmChecked(true);
+    apiRequest<{ checked: number; newLogs: number }>("POST", `/api/apple-music/check-now/${id}`, {})
+      .then(result => {
+        if (result.newLogs > 0) qc.invalidateQueries({ queryKey: [`/api/moments/${id}`] });
+      })
+      .catch(() => { /* Apple Music not connected or not configured */ });
+  }, [data, amChecked, id, qc]);
 
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/moments/${id}/seed-post`, {
@@ -374,13 +400,23 @@ export default function MomentDetail() {
     setAmConnecting(true);
     try {
       const { token } = await apiRequest<{ token: string }>("GET", "/api/apple-music/developer-token");
-      const mk = (window as unknown as Record<string, unknown>)["MusicKit"] as {
+      const w = window as unknown as Record<string, unknown>;
+      // Wait for MusicKit to be available
+      if (!w["MusicKit"]) {
+        await new Promise<void>((resolve, reject) => {
+          let tries = 0;
+          const iv = setInterval(() => {
+            if (w["MusicKit"]) { clearInterval(iv); resolve(); }
+            else if (++tries > 50) { clearInterval(iv); reject(new Error("MusicKit did not load")); }
+          }, 200);
+        });
+      }
+      const MK = w["MusicKit"] as {
         configure: (opts: object) => Promise<void>;
         getInstance: () => { authorize: () => Promise<string> };
-      } | undefined;
-      if (!mk) throw new Error("MusicKit not loaded");
-      await mk.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
-      const musicUserToken = await mk.getInstance().authorize();
+      };
+      await MK.configure({ developerToken: token, app: { name: "Eleanor", build: "1.0.0" } });
+      const musicUserToken = await MK.getInstance().authorize();
       await apiRequest("POST", "/api/apple-music/connect", { musicUserToken });
       void refetchAmStatus();
     } catch (err) {
@@ -564,9 +600,6 @@ export default function MomentDetail() {
         {/* Apple Music connection — listening practices only */}
         {isListening && (
           <>
-            {/* Load MusicKit JS */}
-            <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async crossOrigin="anonymous" />
-
             {amStatus?.connected ? (
               <div className="mb-5 flex items-center justify-between bg-[#FFF0F0] border border-[#FC3C44]/20 rounded-2xl px-4 py-3">
                 <div className="flex items-center gap-2">
