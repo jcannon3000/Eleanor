@@ -1,80 +1,68 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sprout, ArrowRight, Mail } from "lucide-react";
+import { Sprout, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
-type Step = "email" | "name" | "sent";
+type Mode = "signin" | "register";
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useAuth();
-  const searchParams = new URLSearchParams(window.location.search);
-  const authError = searchParams.get("error");
 
-  const [step, setStep] = useState<Step>("email");
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isLoading && user) {
-      setLocation("/dashboard");
-    }
+    if (!isLoading && user) setLocation("/dashboard");
   }, [user, isLoading, setLocation]);
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError("");
-    if (!email.trim() || !email.includes("@")) {
-      setFormError("Please enter a valid email address.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/auth/email/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      const data = await res.json();
-      if (data.needsName) {
-        setStep("name");
-      } else if (data.ok) {
-        setStep("sent");
-      } else {
-        setFormError(data.error ?? "Something went wrong. Please try again.");
-      }
-    } catch {
-      setFormError("Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError("");
+    setPassword("");
+  }
 
-  const handleNameSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError("");
-    if (!name.trim()) {
-      setFormError("Please enter your name.");
-      return;
+    setError("");
+
+    if (!email.trim() || !email.includes("@")) {
+      setError("Enter a valid email address."); return;
     }
+    if (mode === "register" && !name.trim()) {
+      setError("Enter your name."); return;
+    }
+    if (!password || password.length < 6) {
+      setError("Password must be at least 6 characters."); return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/email/request", {
+      const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const body = mode === "register"
+        ? { email: email.trim(), name: name.trim(), password }
+        : { email: email.trim(), password };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
+
       if (data.ok) {
-        setStep("sent");
+        setLocation("/dashboard");
       } else {
-        setFormError(data.error ?? "Something went wrong. Please try again.");
+        setError(data.error ?? "Something went wrong. Please try again.");
       }
     } catch {
-      setFormError("Something went wrong. Please try again.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -88,16 +76,8 @@ export default function Onboarding() {
     );
   }
 
-  const errorMessage =
-    authError === "link_expired"
-      ? "That link has expired. Enter your email below to get a new one."
-      : authError
-      ? "Something went wrong with sign-in. Please try again."
-      : "";
-
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
-      {/* Subtle organic background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/4 blur-3xl" />
         <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-accent/5 blur-3xl" />
@@ -151,136 +131,97 @@ export default function Onboarding() {
               Eleanor turns one-time plans into traditions — coordinating everyone's calendars so the things worth repeating actually do.
             </motion.p>
 
-            {/* Auth error */}
-            {(errorMessage || formError) && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="mb-6 px-4 py-3 rounded-xl bg-destructive/10 text-destructive text-sm border border-destructive/20 max-w-sm mx-auto md:mx-0"
-              >
-                {formError || errorMessage}
-              </motion.div>
-            )}
-
-            {/* Form area */}
+            {/* Form card */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.58 }}
               className="max-w-sm w-full mx-auto md:mx-0"
             >
-              <AnimatePresence mode="wait">
-                {step === "email" && (
-                  <motion.form
-                    key="email-step"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                    onSubmit={handleEmailSubmit}
-                    className="flex flex-col gap-3"
+              {/* Mode toggle */}
+              <div className="flex rounded-xl bg-muted/50 border border-border p-1 mb-5">
+                {(["signin", "register"] as Mode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => switchMode(m)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      mode === m
+                        ? "bg-card shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <div className="relative">
-                      <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={e => { setEmail(e.target.value); setFormError(""); }}
-                        className="w-full pl-11 pr-4 py-4 rounded-2xl bg-card border-2 border-border text-foreground placeholder:text-muted-foreground/60 text-base focus:outline-none focus:border-primary/50 transition-colors"
-                        autoFocus
-                        autoComplete="email"
-                        disabled={submitting}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="flex items-center justify-center gap-2 w-full px-6 py-4 rounded-2xl bg-primary text-primary-foreground font-medium text-base transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
-                      {submitting ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
-                      ) : (
-                        <>Continue <ArrowRight size={16} /></>
-                      )}
-                    </button>
-                  </motion.form>
-                )}
+                    {m === "signin" ? "Sign in" : "Create account"}
+                  </button>
+                ))}
+              </div>
 
-                {step === "name" && (
-                  <motion.form
-                    key="name-step"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                    onSubmit={handleNameSubmit}
-                    className="flex flex-col gap-3"
-                  >
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Welcome! What should we call you?
-                    </p>
+              <AnimatePresence mode="wait">
+                <motion.form
+                  key={mode}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  onSubmit={handleSubmit}
+                  className="flex flex-col gap-3"
+                >
+                  {mode === "register" && (
                     <input
                       type="text"
                       placeholder="Your name"
                       value={name}
-                      onChange={e => { setName(e.target.value); setFormError(""); }}
-                      className="w-full px-4 py-4 rounded-2xl bg-card border-2 border-border text-foreground placeholder:text-muted-foreground/60 text-base focus:outline-none focus:border-primary/50 transition-colors"
-                      autoFocus
+                      onChange={e => { setName(e.target.value); setError(""); }}
+                      className="w-full px-4 py-3.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:border-primary/50 transition-colors"
                       autoComplete="name"
                       disabled={submitting}
                     />
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="flex items-center justify-center gap-2 w-full px-6 py-4 rounded-2xl bg-primary text-primary-foreground font-medium text-base transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
-                      {submitting ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
-                      ) : (
-                        <>Send my link <ArrowRight size={16} /></>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setStep("email"); setFormError(""); }}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      ← Back
-                    </button>
-                  </motion.form>
-                )}
+                  )}
 
-                {step === "sent" && (
-                  <motion.div
-                    key="sent-step"
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="px-6 py-5 rounded-2xl bg-card border-2 border-border text-left"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                        <Mail size={18} />
-                      </div>
-                      <p className="font-medium text-foreground">Check your inbox</p>
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      We sent a sign-in link to <strong className="text-foreground">{email}</strong>. Click it to continue — no password needed.
-                    </p>
-                    <p className="text-xs text-muted-foreground/70 mt-3">
-                      This is also the email calendar invites will be sent to.
-                    </p>
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(""); }}
+                    className="w-full px-4 py-3.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                    autoComplete="email"
+                    disabled={submitting}
+                  />
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Password"
+                      value={password}
+                      onChange={e => { setPassword(e.target.value); setError(""); }}
+                      className="w-full px-4 py-3.5 pr-11 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                      autoComplete={mode === "register" ? "new-password" : "current-password"}
+                      disabled={submitting}
+                    />
                     <button
                       type="button"
-                      onClick={() => { setStep("email"); setFormError(""); }}
-                      className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                      tabIndex={-1}
                     >
-                      Wrong email? Start over
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
-                  </motion.div>
-                )}
+                  </div>
+
+                  {error && (
+                    <p className="text-sm text-destructive px-1">{error}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex items-center justify-center w-full px-6 py-3.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-60 mt-1"
+                  >
+                    {submitting ? (
+                      <div className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
+                    ) : mode === "signin" ? "Sign in" : "Create account"}
+                  </button>
+                </motion.form>
               </AnimatePresence>
             </motion.div>
           </div>
@@ -300,8 +241,6 @@ export default function Onboarding() {
                 className="w-full h-full object-cover"
               />
             </div>
-
-            {/* Floating cards */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

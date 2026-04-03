@@ -3,10 +3,12 @@ import { Router, type IRouter } from "express";
 import passport from "passport";
 import { Strategy as GoogleStrategy, type Profile } from "passport-google-oauth20";
 import { google } from "googleapis";
-import { db, usersTable, emailLoginTokensTable } from "@workspace/db";
-import { eq, and, gt } from "drizzle-orm";
-import { randomBytes } from "crypto";
-import { sendMagicLinkEmail } from "../lib/email";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
 
 const router: IRouter = Router();
 
@@ -207,119 +209,77 @@ router.post("/auth/logout", (req, res, next) => {
   });
 });
 
-// ─── Magic link (email) login ─────────────────────────────────────────────────
+// ─── Password helpers ─────────────────────────────────────────────────────────
 
-// POST /api/auth/email/request
-// Body: { email, name? }
-// Checks if user exists; if not requires name. Sends magic link email.
-router.post("/auth/email/request", async (req, res): Promise<void> => {
-  const { email, name } = req.body as { email?: string; name?: string };
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    res.status(400).json({ error: "A valid email address is required." });
-    return;
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [hashed, salt] = stored.split(".");
+  if (!hashed || !salt) return false;
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  const storedBuf = Buffer.from(hashed, "hex");
+  return buf.length === storedBuf.length && timingSafeEqual(buf, storedBuf);
+}
+
+// ─── POST /api/auth/register ──────────────────────────────────────────────────
+router.post("/auth/register", async (req, res): Promise<void> => {
+  const { email, name, password } = req.body as { email?: string; name?: string; password?: string };
+
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ error: "A valid email address is required." }); return;
+  }
+  if (!name || name.trim().length < 1) {
+    res.status(400).json({ error: "Your name is required." }); return;
+  }
+  if (!password || password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters." }); return;
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-
-  // Check if user already exists
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
-
-  if (!existing) {
-    // New user — name is required
-    if (!name || typeof name !== "string" || name.trim().length < 1) {
-      res.json({ needsName: true });
-      return;
-    }
+  if (existing) {
+    res.status(400).json({ error: "An account with that email already exists." }); return;
   }
 
-  // Generate a secure random token
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  const passwordHash = await hashPassword(password);
+  const [user] = await db
+    .insert(usersTable)
+    .values({ email: normalizedEmail, name: name.trim(), passwordHash })
+    .returning();
 
-  // Invalidate any existing unused tokens for this email first
-  await db
-    .delete(emailLoginTokensTable)
-    .where(eq(emailLoginTokensTable.email, normalizedEmail));
-
-  // Insert new token (store name so we can create the user on verify)
-  const storedName = name?.trim() ?? existing?.name ?? normalizedEmail.split("@")[0];
-  await db.insert(emailLoginTokensTable).values({
-    email: normalizedEmail,
-    name: storedName,
-    token,
-    expiresAt,
+  req.login(user, (err) => {
+    if (err) { res.status(500).json({ error: "Login failed after registration." }); return; }
+    req.session.save(() => res.json({ ok: true }));
   });
-
-  const apiBase = callbackURL.replace("/api/auth/google/callback", "");
-  const magicLink = `${apiBase}/api/auth/email/verify?token=${token}`;
-
-  const sent = await sendMagicLinkEmail(normalizedEmail, magicLink, !existing);
-
-  if (!sent) {
-    // In dev, log the link so it's usable without email
-    console.log(`[DEV] Magic link for ${normalizedEmail}: ${magicLink}`);
-  }
-
-  res.json({ ok: true, sent });
 });
 
-// GET /api/auth/email/verify?token=xxx
-router.get("/auth/email/verify", async (req, res): Promise<void> => {
-  const token = req.query.token as string;
+// ─── POST /api/auth/login ─────────────────────────────────────────────────────
+router.post("/auth/login", async (req, res): Promise<void> => {
+  const { email, password } = req.body as { email?: string; password?: string };
 
-  if (!token) {
-    res.redirect(`${frontendURL}/?error=invalid_link`);
-    return;
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required." }); return;
   }
 
-  const now = new Date();
-  const [row] = await db
-    .select()
-    .from(emailLoginTokensTable)
-    .where(
-      and(
-        eq(emailLoginTokensTable.token, token),
-        gt(emailLoginTokensTable.expiresAt, now)
-      )
-    );
+  const normalizedEmail = email.trim().toLowerCase();
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
 
-  if (!row || row.usedAt) {
-    res.redirect(`${frontendURL}/?error=link_expired`);
-    return;
+  if (!user || !user.passwordHash) {
+    res.status(401).json({ error: "Incorrect email or password." }); return;
   }
 
-  // Mark token as used
-  await db
-    .update(emailLoginTokensTable)
-    .set({ usedAt: now })
-    .where(eq(emailLoginTokensTable.id, row.id));
-
-  const normalizedEmail = row.email;
-
-  // Find or create the user
-  let [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
-
-  if (!user) {
-    const rawName = row.name ?? normalizedEmail.split("@")[0];
-    const capitalized = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-
-    [user] = await db
-      .insert(usersTable)
-      .values({ email: normalizedEmail, name: capitalized })
-      .returning();
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Incorrect email or password." }); return;
   }
 
-  // Log in
   req.login(user, (err) => {
-    if (err) {
-      console.error("Login after magic link failed:", err);
-      res.redirect(`${frontendURL}/?error=auth_failed`);
-      return;
-    }
-    req.session.save(() => {
-      res.redirect(`${frontendURL}/dashboard`);
-    });
+    if (err) { res.status(500).json({ error: "Login failed." }); return; }
+    req.session.save(() => res.json({ ok: true }));
   });
 });
 

@@ -359,6 +359,9 @@ export async function migrate() {
       )
     `);
 
+    // Password-based auth
+    await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
