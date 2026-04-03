@@ -25,7 +25,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      <header className="absolute top-0 w-full z-10 px-6 md:px-8 py-6 md:py-8 flex justify-between items-center">
+      <header className="absolute top-0 left-0 right-0 z-10 px-6 md:px-8 py-6 md:py-8 flex justify-between items-center">
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
