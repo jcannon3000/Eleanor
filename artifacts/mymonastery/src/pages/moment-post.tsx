@@ -3,6 +3,8 @@ import { Link, useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { Sprout } from "lucide-react";
 import clsx from "clsx";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -464,6 +466,7 @@ function IntercessionPrayerPage({
 export default function MomentPostPage() {
   const { momentToken, userToken } = useParams<{ momentToken: string; userToken: string }>();
   const [, setLocation] = useLocation();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [reflection, setReflection] = useState("");
   const [posted, setPosted] = useState(false);
@@ -532,11 +535,47 @@ export default function MomentPostPage() {
     return true;
   };
 
-  // ── Loading / error states ──────────────────────────────────────────────────
-  if (isLoading) {
+  // ── Auth gate — require account to access practice ──────────────────────────
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-[#6B8F71] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    const practiceName = data?.moment?.name ?? "a practice";
+    const inviter = data?.inviterName ?? "Someone";
+    const memberCount = data?.memberCount ?? 0;
+    const currentPath = `/moment/${momentToken}/${userToken}`;
+    return (
+      <div className="min-h-screen bg-[#F5EDD8] flex items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl bg-[#6B8F71]/10 flex items-center justify-center text-[#6B8F71] mx-auto mb-5">
+            <Sprout size={28} strokeWidth={1.5} />
+          </div>
+          <p className="font-serif text-xl font-semibold text-[#2C1A0E] mb-2">You've been invited</p>
+          <p className="text-sm text-[#6b5c4a] leading-relaxed mb-1">
+            {inviter} invited you to
+          </p>
+          <p className="font-serif text-lg font-semibold text-[#2C1A0E] mb-3">{practiceName}</p>
+          {memberCount > 1 && (
+            <p className="text-xs text-[#6b5c4a]/70 mb-6">{memberCount} people practicing together</p>
+          )}
+          <a
+            href={`/?redirect=${encodeURIComponent(currentPath)}`}
+            className="inline-flex items-center justify-center w-full px-6 py-3.5 rounded-xl bg-[#6B8F71] text-white font-medium text-sm transition-opacity hover:opacity-90 mb-3"
+          >
+            Create account to continue
+          </a>
+          <a
+            href={`/?redirect=${encodeURIComponent(currentPath)}`}
+            className="text-sm text-[#6b5c4a] hover:text-[#2C1A0E] transition-colors"
+          >
+            Already have an account? Sign in
+          </a>
+        </div>
       </div>
     );
   }

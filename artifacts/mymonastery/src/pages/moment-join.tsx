@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { Sprout } from "lucide-react";
 
 const SPIRITUAL_TEMPLATES = new Set(["morning-prayer", "evening-prayer", "intercession", "breath", "contemplative", "walk"]);
 const TIME_OF_DAY_MAP: Record<string, { emoji: string; label: string }> = {
@@ -27,6 +29,7 @@ interface PracticeInfo {
 
 export default function MomentJoin() {
   const { momentToken } = useParams<{ momentToken: string }>();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [phase, setPhase] = useState<"info" | "time" | "done">("info");
   const [name, setName] = useState("");
@@ -86,10 +89,48 @@ export default function MomentJoin() {
     });
   }
 
-  if (isLoading) {
+  // Auto-populate from logged-in user
+  useEffect(() => {
+    if (user) {
+      if (!name) setName(user.name);
+      if (!email) setEmail(user.email);
+    }
+  }, [user]);
+
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center">
         <div className="text-[#F5EDD8] text-xl">🌿</div>
+      </div>
+    );
+  }
+
+  // Auth gate — require account
+  if (!user) {
+    const currentPath = `/moment/join/${momentToken}`;
+    return (
+      <div className="min-h-screen bg-[#2C1A0E] flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl bg-[#6B8F71]/20 flex items-center justify-center mx-auto mb-5">
+            <Sprout size={28} strokeWidth={1.5} className="text-[#9ecc9f]" />
+          </div>
+          <p className="text-xl font-semibold text-[#F5EDD8] mb-2">Join this practice</p>
+          {data && <p className="text-[#c9b99a] text-sm mb-1">{data.name}</p>}
+          {data?.intention && <p className="text-[#c9b99a]/70 text-xs italic mb-6">"{data.intention}"</p>}
+          {!data && <p className="text-[#c9b99a] text-sm mb-6">Create an account to join.</p>}
+          <a
+            href={`/?redirect=${encodeURIComponent(currentPath)}`}
+            className="inline-flex items-center justify-center w-full px-6 py-3.5 rounded-xl bg-[#6B8F71] text-white font-medium text-sm transition-opacity hover:opacity-90 mb-3"
+          >
+            Create account to join
+          </a>
+          <a
+            href={`/?redirect=${encodeURIComponent(currentPath)}`}
+            className="text-sm text-[#c9b99a] hover:text-[#F5EDD8] transition-colors"
+          >
+            Already have an account? Sign in
+          </a>
+        </div>
       </div>
     );
   }
@@ -122,24 +163,14 @@ export default function MomentJoin() {
           <h2 className="text-2xl font-semibold mb-2">You're in.</h2>
           <p className="text-[#c9b99a] mb-6 text-sm leading-relaxed">
             {data.name} is yours to tend.<br />
-            Bookmark your personal link below.
-          </p>
-
-          <div className="bg-[#3a2410] rounded-2xl p-5 mb-6 text-left">
-            <p className="text-xs text-[#c9b99a] uppercase tracking-widest mb-2 font-medium">Your personal link</p>
-            <p className="text-[#9ecc9f] text-sm break-all font-mono leading-relaxed">{personalLink}</p>
-          </div>
-
-          <p className="text-xs text-[#c9b99a]/60 italic mb-6">
-            No login needed. Just open this link when it's time.<br />
-            Two calendar events are on their way.
+            A calendar invite is on its way.
           </p>
 
           <a
-            href={personalLink}
+            href="/dashboard"
             className="inline-block px-8 py-3 bg-[#6B8F71] text-white rounded-full font-medium hover:bg-[#5a7a60] transition-colors"
           >
-            Open your practice 🌿
+            Go to your dashboard 🌿
           </a>
         </motion.div>
       </div>
@@ -282,7 +313,7 @@ export default function MomentJoin() {
               className="w-full px-4 py-3 rounded-xl bg-[#2C1A0E] border border-[#5a3d28] text-[#F5EDD8] placeholder-[#7a5a42] focus:border-[#6B8F71] focus:outline-none text-sm"
             />
           </div>
-          <p className="text-xs text-[#c9b99a]/60 italic">No account needed. Your link is private to you.</p>
+          <p className="text-xs text-[#c9b99a]/60 italic">Calendar invites will be sent to your email.</p>
         </div>
 
         <button

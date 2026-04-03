@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sprout, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +10,7 @@ type Mode = "signin" | "register";
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useAuth();
+  const queryClient = useQueryClient();
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -18,9 +20,12 @@ export default function Onboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
+
   useEffect(() => {
-    if (!isLoading && user) setLocation("/dashboard");
-  }, [user, isLoading, setLocation]);
+    if (!isLoading && user) setLocation(redirectTo);
+  }, [user, isLoading, setLocation, redirectTo]);
 
   function switchMode(m: Mode) {
     setMode(m);
@@ -57,7 +62,8 @@ export default function Onboarding() {
       const data = await res.json();
 
       if (data.ok) {
-        setLocation("/dashboard");
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        setLocation(redirectTo);
       } else {
         setError(data.error ?? "Something went wrong. Please try again.");
       }

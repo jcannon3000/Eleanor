@@ -200,17 +200,6 @@ router.patch("/auth/me/presence", async (req, res): Promise<void> => {
   res.json({ showPresence });
 });
 
-// ─── One-time admin: delete all users (remove after use) ─────────────────────
-router.get("/auth/admin/reset-all-users", async (_req, res): Promise<void> => {
-  try {
-    await db.delete(usersTable);
-    res.send("<h2>All users deleted. You can now create fresh accounts.</h2><p><a href='/'>Go to Eleanor</a></p>");
-  } catch (err) {
-    console.error("Reset users failed:", err);
-    res.status(500).send("Failed to delete users.");
-  }
-});
-
 router.post("/auth/logout", (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
