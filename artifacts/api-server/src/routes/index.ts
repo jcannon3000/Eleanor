@@ -10,6 +10,7 @@ import inviteRouter from "./invite";
 import momentsRouter from "./moments";
 import prayerRouter from "./prayer";
 import appleMusicRouter from "./appleMusic";
+import officeRouter from "./office";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(inviteRouter);
 router.use(momentsRouter);
 router.use(prayerRouter);
 router.use(appleMusicRouter);
+router.use(officeRouter);
 
 export default router;

@@ -404,17 +404,30 @@ export default function MomentDetail() {
   const isContemplative = moment.templateType === "contemplative";
   const isFasting = moment.templateType === "fasting";
   const isListening = moment.templateType === "listening";
+  const isMorningPrayer =
+    moment.templateType === "morning_prayer" ||
+    moment.templateType === "morning-prayer";
   const isSpiritual = SPIRITUAL_TEMPLATE_IDS.has(moment.templateType ?? "");
   // Use the backend's computed windowOpen for all practices — it checks day-of-week + time window
   const isOpenNow = data.windowOpen;
 
-  // Intercession: Pray button always accessible (prayer can be read any time; Amen only logs when window open)
+  // Morning Prayer navigates to slideshow; intercession always accessible; others need window open
   const postUrl = myUserToken
-    ? (isIntercession || isOpenNow) ? `/moment/${moment.momentToken}/${myUserToken}` : null
+    ? isMorningPrayer
+      ? `/morning-prayer/${moment.id}/${myUserToken}`
+      : (isIntercession || isOpenNow)
+        ? `/moment/${moment.momentToken}/${myUserToken}`
+        : null
     : null;
 
   // Label for action button — context-sensitive
-  const actionLabel = isIntercession ? "Pray 🙏" : isListening ? "Listen 🎵" : "Log 🌿";
+  const actionLabel = isIntercession
+    ? "Pray 🙏"
+    : isListening
+      ? "Listen 🎵"
+      : isMorningPrayer
+        ? "Open Office 📖"
+        : "Log 🌿";
 
   // Intention display — for intercession, show intercessionTopic if it differs from the practice name
   const intercessionLabel = moment.intercessionTopic ?? moment.intention;
@@ -638,8 +651,8 @@ export default function MomentDetail() {
           )
         )}
 
-        {/* Open Now Banner — only when actually open */}
-        {isOpenNow ? (
+        {/* Open Now Banner — only when actually open (morning prayer is always accessible) */}
+        {(isOpenNow || isMorningPrayer) ? (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -647,10 +660,18 @@ export default function MomentDetail() {
           >
             <div>
               <p className="text-sm font-semibold text-[#C17F24]">
-                {isIntercession ? "🙏 Open today · Pray together" : isListening ? "🎵 Listening today" : "🌿 Open today"}
+                {isMorningPrayer
+                  ? "📖 Morning Prayer · Today's office"
+                  : isIntercession
+                    ? "🙏 Open today · Pray together"
+                    : isListening
+                      ? "🎵 Listening today"
+                      : "🌿 Open today"}
               </p>
               <p className="text-xs text-[#C17F24]/70 mt-0.5">
-                {todayPostCount} of {memberCount} {isIntercession ? "have prayed" : isListening ? "listened" : "logged"}
+                {isMorningPrayer
+                  ? `${todayPostCount} of ${memberCount} have prayed`
+                  : `${todayPostCount} of ${memberCount} ${isIntercession ? "have prayed" : isListening ? "listened" : "logged"}`}
               </p>
             </div>
             {postUrl && !isListening && (

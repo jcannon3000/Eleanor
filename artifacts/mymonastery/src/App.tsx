@@ -55,6 +55,7 @@ import MomentDetail from "./pages/moment-detail";
 import MomentJoin from "./pages/moment-join";
 import TraditionNew from "./pages/tradition-new";
 import AppleMusicAuth from "./pages/apple-music-auth";
+import MorningPrayerPage from "./pages/morning-prayer";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,6 +103,7 @@ function Router() {
       <Route path="/people" component={People} />
       <Route path="/people/:email" component={PersonProfile} />
       <Route path="/apple-music-auth" component={AppleMusicAuth} />
+      <Route path="/morning-prayer/:momentId/:token" component={MorningPrayerPage} />
       <Route component={NotFound} />
     </Switch>
   );

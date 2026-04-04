@@ -12,3 +12,4 @@ export * from "./moment_windows";
 export * from "./prayer_requests";
 export * from "./ritual_time_suggestions";
 export * from "./user_connections_cache";
+export * from "./morningPrayer";
