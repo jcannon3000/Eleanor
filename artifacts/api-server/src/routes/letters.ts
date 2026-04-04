@@ -21,6 +21,7 @@ import {
   isInLastThreeDays,
 } from "../lib/letterPeriods";
 import { sendInvitationEmail, sendNewLetterEmail, sendReminderEmail } from "../lib/letterEmails";
+import { sendLetterCalendarEvent } from "../lib/letterCalendar";
 import { getFrontendUrl } from "../lib/urls";
 
 const router: IRouter = Router();
@@ -285,6 +286,18 @@ router.get(
         ),
       }));
 
+      // Recent letters for preview + postmarks
+      const recentLetters = [...letters]
+        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+        .slice(0, 3);
+
+      // First unread letter for preview
+      const identifier = auth.userId ? auth.userId : auth.email;
+      const firstUnread = letters.find((l) => {
+        const readers = (l.readBy as Array<string | number>) || [];
+        return !readers.includes(identifier) && l.authorEmail !== auth.email;
+      });
+
       results.push({
         ...correspondence,
         members: members.map((m) => ({
@@ -292,9 +305,24 @@ router.get(
           email: m.email,
           joinedAt: m.joinedAt,
           lastLetterAt: m.lastLetterAt,
+          homeCity: m.homeCity,
         })),
         letterCount: letters.length,
         unreadCount,
+        recentPostmarks: recentLetters
+          .filter((l) => l.postmarkCity)
+          .map((l) => ({
+            authorName: l.authorName,
+            city: l.postmarkCity,
+            sentAt: l.sentAt,
+          })),
+        unreadPreview: firstUnread
+          ? {
+              authorName: firstUnread.authorName,
+              content: firstUnread.content.slice(0, 120),
+              postmarkCity: firstUnread.postmarkCity,
+            }
+          : null,
         currentPeriod: {
           periodNumber,
           periodStart: periodStart.toISOString(),
@@ -363,6 +391,7 @@ router.get(
         email: m.email,
         joinedAt: m.joinedAt,
         lastLetterAt: m.lastLetterAt,
+        homeCity: m.homeCity,
       })),
       letters,
       currentPeriod: {
@@ -433,11 +462,16 @@ router.post(
       return;
     }
 
-    const { content } = req.body as { content: string };
+    const { content, postmarkCity } = req.body as { content: string; postmarkCity?: string };
     if (!content || !content.trim()) {
       res.status(400).json({ error: "Letter content is required" });
       return;
     }
+    if (!postmarkCity || !postmarkCity.trim()) {
+      res.status(400).json({ error: "Postmark city is required — where are you writing from?" });
+      return;
+    }
+    const city = postmarkCity.trim().slice(0, 100);
     const wordCount = content.trim().split(/\s+/).length;
     if (wordCount < 100) {
       res.status(400).json({ error: "Letter must be at least 100 words", wordCount });
@@ -499,13 +533,14 @@ router.post(
         letterNumber,
         periodNumber,
         periodStartDate: periodStartStr,
+        postmarkCity: city,
       })
       .returning();
 
-    // Update member's lastLetterAt
+    // Update member's lastLetterAt and homeCity
     await db
       .update(correspondenceMembersTable)
-      .set({ lastLetterAt: now })
+      .set({ lastLetterAt: now, homeCity: city })
       .where(eq(correspondenceMembersTable.id, member.id));
 
     // Delete draft for this period
@@ -519,7 +554,7 @@ router.post(
         ),
       );
 
-    // Send notification emails to other members (fire-and-forget)
+    // Send calendar events + notification emails to other members (fire-and-forget)
     const frontendUrl = getFrontendUrl();
     for (const m of members) {
       if (m.email === auth.email) continue;
@@ -529,6 +564,19 @@ router.post(
         ? `${frontendUrl}/letters/${correspondenceId}`
         : `${frontendUrl}/letters/${correspondenceId}?token=${m.inviteToken}`;
 
+      // Calendar event (primary notification)
+      sendLetterCalendarEvent({
+        recipientEmail: m.email,
+        recipientName: m.name || m.email.split("@")[0],
+        authorName: auth.name,
+        correspondenceName: correspondence.name,
+        postmarkCity: city,
+        letterDate: now,
+        letterUrl: correspondenceUrl,
+        correspondenceId,
+      }).catch((err) => console.error("Failed to send letter calendar event:", err));
+
+      // Email notification (fallback / supplement)
       sendNewLetterEmail({
         to: m.email,
         authorName: auth.name,

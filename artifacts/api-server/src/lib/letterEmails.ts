@@ -119,7 +119,7 @@ export async function sendInvitationEmail(opts: {
   inviteUrl: string;
 }): Promise<boolean> {
   const { to, creatorName, correspondenceName, inviteUrl } = opts;
-  const subject = `${creatorName} wants to stay in touch`;
+  const subject = `${creatorName} wants to stay in touch \u2014 Letters \u{1F4EE}`;
 
   const html = wrapHtml(`
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
@@ -128,14 +128,15 @@ export async function sendInvitationEmail(opts: {
     <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
       ${creatorName} has invited you to exchange letters on Eleanor.
     </p>
+    <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
+      Once every two weeks, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.
+    </p>
     <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
-      Once every two weeks, you each write one letter \u2014
-      sharing what\u2019s been happening, what\u2019s on your mind,
-      what matters. A simple practice of staying close.
+      A simple practice of staying close. \u{1F33F}
     </p>
     ${linkButton(inviteUrl, `Accept ${creatorName}\u2019s invitation \u2192`)}
     <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
-      No account needed. Just your words. \u{1F33F}
+      No account needed. Your link is all you need.
     </p>
   `);
 
@@ -144,12 +145,14 @@ export async function sendInvitationEmail(opts: {
     "",
     `${creatorName} has invited you to exchange letters on Eleanor.`,
     "",
-    "Once every two weeks, you each write one letter \u2014 sharing what\u2019s been happening, what\u2019s on your mind, what matters. A simple practice of staying close.",
+    "Once every two weeks, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.",
+    "",
+    "A simple practice of staying close. \u{1F33F}",
     "",
     `Accept ${creatorName}\u2019s invitation:`,
     inviteUrl,
     "",
-    "No account needed. Just your words. \u{1F33F}",
+    "No account needed. Your link is all you need.",
   ].join("\n");
 
   return sendEmail(to, subject, html, text);

@@ -23,6 +23,8 @@ export const correspondenceMembersTable = pgTable("correspondence_members", {
   inviteToken: text("invite_token").notNull().unique(),
   joinedAt: timestamp("joined_at", { withTimezone: true }),
   lastLetterAt: timestamp("last_letter_at", { withTimezone: true }),
+  homeCity: text("home_city"),
+  homeCountry: text("home_country"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -38,6 +40,8 @@ export const lettersTable = pgTable("letters", {
   letterNumber: integer("letter_number").notNull(),
   periodNumber: integer("period_number").notNull(),
   periodStartDate: date("period_start_date").notNull(),
+  postmarkCity: text("postmark_city"),
+  postmarkCountry: text("postmark_country"),
   sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
   readBy: jsonb("read_by").notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

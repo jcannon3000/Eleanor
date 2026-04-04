@@ -89,24 +89,37 @@ export default function LetterInvitePage() {
   if (!data) return null;
 
   if (accepted) {
+    const writeUrl = correspondenceId
+      ? `/letters/${correspondenceId}/write?token=${inviteToken}`
+      : "/";
     const goUrl = correspondenceId
       ? `/letters/${correspondenceId}?token=${inviteToken}`
       : "/";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: "#FAF6F0" }}>
-        <div className="text-5xl mb-6">📮</div>
+        <div className="text-5xl mb-6">{"\u{1F4EE}"}</div>
         <p className="text-lg font-semibold mb-2" style={{ color: "#2C1810" }}>
-          You're in.
+          You're in. {"\u{1F33F}"}
         </p>
-        <p className="text-sm text-muted-foreground mb-8">
-          Write your first letter whenever you're ready.
+        <p className="text-sm text-muted-foreground mb-2 leading-relaxed">
+          When {data.creatorName} writes you a letter, you'll get
+          a calendar notification with a link to read it.
+        </p>
+        <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+          Write your first letter whenever you're ready. {"\u{1F4EE}"}
         </p>
         <button
-          onClick={() => setLocation(goUrl)}
-          className="px-6 py-3 rounded-xl font-semibold text-sm"
+          onClick={() => setLocation(writeUrl)}
+          className="px-6 py-3 rounded-xl font-semibold text-sm mb-3"
           style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
         >
-          Go to letters
+          Write your first letter {"\u{1F4EE}"}
+        </button>
+        <button
+          onClick={() => setLocation(goUrl)}
+          className="text-sm text-muted-foreground"
+        >
+          or view the correspondence &rarr;
         </button>
       </div>
     );
@@ -125,8 +138,10 @@ export default function LetterInvitePage() {
         </h1>
 
         <p className="text-base text-muted-foreground mb-4 leading-relaxed">
-          {data.creatorName} has invited you to exchange letters &mdash; one every two weeks,
-          in a space set apart from the noise. A simple practice of staying close.
+          {data.creatorName} has invited you to exchange letters on Eleanor.
+          Once every two weeks, you each write one letter. When a letter arrives,
+          you'll get a calendar notification with a link to read it.
+          Then write back when you're ready. A simple practice of staying close.
         </p>
 
         <p className="text-base italic mb-6" style={{ color: "#4A6FA5" }}>

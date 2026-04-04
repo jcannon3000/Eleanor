@@ -11,13 +11,33 @@ interface CorrespondenceMemberStatus {
   hasWritten: boolean;
 }
 
+interface PostmarkData {
+  authorName: string;
+  city: string;
+  sentAt: string;
+}
+
+interface UnreadPreview {
+  authorName: string;
+  content: string;
+  postmarkCity: string | null;
+}
+
 interface CorrespondenceItem {
   id: number;
   name: string;
   groupType: string;
-  members: Array<{ name: string | null; email: string; joinedAt: string | null; lastLetterAt: string | null }>;
+  members: Array<{
+    name: string | null;
+    email: string;
+    joinedAt: string | null;
+    lastLetterAt: string | null;
+    homeCity: string | null;
+  }>;
   letterCount: number;
   unreadCount: number;
+  recentPostmarks: PostmarkData[];
+  unreadPreview: UnreadPreview | null;
   currentPeriod: {
     periodNumber: number;
     periodStart: string;
@@ -29,61 +49,177 @@ interface CorrespondenceItem {
   };
 }
 
-function PeriodStatus({ item, userName }: { item: CorrespondenceItem; userName: string }) {
+function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function formatPeriodRange(start: string, end: string): string {
+  return `${formatShortDate(start)} \u2013 ${formatShortDate(end)}`;
+}
+
+function PostmarkStamp({ city, date, rotation = -8 }: { city: string; date: string; rotation?: number }) {
+  return (
+    <div
+      className="inline-flex flex-col items-center justify-center flex-shrink-0"
+      style={{
+        border: "1px solid #4A6FA5",
+        borderRadius: "50% / 40%",
+        padding: "4px 10px",
+        transform: `rotate(${rotation}deg)`,
+        minWidth: "60px",
+      }}
+    >
+      <span
+        className="font-semibold uppercase"
+        style={{ color: "#4A6FA5", fontSize: "9px", letterSpacing: "0.08em", lineHeight: 1.2 }}
+      >
+        {city}
+      </span>
+      <span style={{ color: "#4A6FA5", fontSize: "8px", lineHeight: 1.2 }}>
+        {formatShortDate(date)}
+      </span>
+    </div>
+  );
+}
+
+function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; userName: string }) {
   const { currentPeriod } = item;
 
-  if (item.unreadCount > 0) {
-    const writer = currentPeriod.membersWritten.find(
-      (m) => m.hasWritten && m.name !== userName,
-    );
-    return (
-      <div className="flex items-center gap-2">
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{
-            backgroundColor: "#4A6FA5",
-            animation: "letterPulse 2s ease-in-out infinite",
-          }}
-        />
-        <span className="text-[13px] italic" style={{ color: "#4A6FA5" }}>
-          {writer?.name || "Someone"} wrote
-        </span>
-      </div>
-    );
-  }
-
-  if (!currentPeriod.hasWrittenThisPeriod && currentPeriod.isLastThreeDays) {
-    return (
-      <span className="text-[13px]" style={{ color: "#C17F24" }}>
-        Your letter is due
-      </span>
-    );
-  }
-
+  // Status text
+  let statusText = "";
+  let statusColor = "#9a9390";
   if (!currentPeriod.hasWrittenThisPeriod) {
-    return (
-      <span className="text-[13px] text-muted-foreground">
-        Period {currentPeriod.periodNumber} · {currentPeriod.periodLabel}
-      </span>
-    );
+    if (currentPeriod.isLastThreeDays) {
+      statusText = "Write your letter \u{1F4EE}";
+      statusColor = "#C17F24";
+    }
+  } else {
+    const allWritten = currentPeriod.membersWritten.every((m) => m.hasWritten);
+    if (allWritten) {
+      statusText = "All letters in \u{1F338}";
+      statusColor = "#6B8F71";
+    } else {
+      const waiting = currentPeriod.membersWritten.find(
+        (m) => !m.hasWritten && m.name !== userName,
+      );
+      statusText = `Waiting for ${waiting?.name || "others"}... \u{1F33F}`;
+      statusColor = "#6B8F71";
+    }
   }
 
-  const allWritten = currentPeriod.membersWritten.every((m) => m.hasWritten);
-  if (allWritten) {
-    return (
-      <span className="text-[13px]" style={{ color: "#6B8F71" }}>
-        All letters in
-      </span>
-    );
-  }
+  const otherMembers = item.members
+    .filter((m) => m.name !== userName)
+    .map((m) => m.name || m.email?.split("@")[0])
+    .join(", ");
 
-  const waiting = currentPeriod.membersWritten.find(
-    (m) => !m.hasWritten && m.name !== userName,
-  );
   return (
-    <span className="text-[13px] text-muted-foreground" style={{ color: "#6B8F71" }}>
-      Waiting for {waiting?.name || "others"}...
-    </span>
+    <Link href={`/letters/${item.id}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative cursor-pointer transition-shadow hover:shadow-md active:scale-[0.99] transition-transform"
+        style={{
+          backgroundColor: "#FAF6F0",
+          border: "1px solid rgba(74, 111, 165, 0.2)",
+          borderRadius: "4px",
+          borderLeft: "3px solid #4A6FA5",
+          boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
+          padding: "24px",
+          marginBottom: "20px",
+        }}
+      >
+        {/* Top row */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[18px] font-bold truncate" style={{ color: "#2C1810" }}>
+              {item.name}
+            </p>
+            <p className="text-[14px] text-muted-foreground truncate">
+              with {otherMembers}
+            </p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p
+              className="text-[10px] font-semibold uppercase"
+              style={{ color: "#4A6FA5", letterSpacing: "0.08em" }}
+            >
+              Letter {currentPeriod.periodNumber}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {formatPeriodRange(currentPeriod.periodStart, currentPeriod.periodEnd)}
+            </p>
+          </div>
+        </div>
+
+        {/* Postmark stamps */}
+        {item.recentPostmarks.length > 0 && (
+          <div className="flex justify-end gap-2 mt-3 -mr-2">
+            {item.recentPostmarks.slice(0, 2).map((pm, i) => (
+              <PostmarkStamp
+                key={i}
+                city={pm.city}
+                date={pm.sentAt}
+                rotation={i === 0 ? -8 : 6}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Unread letter preview */}
+        {item.unreadPreview && (
+          <div
+            className="mt-3"
+            style={{
+              backgroundColor: "#F7F0E6",
+              borderLeft: "2px solid #4A6FA5",
+              padding: "12px 16px",
+              borderRadius: "0 4px 4px 0",
+            }}
+          >
+            <p
+              className="text-[11px] font-semibold uppercase mb-1"
+              style={{ color: "#4A6FA5", letterSpacing: "0.08em" }}
+            >
+              {item.unreadPreview.authorName} wrote {item.unreadPreview.postmarkCity ? `from ${item.unreadPreview.postmarkCity}` : ""} {"\u{1F33F}"}
+            </p>
+            <p className="text-[15px]" style={{ color: "#2C1810" }}>
+              {item.unreadPreview.content}{item.unreadPreview.content.length >= 120 ? "..." : ""}
+            </p>
+            <p
+              className="text-[12px] font-medium mt-2 text-right"
+              style={{ color: "#4A6FA5" }}
+            >
+              Read letter &rarr;
+            </p>
+          </div>
+        )}
+
+        {/* Status row */}
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center gap-3">
+            {currentPeriod.membersWritten.map((m) => (
+              <span key={m.name} className="flex items-center gap-1 text-[13px]">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: m.hasWritten ? "#4A6FA5" : "transparent",
+                    border: `1.5px solid #4A6FA5`,
+                  }}
+                />
+                <span style={{ color: "#2C1810" }}>{m.name}</span>
+              </span>
+            ))}
+          </div>
+          {statusText && (
+            <span className="text-[13px]" style={{ color: statusColor }}>
+              {statusText}
+            </span>
+          )}
+        </div>
+      </motion.div>
+    </Link>
   );
 }
 
@@ -108,50 +244,96 @@ export default function LettersPage() {
 
   return (
     <Layout>
-      <style>{`
-        @keyframes letterPulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
-
       <div className="flex flex-col w-full pb-24">
         {/* Header */}
-        <div className="mb-6">
-          <h1
-            className="text-[28px] font-bold"
-            style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}
-          >
-            Letters
-          </h1>
+        <div className="mb-2">
+          <div className="flex items-center justify-between">
+            <h1
+              className="text-[28px] font-bold"
+              style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              Letters {"\u{1F4EE}"}
+            </h1>
+            {!isEmpty && (
+              <Link href="/letters/new">
+                <span
+                  className="text-[13px] font-semibold"
+                  style={{ color: "#4A6FA5" }}
+                >
+                  + New
+                </span>
+              </Link>
+            )}
+          </div>
           <p className="text-[15px] italic mt-1" style={{ color: "#6B8F71" }}>
-            One letter every two weeks. A practice of staying close.
+            One letter every two weeks.
+            {"\n"}A practice of staying close.
           </p>
         </div>
 
+        {/* Ink rule */}
+        <div className="mb-6" style={{ borderTop: "1px solid #4A6FA5", opacity: 0.3 }} />
+
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {[1, 2].map((i) => (
-              <div key={i} className="h-20 rounded-2xl bg-card border border-border animate-pulse" />
+              <div
+                key={i}
+                className="h-32 rounded animate-pulse"
+                style={{ backgroundColor: "#F7F0E6", border: "1px solid rgba(74,111,165,0.1)" }}
+              />
             ))}
           </div>
         ) : isEmpty ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center text-center py-16"
+            className="flex flex-col items-center text-center py-12"
           >
-            <div className="text-5xl mb-6">📮</div>
-            <p className="text-base text-muted-foreground mb-1">No letters yet.</p>
+            <div className="text-5xl mb-6">{"\u{1F4EE}"}</div>
+            <p className="text-base mb-1" style={{ color: "#2C1810" }}>No letters yet.</p>
             <p className="text-sm text-muted-foreground mb-8">
-              Send your first letter.
+              Start a correspondence and write your first letter.
             </p>
+
+            {/* Ghost card preview */}
+            <div
+              className="w-full max-w-sm mb-8"
+              style={{
+                opacity: 0.35,
+                pointerEvents: "none",
+                backgroundColor: "#FAF6F0",
+                border: "1px solid rgba(74, 111, 165, 0.2)",
+                borderRadius: "4px",
+                borderLeft: "3px solid #4A6FA5",
+                boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
+                padding: "24px",
+              }}
+            >
+              <p className="text-[18px] font-bold" style={{ color: "#2C1810" }}>
+                Letters with a friend
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="flex items-center gap-1 text-[13px]" style={{ color: "#9a9390" }}>
+                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#4A6FA5" }} />
+                  You
+                </span>
+                <span className="flex items-center gap-1 text-[13px]" style={{ color: "#9a9390" }}>
+                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#4A6FA5" }} />
+                  Them
+                </span>
+              </div>
+              <p className="text-[14px] italic mt-3" style={{ color: "#9a9390" }}>
+                Your first letter is waiting to be written...
+              </p>
+            </div>
+
             <Link href="/letters/new">
               <button
                 className="px-6 py-3.5 rounded-2xl text-base font-semibold"
                 style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
               >
-                Send a letter
+                + Start a correspondence {"\u{1F4EE}"}
               </button>
             </Link>
           </motion.div>
@@ -160,53 +342,11 @@ export default function LettersPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
-            className="space-y-0"
           >
-            {items.map((item) => {
-              const otherMembers = item.members
-                .filter((m) => m.email !== user.email)
-                .map((m) => m.name || m.email.split("@")[0])
-                .join(", ");
-
-              return (
-                <Link key={item.id} href={`/letters/${item.id}`}>
-                  <div
-                    className="flex items-center py-4 border-b border-border/40 hover:bg-[#F7F0E6]/50 transition-colors cursor-pointer"
-                  >
-                    <div
-                      className="w-0.5 self-stretch rounded-full mr-4 flex-shrink-0"
-                      style={{ backgroundColor: "#4A6FA5" }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[17px] font-bold truncate" style={{ color: "#2C1810" }}>
-                        {item.name}
-                      </p>
-                      <p className="text-[14px] text-muted-foreground truncate">
-                        with {otherMembers}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0 ml-3 text-right">
-                      <PeriodStatus item={item} userName={user.name} />
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {items.map((item) => (
+              <CorrespondenceCard key={item.id} item={item} userName={user.name} />
+            ))}
           </motion.div>
-        )}
-
-        {/* Floating + button */}
-        {!isEmpty && (
-          <div className="fixed bottom-6 right-6 z-30">
-            <Link href="/letters/new">
-              <button
-                className="px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
-              >
-                + Send a letter
-              </button>
-            </Link>
-          </div>
         )}
       </div>
     </Layout>

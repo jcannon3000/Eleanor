@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,8 @@ interface LetterData {
   letterNumber: number;
   periodNumber: number;
   periodStartDate: string;
+  postmarkCity: string | null;
+  postmarkCountry: string | null;
   sentAt: string;
   readBy: Array<string | number>;
 }
@@ -37,6 +39,7 @@ interface CorrespondenceDetail {
     email: string;
     joinedAt: string | null;
     lastLetterAt: string | null;
+    homeCity: string | null;
   }>;
   letters: LetterData[];
   currentPeriod: {
@@ -60,13 +63,46 @@ function formatLetterDate(dateStr: string): string {
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function PostmarkStamp({ city, date, rotation = -8, size = "medium" }: {
+  city: string;
+  date: string;
+  rotation?: number;
+  size?: "small" | "medium";
+}) {
+  const isSmall = size === "small";
+  return (
+    <div
+      className="inline-flex flex-col items-center justify-center flex-shrink-0"
+      style={{
+        border: "1px solid #4A6FA5",
+        borderRadius: "50% / 40%",
+        padding: isSmall ? "4px 8px" : "6px 12px",
+        transform: `rotate(${rotation}deg)`,
+        minWidth: isSmall ? "50px" : "70px",
+      }}
+    >
+      <span
+        className="font-semibold uppercase"
+        style={{
+          color: "#4A6FA5",
+          fontSize: isSmall ? "8px" : "10px",
+          letterSpacing: "0.08em",
+          lineHeight: 1.2,
+        }}
+      >
+        {city}
+      </span>
+      <span style={{ color: "#4A6FA5", fontSize: isSmall ? "7px" : "9px", lineHeight: 1.2 }}>
+        {formatShortDate(date)}
+      </span>
+    </div>
+  );
 }
 
 export default function CorrespondencePage() {
@@ -132,6 +168,11 @@ export default function CorrespondencePage() {
 
   const writeUrl = `/letters/${correspondenceId}/write${token ? `?token=${token}` : ""}`;
 
+  // Member postmark row
+  const memberCities = members
+    .filter((m) => m.homeCity)
+    .map((m) => `${m.name || m.email.split("@")[0]} from ${m.homeCity}`);
+
   return (
     <Layout>
       <div className="flex flex-col w-full pb-24">
@@ -150,47 +191,52 @@ export default function CorrespondencePage() {
         >
           {data.name}
         </h1>
-        <p className="text-[14px] text-muted-foreground mb-5">with {otherMembers}</p>
+        <p className="text-[14px] text-muted-foreground mb-1">with {otherMembers}</p>
+
+        {/* Member postmark cities */}
+        {memberCities.length > 0 && (
+          <p className="text-[13px] text-muted-foreground mb-5">
+            {"\u{1F4EE}"} {memberCities.join(" \u00b7 ")}
+          </p>
+        )}
+        {memberCities.length === 0 && <div className="mb-5" />}
 
         {/* Current Period Bar */}
         <div
-          className="rounded-2xl overflow-hidden mb-8"
-          style={{ backgroundColor: "#F7F0E6" }}
+          className="rounded overflow-hidden mb-8"
+          style={{
+            backgroundColor: "#FAF6F0",
+            border: "1px solid rgba(74, 111, 165, 0.2)",
+            boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
+          }}
         >
           <div className="flex">
             <div className="w-[3px] flex-shrink-0" style={{ backgroundColor: "#4A6FA5" }} />
             <div className="flex-1 p-5">
               <p
-                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                className="text-sm font-semibold uppercase tracking-wider mb-4"
                 style={{ color: "#4A6FA5", letterSpacing: "0.1em" }}
               >
                 Letter {currentPeriod.periodNumber} · {currentPeriod.periodLabel}
               </p>
 
-              {/* Member status */}
-              <div className="space-y-2 mb-4">
+              {/* Member status with envelope icons */}
+              <div className="flex items-center gap-6 mb-4">
                 {currentPeriod.membersWritten.map((m) => {
                   const isYou = m.email === userEmail;
                   return (
-                    <div key={m.email || m.name} className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+                    <div key={m.email || m.name} className="flex flex-col items-center gap-1">
+                      <span className="text-xl">
+                        {m.hasWritten ? "\u2709\uFE0F" : "\u{1F4E8}"}
+                      </span>
+                      <span
+                        className="text-[11px]"
                         style={{
-                          backgroundColor: m.hasWritten ? "#4A6FA5" : "transparent",
-                          color: m.hasWritten ? "#F7F0E6" : "#4A6FA5",
-                          border: `2px solid #4A6FA5`,
-                          boxShadow: isYou ? "0 0 0 2px #4A6FA5, 0 0 0 4px #F7F0E6, 0 0 0 6px #4A6FA5" : undefined,
+                          color: isYou ? "#4A6FA5" : "#2C1810",
+                          fontWeight: isYou ? 600 : 400,
                         }}
                       >
-                        {getInitials(m.name)}
-                      </div>
-                      <span className="text-sm" style={{ color: "#2C1810" }}>
                         {m.name}
-                        {m.hasWritten ? (
-                          <span className="text-muted-foreground"> wrote</span>
-                        ) : (
-                          <span className="text-muted-foreground"> hasn't written yet</span>
-                        )}
                       </span>
                     </div>
                   );
@@ -204,13 +250,13 @@ export default function CorrespondencePage() {
                     className="w-full py-3 rounded-xl text-base font-semibold"
                     style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
                   >
-                    Write your letter
+                    Write your letter {"\u{1F4EE}"}
                   </button>
                 </Link>
               ) : (
                 <div>
                   <p className="text-sm" style={{ color: "#6B8F71" }}>
-                    Your letter is sent.
+                    Your letter is sent. {"\u{1F33F}"}
                   </p>
                   {currentPeriod.isLastThreeDays && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -234,14 +280,14 @@ export default function CorrespondencePage() {
                   className="px-6 py-3 rounded-xl font-semibold"
                   style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
                 >
-                  Write your letter
+                  Write your letter {"\u{1F4EE}"}
                 </button>
               </Link>
             )}
           </div>
         ) : (
-          <div className="space-y-0">
-            {letters.map((letter) => {
+          <div>
+            {letters.map((letter, index) => {
               const isOwn = letter.authorEmail === userEmail;
               const readers = (letter.readBy as Array<string | number>) || [];
               const otherMemberNames = members
@@ -249,29 +295,60 @@ export default function CorrespondencePage() {
                 .filter((m) => readers.includes(m.email) || (m.id && readers.includes(m.id)))
                 .map((m) => m.name || m.email.split("@")[0]);
 
+              // Find recipient names for salutation
+              const recipientNames = members
+                .filter((m) => m.email !== letter.authorEmail)
+                .map((m) => m.name || m.email.split("@")[0]);
+              const salutation = recipientNames.length <= 2
+                ? recipientNames.join(" and ")
+                : recipientNames.slice(0, -1).join(", ") + ", and " + recipientNames[recipientNames.length - 1];
+
               return (
-                <Link key={letter.id} href={`/letters/${correspondenceId}/read/${letter.id}${token ? `?token=${token}` : ""}`}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex cursor-pointer hover:bg-[#F7F0E6]/40 transition-colors"
-                  >
-                    <div
-                      className="w-0.5 flex-shrink-0 rounded-full"
+                <div key={letter.id}>
+                  <Link href={`/letters/${correspondenceId}/read/${letter.id}${token ? `?token=${token}` : ""}`}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="relative cursor-pointer hover:shadow-sm transition-shadow"
                       style={{
-                        backgroundColor: isOwn ? "#4A6FA5" : "#e8e2d9",
+                        backgroundColor: "#FAF6F0",
+                        border: "1px solid rgba(74, 111, 165, 0.15)",
+                        borderRadius: "4px",
+                        padding: "28px 32px",
+                        boxShadow: "0 2px 8px rgba(44, 24, 16, 0.04)",
                       }}
-                    />
-                    <div className="flex-1 px-6 py-5">
+                    >
+                      {/* Postmark stamp — top right */}
+                      {letter.postmarkCity && (
+                        <div className="absolute top-4 right-4">
+                          <PostmarkStamp
+                            city={letter.postmarkCity}
+                            date={letter.sentAt}
+                            rotation={-8}
+                            size="small"
+                          />
+                        </div>
+                      )}
+
+                      {/* Header */}
                       <p
-                        className="text-[11px] font-semibold uppercase mb-3"
-                        style={{
-                          color: "#9a9390",
-                          letterSpacing: "0.1em",
-                        }}
+                        className="text-[11px] font-semibold uppercase mb-4 pr-20"
+                        style={{ color: "#9a9390", letterSpacing: "0.1em" }}
                       >
-                        {letter.authorName} · Letter {letter.letterNumber} · {formatLetterDate(letter.sentAt)}
+                        {letter.authorName} · Letter {letter.letterNumber}
+                        {letter.postmarkCity ? ` · ${letter.postmarkCity}` : ""}
+                        {" · "}{formatLetterDate(letter.sentAt)}
                       </p>
+
+                      {/* Salutation */}
+                      <p
+                        className="text-[17px] italic mb-3"
+                        style={{ color: "#6B8F71" }}
+                      >
+                        Dear {salutation},
+                      </p>
+
+                      {/* Content */}
                       <p
                         className="text-[17px] leading-[1.9] whitespace-pre-wrap"
                         style={{
@@ -281,14 +358,34 @@ export default function CorrespondencePage() {
                       >
                         {letter.content}
                       </p>
+
+                      {/* Signature */}
+                      <p
+                        className="text-[17px] mt-6"
+                        style={{ color: "#2C1810" }}
+                      >
+                        &mdash; {letter.authorName}
+                      </p>
+
+                      {/* Read receipt */}
                       {isOwn && otherMemberNames.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-4">
-                          Read by {otherMemberNames.join(", ")}
+                          Read by {otherMemberNames.join(", ")} {"\u{1F33F}"}
                         </p>
                       )}
+                    </motion.div>
+                  </Link>
+
+                  {/* Divider between letters */}
+                  {index < letters.length - 1 && (
+                    <div
+                      className="flex items-center justify-center py-4"
+                      style={{ color: "rgba(74, 111, 165, 0.3)" }}
+                    >
+                      <span className="text-sm tracking-[0.5em]">&middot; &middot; &middot;</span>
                     </div>
-                  </motion.div>
-                </Link>
+                  )}
+                </div>
               );
             })}
           </div>
