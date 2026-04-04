@@ -439,8 +439,8 @@ router.post(
       return;
     }
     const wordCount = content.trim().split(/\s+/).length;
-    if (wordCount < 200) {
-      res.status(400).json({ error: "Letter must be at least 200 words", wordCount });
+    if (wordCount < 100) {
+      res.status(400).json({ error: "Letter must be at least 100 words", wordCount });
       return;
     }
     if (wordCount > 1000) {

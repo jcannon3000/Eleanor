@@ -122,7 +122,7 @@ export default function WriteLetter() {
   });
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-  const canSend = wordCount >= 200 && wordCount <= 1000 && !sendMutation.isPending;
+  const canSend = wordCount >= 100 && wordCount <= 1000 && !sendMutation.isPending;
 
   // Back navigation with confirmation
   function handleBack() {
@@ -178,7 +178,7 @@ export default function WriteLetter() {
             <span
               className="text-xs"
               style={{
-                color: wordCount < 200 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71",
+                color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71",
               }}
             >
               {wordCount} / 1000
@@ -222,9 +222,9 @@ export default function WriteLetter() {
       >
         {!confirmSend ? (
           <div className="flex items-center justify-between">
-            <span className="text-[13px]" style={{ color: wordCount < 200 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71" }}>
+            <span className="text-[13px]" style={{ color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71" }}>
               {wordCount} word{wordCount !== 1 ? "s" : ""}
-              {wordCount > 0 && wordCount < 200 && <span className="text-muted-foreground"> · {200 - wordCount} to go</span>}
+              {wordCount > 0 && wordCount < 100 && <span className="text-muted-foreground"> · {100 - wordCount} to go</span>}
               {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
             </span>
             <button
