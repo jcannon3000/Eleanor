@@ -36,7 +36,7 @@ interface BibleData {
   books: BibleBook[];
 }
 
-const bibleDataPath = join(__dirname, "..", "data", "rsv.json");
+const bibleDataPath = join(__dirname, "data", "rsv.json");
 const bible: BibleData = JSON.parse(readFileSync(bibleDataPath, "utf-8"));
 
 /* ------------------------------------------------------------------ */
