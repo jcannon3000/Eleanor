@@ -734,7 +734,15 @@ router.post(
     }
 
     try {
-      const { anthropic } = await import("@workspace/integrations-anthropic-ai");
+      let anthropic;
+      try {
+        const mod = await import("@workspace/integrations-anthropic-ai");
+        anthropic = mod.anthropic;
+      } catch (importErr) {
+        console.error("Anthropic SDK not configured:", importErr);
+        res.status(503).json({ error: "AI polish is not configured on this server" });
+        return;
+      }
 
       const toLine = recipientName ? ` to ${recipientName}` : "";
 

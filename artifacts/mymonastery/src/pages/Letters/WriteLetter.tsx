@@ -150,8 +150,9 @@ export default function WriteLetter() {
         setContent(result.polished);
         setPolishState("polished");
       }
-    } catch {
-      // Silent fail — user keeps their original
+    } catch (err) {
+      console.error("Polish failed:", err);
+      alert("Polish isn't working right now. Check that the server has deployed.");
     } finally {
       setIsPolishing(false);
     }
