@@ -117,8 +117,8 @@ router.post(
       res.status(400).json({ error: "One-to-one requires exactly 1 member" });
       return;
     }
-    if (groupType === "small_group" && (members.length < 2 || members.length > 4)) {
-      res.status(400).json({ error: "Small group requires 2-4 members" });
+    if (groupType === "small_group" && (members.length < 2 || members.length > 7)) {
+      res.status(400).json({ error: "Correspondence requires 2-7 members" });
       return;
     }
 
