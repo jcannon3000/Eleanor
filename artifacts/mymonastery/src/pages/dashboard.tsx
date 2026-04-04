@@ -324,21 +324,15 @@ function FAB() {
             transition={{ duration: 0.15 }}
             className="flex flex-col gap-2 mb-1"
           >
-            <Link href="/letters" onClick={() => setOpen(false)}>
+            <Link href="/letters/new" onClick={() => setOpen(false)}>
               <div className="px-4 py-3 bg-card border border-[#4A6FA5]/30 rounded-2xl shadow-lg hover:bg-[#4A6FA5]/5 transition-colors whitespace-nowrap min-w-[210px]">
-                <p className="text-sm font-semibold text-foreground">📮 Plant a Letter</p>
+                <p className="text-sm font-semibold text-foreground">📮 Send a Letter</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every two weeks</p>
-              </div>
-            </Link>
-            <Link href="/moment/new" onClick={() => setOpen(false)}>
-              <div className="px-4 py-3 bg-card border border-[#6B8F71]/30 rounded-2xl shadow-lg hover:bg-[#6B8F71]/5 transition-colors whitespace-nowrap min-w-[210px]">
-                <p className="text-sm font-semibold text-foreground">🌿 Plant a Practice</p>
-                <p className="text-xs text-muted-foreground mt-0.5">For when you can't be together</p>
               </div>
             </Link>
             <Link href="/tradition/new" onClick={() => setOpen(false)}>
               <div className="px-4 py-3 bg-card border border-[#C17F24]/30 rounded-2xl shadow-lg hover:bg-[#C17F24]/5 transition-colors whitespace-nowrap min-w-[210px]">
-                <p className="text-sm font-semibold text-foreground">🌱 Plant a Gathering</p>
+                <p className="text-sm font-semibold text-foreground">🌱 Start a Gathering</p>
                 <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </div>
             </Link>
@@ -526,7 +520,7 @@ export default function Dashboard() {
     })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  const isEmpty = gatherings.length === 0 && moments.length === 0;
+  const isEmpty = gatherings.length === 0;
 
   return (
     <>
@@ -548,8 +542,8 @@ export default function Dashboard() {
         <PresenceBar users={presentUsers} />
 
         <div className="mt-3 mb-4 flex items-center gap-3">
-          <Link href="/moments" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
-            🌿 Practices →
+          <Link href="/letters" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+            📮 Letters →
           </Link>
           <span className="text-muted-foreground/30 text-xs">·</span>
           <Link href="/tradition/new" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
@@ -577,12 +571,12 @@ export default function Dashboard() {
               "The rituals you tend now become<br />the traditions you'll remember."
             </p>
             <div className="mt-8 space-y-3 w-full">
-              <Link href="/moment/new" className="block w-full text-left px-5 py-4 bg-primary text-primary-foreground rounded-2xl font-medium animate-glow-breathe transition-transform hover:-translate-y-0.5 active:translate-y-0 duration-200">
-                <p className="font-semibold">🌿 Plant a Practice</p>
-                <p className="text-xs opacity-80 mt-0.5">For when you can't be together</p>
+              <Link href="/letters" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#4A6FA5]/30 rounded-2xl font-medium hover:bg-[#4A6FA5]/5 transition-all animate-glow-breathe hover:-translate-y-0.5 active:translate-y-0 duration-200">
+                <p className="font-semibold">📮 Send a Letter</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every two weeks</p>
               </Link>
               <Link href="/tradition/new" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#C17F24]/30 rounded-2xl font-medium hover:bg-[#C17F24]/5 transition-all">
-                <p className="font-semibold">🌱 Plant a Gathering</p>
+                <p className="font-semibold">🌱 Start a Gathering</p>
                 <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </Link>
             </div>
@@ -595,30 +589,17 @@ export default function Dashboard() {
             className="space-y-1"
           >
 
-            {/* ── NOW — pinned open windows ── */}
-            {openNowMoments.length > 0 && (
-              <>
-                <TimeAnchor label="Open now" />
-                <div className="space-y-3">
-                  {openNowMoments.map(m => (
-                    <SharedMomentCard key={m.id} moment={m} dim={false} pinned />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* ── COMING UP ── */}
-            {upcomingItems.length > 0 && (
+            {/* ── COMING UP — gatherings only ── */}
+            {upcomingItems.filter(i => i.type === "gathering").length > 0 && (
               <>
                 <TimeAnchor label="Coming up" />
                 <div className="space-y-3">
-                  {upcomingItems.map(item =>
-                    item.type === "gathering" ? (
-                      <GatheringCard key={`g-${item.data.id}`} ritual={item.data} dim={false} />
-                    ) : (
-                      <SharedMomentCard key={`m-${item.data.id}`} moment={item.data} dim={false} />
-                    )
-                  )}
+                  {upcomingItems
+                    .filter(i => i.type === "gathering")
+                    .map(item => (
+                      <GatheringCard key={`g-${(item.data as any).id}`} ritual={item.data as any} dim={false} />
+                    ))
+                  }
                 </div>
               </>
             )}
