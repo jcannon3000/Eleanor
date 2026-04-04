@@ -31,7 +31,6 @@ export default function WriteLetter() {
   const [content, setContent] = useState("");
   const [showSaved, setShowSaved] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
-  const [toast, setToast] = useState("");
   const [errorState, setErrorState] = useState<{ message: string; nextPeriodStart?: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -125,51 +124,6 @@ export default function WriteLetter() {
     },
   });
 
-  // Polish letter with undo/redo
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [originalBeforePolish, setOriginalBeforePolish] = useState<string | null>(null);
-  const [cachedPolished, setCachedPolished] = useState<string | null>(null);
-  const [polishState, setPolishState] = useState<"idle" | "polished" | "undone">("idle");
-
-  async function handlePolish() {
-    // Redo: if undone and content matches original, swap back without API call
-    if (polishState === "undone" && cachedPolished && content === originalBeforePolish) {
-      setContent(cachedPolished);
-      setPolishState("polished");
-      return;
-    }
-
-    if (!content.trim() || isPolishing) return;
-    setIsPolishing(true);
-    try {
-      const recipientName = correspondence?.name?.replace("Letters with ", "") || undefined;
-      const result = await apiRequest<{ polished: string }>(
-        "POST",
-        `/api/letters/polish${tokenParam}`,
-        { content: content.trim(), recipientName },
-      );
-      if (result.polished) {
-        setOriginalBeforePolish(content);
-        setCachedPolished(result.polished);
-        setContent(result.polished);
-        setPolishState("polished");
-      }
-    } catch (err: unknown) {
-      console.error("Polish failed:", err);
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(`Polish failed: ${msg}`);
-    } finally {
-      setIsPolishing(false);
-    }
-  }
-
-  function handleUndoPolish() {
-    if (originalBeforePolish !== null) {
-      setContent(originalBeforePolish);
-      setPolishState("undone");
-    }
-  }
-
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const canSend = wordCount >= 100 && wordCount <= 1000 && !sendMutation.isPending;
 
@@ -221,108 +175,44 @@ export default function WriteLetter() {
             </p>
           )}
         </div>
-        {/* Word count indicator */}
-        <div className="w-20 text-right">
-          {wordCount > 0 && (
-            <span
-              className="text-xs"
-              style={{
-                color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71",
-              }}
-            >
-              {wordCount} / 1000
-            </span>
-          )}
-        </div>
+        <div className="w-8" />
       </div>
 
-      {/* Polish bar */}
-      {wordCount >= 20 && (
-        <div className="px-6 pb-3 flex items-center gap-2">
-          {polishState === "polished" && (
-            <button
-              onClick={handleUndoPolish}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: "#9a9390" }}
-            >
-              Undo polish
-            </button>
-          )}
-          <button
-            onClick={handlePolish}
-            disabled={isPolishing}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50"
-            style={{
-              borderColor: polishState === "polished" ? "#6B8F71" : "#4A6FA5",
-              color: isPolishing ? "#9a9390" : polishState === "polished" ? "#6B8F71" : "#4A6FA5",
-            }}
-          >
-            {isPolishing ? "Polishing..." : polishState === "undone" ? "Redo polish" : polishState === "polished" ? "Polished \u2713" : "Polish \u2728"}
-          </button>
-        </div>
-      )}
-
-      {/* Writing area */}
-      <div className="flex-1 px-6 relative">
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
-            setConfirmSend(false);
-          }}
-          placeholder={`What's been on your mind these past two weeks?\n\nWhat happened that you want them to know?\n\nWhat are you looking forward to?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as long or as short as feels right.`}
-          className="w-full min-h-[50vh] bg-transparent resize-none focus:outline-none placeholder:italic"
-          style={{
-            color: "#2C1810",
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "18px",
-            lineHeight: "2.0",
-            caretColor: "#4A6FA5",
-          }}
-        />
-
-        {/* Saved indicator */}
-        {showSaved && (
-          <div className="fixed bottom-24 right-6 text-xs" style={{ color: "#6B8F71" }}>
-            Saved
-          </div>
-        )}
-      </div>
-
-      {/* Bottom bar */}
+      {/* Action bar — word count, save, send, polish */}
       <div
-        className="sticky bottom-0 px-6 py-4 border-t"
-        style={{ borderColor: "#e8e2d9", backgroundColor: "#FAF6F0" }}
+        className="px-6 pb-3 border-b"
+        style={{ borderColor: "#e8e2d9" }}
       >
         {!confirmSend ? (
-          <div className="flex items-center justify-between">
-            <span className="text-[13px]" style={{ color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71" }}>
-              {wordCount} word{wordCount !== 1 ? "s" : ""}
-              {wordCount > 0 && wordCount < 100 && <span className="text-muted-foreground"> · {100 - wordCount} to go</span>}
-              {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => { saveDraft(); }}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors"
-                style={{
-                  borderColor: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#e8e2d9",
-                  color: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#9a9390",
-                }}
-              >
-                {draftError ? "Save failed" : showSaved ? "Saved \u2713" : "Save draft"}
-              </button>
-              <button
-                onClick={() => setConfirmSend(true)}
-                disabled={!canSend}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
-              >
-                Send letter
-              </button>
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-[13px]" style={{ color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71" }}>
+                {wordCount} word{wordCount !== 1 ? "s" : ""}
+                {wordCount > 0 && wordCount < 100 && <span className="text-muted-foreground"> · {100 - wordCount} to go</span>}
+                {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { saveDraft(); }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors"
+                  style={{
+                    borderColor: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#e8e2d9",
+                    color: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#9a9390",
+                  }}
+                >
+                  {draftError ? "Save failed" : showSaved ? "Saved \u2713" : "Save draft"}
+                </button>
+                <button
+                  onClick={() => setConfirmSend(true)}
+                  disabled={!canSend}
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-40"
+                  style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                >
+                  Send letter
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         ) : (
           <div>
             <p className="text-sm text-muted-foreground mb-3">
@@ -346,6 +236,27 @@ export default function WriteLetter() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Writing area */}
+      <div className="flex-1 px-6 pt-4">
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => {
+            setContent(e.target.value);
+            setConfirmSend(false);
+          }}
+          placeholder={`What's been on your mind these past two weeks?\n\nWhat happened that you want them to know?\n\nWhat are you looking forward to?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as long or as short as feels right.`}
+          className="w-full min-h-[60vh] bg-transparent resize-none focus:outline-none placeholder:italic"
+          style={{
+            color: "#2C1810",
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "18px",
+            lineHeight: "2.0",
+            caretColor: "#4A6FA5",
+          }}
+        />
       </div>
     </div>
   );
