@@ -721,6 +721,55 @@ router.post("/letters/invite/:token/accept", async (req, res): Promise<void> => 
   res.json({ correspondenceId: member.correspondenceId, token });
 });
 
+// ─── POLISH ─────────────────────────────────────────────────────────────────
+
+router.post(
+  "/letters/polish",
+  requireAuth(async (req, res, auth) => {
+    const { content, recipientName } = req.body as { content: string; recipientName?: string };
+
+    if (!content || content.trim().length < 10) {
+      res.status(400).json({ error: "Content too short to polish" });
+      return;
+    }
+
+    try {
+      const { anthropic } = await import("@workspace/integrations-anthropic-ai");
+
+      const toLine = recipientName ? ` to ${recipientName}` : "";
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        system: `You are a gentle writing assistant. The user is writing a personal letter${toLine} as part of a fortnightly correspondence practice called Eleanor Letters.
+
+Your job is to polish their letter — not rewrite it. Preserve their voice, their stories, their way of speaking. Fix awkward phrasing, smooth transitions, correct grammar and spelling, and help the letter flow better.
+
+Rules:
+- Keep their tone and personality intact
+- Don't add content they didn't write
+- Don't make it more formal or literary unless that's their style
+- Don't add greetings or sign-offs unless they already have them
+- Return ONLY the polished letter text, nothing else — no preamble, no explanation, no quotes around it`,
+        messages: [
+          {
+            role: "user",
+            content: `Please polish this letter:\n\n${content}`,
+          },
+        ],
+      });
+
+      const polished =
+        response.content[0].type === "text" ? response.content[0].text : content;
+
+      res.json({ polished });
+    } catch (err) {
+      console.error("Failed to polish letter:", err);
+      res.status(500).json({ error: "Failed to polish letter" });
+    }
+  }),
+);
+
 // ─── REMINDER CRON ──────────────────────────────────────────────────────────
 
 router.post("/letters/send-reminders", async (req, res): Promise<void> => {

@@ -121,6 +121,32 @@ export default function WriteLetter() {
     },
   });
 
+  // Polish letter
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [showPolishDone, setShowPolishDone] = useState(false);
+
+  async function handlePolish() {
+    if (!content.trim() || isPolishing) return;
+    setIsPolishing(true);
+    try {
+      const recipientName = correspondence?.name?.replace("Letters with ", "") || undefined;
+      const result = await apiRequest<{ polished: string }>(
+        "POST",
+        `/api/letters/polish${tokenParam}`,
+        { content: content.trim(), recipientName },
+      );
+      if (result.polished) {
+        setContent(result.polished);
+        setShowPolishDone(true);
+        setTimeout(() => setShowPolishDone(false), 3000);
+      }
+    } catch {
+      // Silent fail — user keeps their original
+    } finally {
+      setIsPolishing(false);
+    }
+  }
+
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const canSend = wordCount >= 100 && wordCount <= 1000 && !sendMutation.isPending;
 
@@ -227,14 +253,30 @@ export default function WriteLetter() {
               {wordCount > 0 && wordCount < 100 && <span className="text-muted-foreground"> · {100 - wordCount} to go</span>}
               {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
             </span>
-            <button
-              onClick={() => setConfirmSend(true)}
-              disabled={!canSend}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
-              style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
-            >
-              Send letter
-            </button>
+            <div className="flex items-center gap-2">
+              {wordCount >= 20 && (
+                <button
+                  onClick={handlePolish}
+                  disabled={isPolishing}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50"
+                  style={{
+                    borderColor: "#4A6FA5",
+                    color: isPolishing ? "#9a9390" : "#4A6FA5",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  {isPolishing ? "Polishing..." : showPolishDone ? "Polished \u2713" : "Polish \u2728"}
+                </button>
+              )}
+              <button
+                onClick={() => setConfirmSend(true)}
+                disabled={!canSend}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+              >
+                Send letter
+              </button>
+            </div>
           </div>
         ) : (
           <div>
