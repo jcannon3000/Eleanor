@@ -1,10 +1,12 @@
 /**
  * Period calculation helpers for Eleanor Letters.
  *
- * A "period" is a 14-day window (Monday–Sunday) anchored to the
+ * A "period" is a 7-day window (Monday–Sunday) anchored to the
  * correspondence's startedAt date. Period 1 begins on the first
  * Monday on or after startedAt.
  */
+
+const PERIOD_DAYS = 7;
 
 function getFirstMonday(startedAt: Date): Date {
   const d = new Date(startedAt);
@@ -28,15 +30,15 @@ export function getPeriodStart(
   if (diffMs < 0) return firstMonday; // reference is before period 1
 
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const periodsElapsed = Math.floor(diffDays / 14);
+  const periodsElapsed = Math.floor(diffDays / PERIOD_DAYS);
   const start = new Date(firstMonday);
-  start.setDate(start.getDate() + periodsElapsed * 14);
+  start.setDate(start.getDate() + periodsElapsed * PERIOD_DAYS);
   return start;
 }
 
 export function getPeriodEnd(periodStart: Date): Date {
   const end = new Date(periodStart);
-  end.setDate(end.getDate() + 13);
+  end.setDate(end.getDate() + PERIOD_DAYS - 1);
   return end;
 }
 
@@ -52,7 +54,7 @@ export function getPeriodNumber(
   if (diffMs < 0) return 1;
 
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  return Math.floor(diffDays / 14) + 1;
+  return Math.floor(diffDays / PERIOD_DAYS) + 1;
 }
 
 export function getNextPeriodStart(
@@ -61,7 +63,7 @@ export function getNextPeriodStart(
 ): Date {
   const currentStart = getPeriodStart(correspondenceStartedAt, referenceDate);
   const next = new Date(currentStart);
-  next.setDate(next.getDate() + 14);
+  next.setDate(next.getDate() + PERIOD_DAYS);
   return next;
 }
 
@@ -98,13 +100,13 @@ export function isInLastThreeDays(
   const ref = new Date(referenceDate);
   ref.setHours(0, 0, 0, 0);
 
-  // Friday of the period = periodStart + 11 days
-  const friday = new Date(periodStart);
-  friday.setDate(friday.getDate() + 11);
+  // Last 2 days of a 7-day period (Saturday–Sunday)
+  const lastTwoDays = new Date(periodStart);
+  lastTwoDays.setDate(lastTwoDays.getDate() + PERIOD_DAYS - 2);
 
   const end = getPeriodEnd(periodStart);
 
-  return ref >= friday && ref <= end;
+  return ref >= lastTwoDays && ref <= end;
 }
 
 export function formatNextPeriodStart(

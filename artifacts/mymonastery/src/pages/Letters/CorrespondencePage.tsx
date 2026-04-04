@@ -80,7 +80,7 @@ function PostmarkStamp({ city, date, rotation = -8, size = "medium" }: {
     <div
       className="inline-flex flex-col items-center justify-center flex-shrink-0"
       style={{
-        border: "1px solid #4A6FA5",
+        border: "1px solid #6B8F71",
         borderRadius: "50% / 40%",
         padding: isSmall ? "4px 8px" : "6px 12px",
         transform: `rotate(${rotation}deg)`,
@@ -90,7 +90,7 @@ function PostmarkStamp({ city, date, rotation = -8, size = "medium" }: {
       <span
         className="font-semibold uppercase"
         style={{
-          color: "#4A6FA5",
+          color: "#6B8F71",
           fontSize: isSmall ? "8px" : "10px",
           letterSpacing: "0.08em",
           lineHeight: 1.2,
@@ -98,7 +98,7 @@ function PostmarkStamp({ city, date, rotation = -8, size = "medium" }: {
       >
         {city}
       </span>
-      <span style={{ color: "#4A6FA5", fontSize: isSmall ? "7px" : "9px", lineHeight: 1.2 }}>
+      <span style={{ color: "#6B8F71", fontSize: isSmall ? "7px" : "9px", lineHeight: 1.2 }}>
         {formatShortDate(date)}
       </span>
     </div>
@@ -206,16 +206,16 @@ export default function CorrespondencePage() {
           className="rounded overflow-hidden mb-8"
           style={{
             backgroundColor: "#FAF6F0",
-            border: "1px solid rgba(74, 111, 165, 0.2)",
+            border: "1px solid rgba(107, 143, 113, 0.2)",
             boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
           }}
         >
           <div className="flex">
-            <div className="w-[3px] flex-shrink-0" style={{ backgroundColor: "#4A6FA5" }} />
+            <div className="w-[3px] flex-shrink-0" style={{ backgroundColor: "#6B8F71" }} />
             <div className="flex-1 p-5">
               <p
                 className="text-sm font-semibold uppercase tracking-wider mb-4"
-                style={{ color: "#4A6FA5", letterSpacing: "0.1em" }}
+                style={{ color: "#6B8F71", letterSpacing: "0.1em" }}
               >
                 Letter {currentPeriod.periodNumber} · {currentPeriod.periodLabel}
               </p>
@@ -232,7 +232,7 @@ export default function CorrespondencePage() {
                       <span
                         className="text-[11px]"
                         style={{
-                          color: isYou ? "#4A6FA5" : "#2C1810",
+                          color: isYou ? "#6B8F71" : "#2C1810",
                           fontWeight: isYou ? 600 : 400,
                         }}
                       >
@@ -248,7 +248,7 @@ export default function CorrespondencePage() {
                 <Link href={writeUrl}>
                   <button
                     className="w-full py-3 rounded-xl text-base font-semibold"
-                    style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                    style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
                   >
                     Write your letter {"\u{1F4EE}"}
                   </button>
@@ -278,7 +278,7 @@ export default function CorrespondencePage() {
               <Link href={writeUrl}>
                 <button
                   className="px-6 py-3 rounded-xl font-semibold"
-                  style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                  style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
                 >
                   Write your letter {"\u{1F4EE}"}
                 </button>
@@ -295,14 +295,6 @@ export default function CorrespondencePage() {
                 .filter((m) => readers.includes(m.email) || (m.id && readers.includes(m.id)))
                 .map((m) => m.name || m.email.split("@")[0]);
 
-              // Find recipient names for salutation
-              const recipientNames = members
-                .filter((m) => m.email !== letter.authorEmail)
-                .map((m) => m.name || m.email.split("@")[0]);
-              const salutation = recipientNames.length <= 2
-                ? recipientNames.join(" and ")
-                : recipientNames.slice(0, -1).join(", ") + ", and " + recipientNames[recipientNames.length - 1];
-
               return (
                 <div key={letter.id}>
                   <Link href={`/letters/${correspondenceId}/read/${letter.id}${token ? `?token=${token}` : ""}`}>
@@ -312,7 +304,7 @@ export default function CorrespondencePage() {
                       className="relative cursor-pointer hover:shadow-sm transition-shadow"
                       style={{
                         backgroundColor: "#FAF6F0",
-                        border: "1px solid rgba(74, 111, 165, 0.15)",
+                        border: "1px solid rgba(107, 143, 113, 0.15)",
                         borderRadius: "4px",
                         padding: "28px 32px",
                         boxShadow: "0 2px 8px rgba(44, 24, 16, 0.04)",
@@ -340,14 +332,6 @@ export default function CorrespondencePage() {
                         {" · "}{formatLetterDate(letter.sentAt)}
                       </p>
 
-                      {/* Salutation */}
-                      <p
-                        className="text-[17px] italic mb-3"
-                        style={{ color: "#6B8F71" }}
-                      >
-                        Dear {salutation},
-                      </p>
-
                       {/* Content */}
                       <p
                         className="text-[17px] leading-[1.9] whitespace-pre-wrap"
@@ -357,14 +341,6 @@ export default function CorrespondencePage() {
                         }}
                       >
                         {letter.content}
-                      </p>
-
-                      {/* Signature */}
-                      <p
-                        className="text-[17px] mt-6"
-                        style={{ color: "#2C1810" }}
-                      >
-                        &mdash; {letter.authorName}
                       </p>
 
                       {/* Read receipt */}
@@ -380,7 +356,7 @@ export default function CorrespondencePage() {
                   {index < letters.length - 1 && (
                     <div
                       className="flex items-center justify-center py-4"
-                      style={{ color: "rgba(74, 111, 165, 0.3)" }}
+                      style={{ color: "rgba(107, 143, 113, 0.3)" }}
                     >
                       <span className="text-sm tracking-[0.5em]">&middot; &middot; &middot;</span>
                     </div>

@@ -12,7 +12,7 @@ function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium" style={{ color: "#4A6FA5" }}>
+        <span className="text-xs font-medium" style={{ color: "#6B8F71" }}>
           Step {step} of {TOTAL_STEPS} — {STEP_LABELS[step - 1]}
         </span>
         {step > 1 && (
@@ -24,7 +24,7 @@ function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
       <div className="w-full h-1 bg-[#e8d5b8] rounded-full">
         <div
           className="h-full rounded-full transition-all duration-300"
-          style={{ width: `${(step / TOTAL_STEPS) * 100}%`, backgroundColor: "#4A6FA5" }}
+          style={{ width: `${(step / TOTAL_STEPS) * 100}%`, backgroundColor: "#6B8F71" }}
         />
       </div>
     </div>
@@ -38,7 +38,7 @@ function ContinueButton({ disabled, onClick, label }: { disabled?: boolean; onCl
         onClick={onClick}
         disabled={disabled}
         className="text-white rounded-2xl px-6 py-3 font-medium transition-colors disabled:opacity-40"
-        style={{ backgroundColor: "#4A6FA5" }}
+        style={{ backgroundColor: "#6B8F71" }}
       >
         {label || "Continue →"}
       </button>
@@ -185,7 +185,7 @@ export default function LetterNew() {
               Send a letter
             </h1>
             <p className="text-sm text-muted-foreground mb-8">
-              One letter every two weeks. A practice of staying close.
+              One letter every week. A practice of staying close.
             </p>
 
             <p className="text-sm font-medium mb-4" style={{ color: "#2C1810" }}>
@@ -195,18 +195,18 @@ export default function LetterNew() {
             <div className="space-y-3">
               <button
                 onClick={() => selectType("one_to_one")}
-                className="w-full text-left p-5 rounded-2xl border-2 border-transparent bg-white hover:border-[#4A6FA5]/30 transition-colors"
+                className="w-full text-left p-5 rounded-2xl border-2 border-transparent bg-white hover:border-[#6B8F71]/30 transition-colors"
               >
                 <p className="text-base font-semibold" style={{ color: "#2C1810" }}>
                   📮 A dialogue
                 </p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Just the two of you — one letter each, every two weeks
+                  Just the two of you — one letter each, every week
                 </p>
               </button>
               <button
                 onClick={() => selectType("small_group")}
-                className="w-full text-left p-5 rounded-2xl border-2 border-transparent bg-white hover:border-[#4A6FA5]/30 transition-colors"
+                className="w-full text-left p-5 rounded-2xl border-2 border-transparent bg-white hover:border-[#6B8F71]/30 transition-colors"
               >
                 <p className="text-base font-semibold" style={{ color: "#2C1810" }}>
                   ✉️ A correspondence
@@ -247,8 +247,8 @@ export default function LetterNew() {
                         onClick={() => selectConnection(c)}
                         className="px-3 py-1.5 rounded-full text-sm border transition-colors"
                         style={{
-                          borderColor: selected ? "#4A6FA5" : "#e8e2d9",
-                          backgroundColor: selected ? "#4A6FA5" : "white",
+                          borderColor: selected ? "#6B8F71" : "#e8e2d9",
+                          backgroundColor: selected ? "#6B8F71" : "white",
                           color: selected ? "white" : "#2C1810",
                         }}
                       >
@@ -270,7 +270,7 @@ export default function LetterNew() {
                       placeholder="Name (optional)"
                       value={m.name}
                       onChange={(e) => updateMember(idx, "name", e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e8e2d9] text-sm focus:outline-none focus:border-[#4A6FA5] transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e8e2d9] text-sm focus:outline-none focus:border-[#6B8F71] transition-colors"
                       style={{ color: "#2C1810" }}
                     />
                     <input
@@ -278,7 +278,7 @@ export default function LetterNew() {
                       placeholder="Email address"
                       value={m.email}
                       onChange={(e) => updateMember(idx, "email", e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e8e2d9] text-sm focus:outline-none focus:border-[#4A6FA5] transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e8e2d9] text-sm focus:outline-none focus:border-[#6B8F71] transition-colors"
                       style={{ color: "#2C1810" }}
                     />
                   </div>
@@ -298,7 +298,7 @@ export default function LetterNew() {
               <button
                 onClick={addMember}
                 className="mt-3 text-sm font-medium"
-                style={{ color: "#4A6FA5" }}
+                style={{ color: "#6B8F71" }}
               >
                 + Add another person
               </button>

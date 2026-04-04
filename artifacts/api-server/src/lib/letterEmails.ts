@@ -93,7 +93,7 @@ function wrapHtml(content: string): string {
 }
 
 function linkButton(url: string, label: string): string {
-  return `<a href="${url}" style="display:inline-block;background:#4A6FA5;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:600;letter-spacing:-0.2px;">${label}</a>`;
+  return `<a href="${url}" style="display:inline-block;background:#6B8F71;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:600;letter-spacing:-0.2px;">${label}</a>`;
 }
 
 async function sendEmail(to: string, subject: string, html: string, text: string): Promise<boolean> {
@@ -129,7 +129,7 @@ export async function sendInvitationEmail(opts: {
       ${creatorName} has invited you to exchange letters on Eleanor.
     </p>
     <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
-      Once every two weeks, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.
+      Once every week, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.
     </p>
     <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
       A simple practice of staying close. \u{1F33F}
@@ -145,7 +145,7 @@ export async function sendInvitationEmail(opts: {
     "",
     `${creatorName} has invited you to exchange letters on Eleanor.`,
     "",
-    "Once every two weeks, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.",
+    "Once every week, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.",
     "",
     "A simple practice of staying close. \u{1F33F}",
     "",

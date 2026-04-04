@@ -164,15 +164,7 @@ export default function WriteLetter() {
     setLocation(`/letters/${correspondenceId}${tokenParam}`);
   }
 
-  // Compute recipient names for salutation
   const userEmail = user?.email || "";
-  const recipientNames = correspondence?.members
-    ?.filter((m) => m.email !== userEmail)
-    .map((m) => m.name || m.email.split("@")[0]) || [];
-  const salutation = recipientNames.length <= 2
-    ? recipientNames.join(" and ")
-    : recipientNames.slice(0, -1).join(", ") + ", and " + recipientNames[recipientNames.length - 1];
-  const authorName = user?.name || "You";
 
   if (errorState) {
     return (
@@ -191,7 +183,7 @@ export default function WriteLetter() {
         <button
           onClick={() => setLocation(`/letters/${correspondenceId}${tokenParam}`)}
           className="text-sm font-medium"
-          style={{ color: "#4A6FA5" }}
+          style={{ color: "#6B8F71" }}
         >
           &larr; Back to letters
         </button>
@@ -209,7 +201,7 @@ export default function WriteLetter() {
         <div className="text-center">
           <p className="text-[13px] text-muted-foreground">{correspondence?.name}</p>
           {correspondence?.currentPeriod && (
-            <p className="text-[13px]" style={{ color: "#4A6FA5" }}>
+            <p className="text-[13px]" style={{ color: "#6B8F71" }}>
               Letter {correspondence.currentPeriod.periodNumber} · {correspondence.currentPeriod.periodLabel}
             </p>
           )}
@@ -244,7 +236,7 @@ export default function WriteLetter() {
                 onClick={handleSendClick}
                 disabled={!canSend}
                 className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
               >
                 Send letter
               </button>
@@ -260,7 +252,7 @@ export default function WriteLetter() {
                 onClick={() => sendMutation.mutate()}
                 disabled={sendMutation.isPending}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
               >
                 {sendMutation.isPending ? "Sending..." : "Send"}
               </button>
@@ -277,16 +269,6 @@ export default function WriteLetter() {
 
       {/* Writing area */}
       <div className="flex-1 px-6 pt-6">
-        {/* Salutation (not editable) */}
-        {salutation && (
-          <p
-            className="text-[19px] italic mb-4"
-            style={{ color: "#6B8F71" }}
-          >
-            Dear {salutation},
-          </p>
-        )}
-
         <textarea
           ref={textareaRef}
           value={content}
@@ -294,24 +276,16 @@ export default function WriteLetter() {
             setContent(e.target.value);
             setConfirmSend(false);
           }}
-          placeholder={`What's been on your mind these past two weeks?\n\nWhat happened that you want them to know?\n\nWhat are you looking forward to?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as long or as short as feels right.`}
+          placeholder={`What's been on your mind this week?\n\nWhat happened that you want them to know?\n\nWhat are you looking forward to?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as long or as short as feels right.`}
           className="w-full min-h-[50vh] bg-transparent resize-none focus:outline-none placeholder:italic"
           style={{
             color: "#2C1810",
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: "18px",
             lineHeight: "2.0",
-            caretColor: "#4A6FA5",
+            caretColor: "#6B8F71",
           }}
         />
-
-        {/* Signature (not editable) */}
-        <p
-          className="text-[19px] italic mt-4 mb-8"
-          style={{ color: "#6B8F71" }}
-        >
-          &mdash; {authorName}
-        </p>
 
         {/* Postmark field */}
         <div className="mb-8">

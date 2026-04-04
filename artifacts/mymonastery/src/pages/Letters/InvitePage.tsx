@@ -111,7 +111,7 @@ export default function LetterInvitePage() {
         <button
           onClick={() => setLocation(writeUrl)}
           className="px-6 py-3 rounded-xl font-semibold text-sm mb-3"
-          style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+          style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
         >
           Write your first letter {"\u{1F4EE}"}
         </button>
@@ -139,12 +139,12 @@ export default function LetterInvitePage() {
 
         <p className="text-base text-muted-foreground mb-4 leading-relaxed">
           {data.creatorName} has invited you to exchange letters on Eleanor.
-          Once every two weeks, you each write one letter. When a letter arrives,
+          Once every week, you each write one letter. When a letter arrives,
           you'll get a calendar notification with a link to read it.
           Then write back when you're ready. A simple practice of staying close.
         </p>
 
-        <p className="text-base italic mb-6" style={{ color: "#4A6FA5" }}>
+        <p className="text-base italic mb-6" style={{ color: "#6B8F71" }}>
           {data.correspondenceName}
         </p>
 
@@ -162,7 +162,7 @@ export default function LetterInvitePage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#4A6FA5] transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#6B8F71] transition-colors"
               style={{ color: "#2C1810" }}
               placeholder="Your name"
             />
@@ -173,7 +173,7 @@ export default function LetterInvitePage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#4A6FA5] transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#6B8F71] transition-colors"
               style={{ color: "#2C1810" }}
               placeholder="you@email.com"
             />
@@ -184,7 +184,7 @@ export default function LetterInvitePage() {
           onClick={handleAccept}
           disabled={!name.trim() || !email.includes("@") || isSubmitting}
           className="w-full py-3.5 rounded-2xl text-base font-semibold transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+          style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
         >
           {isSubmitting ? "Accepting..." : "Accept and start writing"}
         </button>

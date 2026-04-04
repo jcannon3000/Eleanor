@@ -41,7 +41,7 @@ export async function sendLetterCalendarEvent(params: {
     `Then write back when you're ready. 🌿`,
     "",
     `──────────────────`,
-    `Eleanor Letters · One letter every two weeks.`,
+    `Eleanor Letters · One letter every week.`,
   ].join("\n");
 
   try {

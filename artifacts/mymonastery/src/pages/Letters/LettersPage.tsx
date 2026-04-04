@@ -64,7 +64,7 @@ function PostmarkStamp({ city, date, rotation = -8 }: { city: string; date: stri
     <div
       className="inline-flex flex-col items-center justify-center flex-shrink-0"
       style={{
-        border: "1px solid #4A6FA5",
+        border: "1px solid #6B8F71",
         borderRadius: "50% / 40%",
         padding: "4px 10px",
         transform: `rotate(${rotation}deg)`,
@@ -73,11 +73,11 @@ function PostmarkStamp({ city, date, rotation = -8 }: { city: string; date: stri
     >
       <span
         className="font-semibold uppercase"
-        style={{ color: "#4A6FA5", fontSize: "9px", letterSpacing: "0.08em", lineHeight: 1.2 }}
+        style={{ color: "#6B8F71", fontSize: "9px", letterSpacing: "0.08em", lineHeight: 1.2 }}
       >
         {city}
       </span>
-      <span style={{ color: "#4A6FA5", fontSize: "8px", lineHeight: 1.2 }}>
+      <span style={{ color: "#6B8F71", fontSize: "8px", lineHeight: 1.2 }}>
         {formatShortDate(date)}
       </span>
     </div>
@@ -122,9 +122,9 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
         className="relative cursor-pointer transition-shadow hover:shadow-md active:scale-[0.99] transition-transform"
         style={{
           backgroundColor: "#FAF6F0",
-          border: "1px solid rgba(74, 111, 165, 0.2)",
+          border: "1px solid rgba(107, 143, 113, 0.25)",
           borderRadius: "4px",
-          borderLeft: "3px solid #4A6FA5",
+          borderLeft: "3px solid #6B8F71",
           boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
           padding: "24px",
           marginBottom: "20px",
@@ -143,7 +143,7 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
           <div className="text-right flex-shrink-0">
             <p
               className="text-[10px] font-semibold uppercase"
-              style={{ color: "#4A6FA5", letterSpacing: "0.08em" }}
+              style={{ color: "#6B8F71", letterSpacing: "0.08em" }}
             >
               Letter {currentPeriod.periodNumber}
             </p>
@@ -173,14 +173,14 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
             className="mt-3"
             style={{
               backgroundColor: "#F7F0E6",
-              borderLeft: "2px solid #4A6FA5",
+              borderLeft: "2px solid #6B8F71",
               padding: "12px 16px",
               borderRadius: "0 4px 4px 0",
             }}
           >
             <p
               className="text-[11px] font-semibold uppercase mb-1"
-              style={{ color: "#4A6FA5", letterSpacing: "0.08em" }}
+              style={{ color: "#6B8F71", letterSpacing: "0.08em" }}
             >
               {item.unreadPreview.authorName} wrote {item.unreadPreview.postmarkCity ? `from ${item.unreadPreview.postmarkCity}` : ""} {"\u{1F33F}"}
             </p>
@@ -189,7 +189,7 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
             </p>
             <p
               className="text-[12px] font-medium mt-2 text-right"
-              style={{ color: "#4A6FA5" }}
+              style={{ color: "#6B8F71" }}
             >
               Read letter &rarr;
             </p>
@@ -204,8 +204,8 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
                 <span
                   className="inline-block w-2 h-2 rounded-full"
                   style={{
-                    backgroundColor: m.hasWritten ? "#4A6FA5" : "transparent",
-                    border: `1.5px solid #4A6FA5`,
+                    backgroundColor: m.hasWritten ? "#6B8F71" : "transparent",
+                    border: `1.5px solid #6B8F71`,
                   }}
                 />
                 <span style={{ color: "#2C1810" }}>{m.name}</span>
@@ -258,7 +258,7 @@ export default function LettersPage() {
               <Link href="/letters/new">
                 <span
                   className="text-[13px] font-semibold"
-                  style={{ color: "#4A6FA5" }}
+                  style={{ color: "#6B8F71" }}
                 >
                   + New
                 </span>
@@ -266,13 +266,13 @@ export default function LettersPage() {
             )}
           </div>
           <p className="text-[15px] italic mt-1" style={{ color: "#6B8F71" }}>
-            One letter every two weeks.
+            One letter every week.
             {"\n"}A practice of staying close.
           </p>
         </div>
 
         {/* Ink rule */}
-        <div className="mb-6" style={{ borderTop: "1px solid #4A6FA5", opacity: 0.3 }} />
+        <div className="mb-6" style={{ borderTop: "1px solid #6B8F71", opacity: 0.3 }} />
 
         {isLoading ? (
           <div className="space-y-5">
@@ -280,7 +280,7 @@ export default function LettersPage() {
               <div
                 key={i}
                 className="h-32 rounded animate-pulse"
-                style={{ backgroundColor: "#F7F0E6", border: "1px solid rgba(74,111,165,0.1)" }}
+                style={{ backgroundColor: "#F7F0E6", border: "1px solid rgba(107,143,113,0.1)" }}
               />
             ))}
           </div>
@@ -303,9 +303,9 @@ export default function LettersPage() {
                 opacity: 0.35,
                 pointerEvents: "none",
                 backgroundColor: "#FAF6F0",
-                border: "1px solid rgba(74, 111, 165, 0.2)",
+                border: "1px solid rgba(107, 143, 113, 0.25)",
                 borderRadius: "4px",
-                borderLeft: "3px solid #4A6FA5",
+                borderLeft: "3px solid #6B8F71",
                 boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
                 padding: "24px",
               }}
@@ -315,11 +315,11 @@ export default function LettersPage() {
               </p>
               <div className="flex items-center gap-3 mt-3">
                 <span className="flex items-center gap-1 text-[13px]" style={{ color: "#9a9390" }}>
-                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#4A6FA5" }} />
+                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#6B8F71" }} />
                   You
                 </span>
                 <span className="flex items-center gap-1 text-[13px]" style={{ color: "#9a9390" }}>
-                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#4A6FA5" }} />
+                  <span className="inline-block w-2 h-2 rounded-full border" style={{ borderColor: "#6B8F71" }} />
                   Them
                 </span>
               </div>
@@ -331,7 +331,7 @@ export default function LettersPage() {
             <Link href="/letters/new">
               <button
                 className="px-6 py-3.5 rounded-2xl text-base font-semibold"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
               >
                 + Start a correspondence {"\u{1F4EE}"}
               </button>
@@ -343,6 +343,29 @@ export default function LettersPage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
           >
+            {/* Prominent write CTA if any correspondence needs a letter */}
+            {(() => {
+              const needsLetter = items.find((i) => !i.currentPeriod.hasWrittenThisPeriod);
+              if (!needsLetter) return null;
+              return (
+                <Link href={`/letters/${needsLetter.id}/write`}>
+                  <div
+                    className="mb-6 p-5 rounded-2xl text-center cursor-pointer hover:shadow-md transition-shadow"
+                    style={{
+                      backgroundColor: "#6B8F71",
+                      color: "#F7F0E6",
+                      boxShadow: "0 4px 16px rgba(107, 143, 113, 0.3)",
+                    }}
+                  >
+                    <p className="text-lg font-semibold">Write your letter {"\u{1F4EE}"}</p>
+                    <p className="text-sm opacity-80 mt-1">
+                      {needsLetter.name} · Letter {needsLetter.currentPeriod.periodNumber}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })()}
+
             {items.map((item) => (
               <CorrespondenceCard key={item.id} item={item} userName={user.name} />
             ))}

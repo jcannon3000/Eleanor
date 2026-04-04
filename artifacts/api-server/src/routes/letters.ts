@@ -829,6 +829,20 @@ Rules:
   }),
 );
 
+// ─── DELETE ALL LETTERS (admin) ─────────────────────────────────────────────
+
+router.delete("/letters/all", async (req, res): Promise<void> => {
+  const internalKey = req.headers["x-internal-key"];
+  if (internalKey !== process.env["INTERNAL_API_KEY"]) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  await db.delete(letterDraftsTable);
+  await db.delete(lettersTable);
+  res.json({ ok: true, message: "All letters and drafts deleted" });
+});
+
 // ─── REMINDER CRON ──────────────────────────────────────────────────────────
 
 router.post("/letters/send-reminders", async (req, res): Promise<void> => {

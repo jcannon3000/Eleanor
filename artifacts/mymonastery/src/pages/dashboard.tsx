@@ -325,9 +325,9 @@ function FAB() {
             className="flex flex-col gap-2 mb-1"
           >
             <Link href="/letters/new" onClick={() => setOpen(false)}>
-              <div className="px-4 py-3 bg-card border border-[#4A6FA5]/30 rounded-2xl shadow-lg hover:bg-[#4A6FA5]/5 transition-colors whitespace-nowrap min-w-[210px]">
+              <div className="px-4 py-3 bg-card border border-[#6B8F71]/30 rounded-2xl shadow-lg hover:bg-[#6B8F71]/5 transition-colors whitespace-nowrap min-w-[210px]">
                 <p className="text-sm font-semibold text-foreground">📮 Send a Letter</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every two weeks</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every week</p>
               </div>
             </Link>
             <Link href="/tradition/new" onClick={() => setOpen(false)}>
@@ -370,7 +370,10 @@ function LettersSection() {
     id: number;
     name: string;
     unreadCount: number;
+    members: Array<{ name: string | null; email: string; homeCity: string | null }>;
     currentPeriod: {
+      periodNumber: number;
+      periodLabel: string;
       hasWrittenThisPeriod: boolean;
       isLastThreeDays: boolean;
       membersWritten: Array<{ name: string; hasWritten: boolean }>;
@@ -383,41 +386,101 @@ function LettersSection() {
 
   if (!correspondences || correspondences.length === 0) return null;
 
-  // Build action items
-  const items: Array<{ id: number; label: string; type: "unread" | "due" }> = [];
-  for (const c of correspondences) {
-    if (c.unreadCount > 0) {
-      const writer = c.currentPeriod.membersWritten.find(m => m.hasWritten && m.name !== user?.name);
-      items.push({ id: c.id, label: `${writer?.name || "Someone"} wrote`, type: "unread" });
-    } else if (!c.currentPeriod.hasWrittenThisPeriod && c.currentPeriod.isLastThreeDays) {
-      items.push({ id: c.id, label: "Your letter is due", type: "due" });
-    }
-  }
-
-  if (items.length === 0) return null;
-
   return (
-    <div className="mt-6 mb-2">
-      <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: "#4A6FA5", letterSpacing: "0.1em" }}>
-        Letters 📮
-      </p>
-      <div className="space-y-2">
-        {items.slice(0, 3).map((item) => (
-          <Link key={item.id} href={`/letters/${item.id}`}>
-            <div className="flex items-center gap-2 py-1.5 cursor-pointer">
-              {item.type === "unread" ? (
-                <span className="text-sm" style={{ color: "#4A6FA5" }}>{item.label} 🌿</span>
-              ) : (
-                <span className="text-sm" style={{ color: "#C17F24" }}>{item.label} 📮</span>
-              )}
-            </div>
-          </Link>
-        ))}
+    <>
+      <TimeAnchor label="Letters" />
+      <div className="space-y-3">
+        {correspondences.map((c) => {
+          const otherMembers = c.members
+            .filter((m) => m.email !== user?.email)
+            .map((m) => m.name || m.email.split("@")[0])
+            .join(", ");
+
+          const needsWrite = !c.currentPeriod.hasWrittenThisPeriod;
+          const isDue = needsWrite && c.currentPeriod.isLastThreeDays;
+          const hasUnread = c.unreadCount > 0;
+
+          let statusText = "";
+          let statusColor = "#6B8F71";
+          if (hasUnread) {
+            const writer = c.currentPeriod.membersWritten.find(m => m.hasWritten && m.name !== user?.name);
+            statusText = `${writer?.name || "Someone"} wrote you a letter`;
+          } else if (needsWrite) {
+            const written = c.currentPeriod.membersWritten.filter(m => m.hasWritten).length;
+            statusText = `${written} of ${c.currentPeriod.membersWritten.length} written this week`;
+            if (isDue) statusColor = "#C17F24";
+          } else {
+            const allWritten = c.currentPeriod.membersWritten.every((m) => m.hasWritten);
+            statusText = allWritten ? "All letters in this week" : "Waiting for others...";
+          }
+
+          // Border color: amber if due, green otherwise
+          const borderColor = isDue ? "#C17F24" : "#6B8F71";
+
+          return (
+            <Link key={c.id} href={`/letters/${c.id}`}>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative flex rounded-2xl overflow-hidden border hover:shadow-md transition-all duration-200 cursor-pointer"
+                style={{
+                  borderColor: `${borderColor}40`,
+                  backgroundColor: isDue ? "#FFFBF0" : "#FAF6F0",
+                }}
+              >
+                <div className="w-1 flex-shrink-0" style={{ backgroundColor: borderColor }} />
+                <div className="flex-1 p-4">
+                  {/* Top row: title + badge */}
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-base font-semibold leading-tight" style={{ color: "#2C1810" }}>
+                        📮 {c.name}
+                      </span>
+                      <p className="text-sm text-muted-foreground">
+                        with {otherMembers}
+                      </p>
+                    </div>
+                    <span
+                      className="text-[10px] font-semibold uppercase shrink-0"
+                      style={{ color: borderColor, letterSpacing: "0.08em" }}
+                    >
+                      Letter {c.currentPeriod.periodNumber} 🌿
+                    </span>
+                  </div>
+
+                  {/* Status */}
+                  <p className="text-sm font-medium mt-1" style={{ color: statusColor }}>
+                    {statusText}
+                  </p>
+
+                  {/* Bottom row: period label + CTA */}
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <span className="text-[11px] text-[#6b5c4a]/70">
+                      {c.currentPeriod.periodLabel}
+                    </span>
+                    {needsWrite && (
+                      <Link
+                        href={`/letters/${c.id}/write`}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
+                        <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 hover:bg-[#5a7a60] transition-colors whitespace-nowrap shrink-0">
+                          Write 📮
+                        </span>
+                      </Link>
+                    )}
+                    {hasUnread && !needsWrite && (
+                      <span className="text-xs font-medium text-white bg-[#6B8F71] rounded-full px-3 py-1.5 whitespace-nowrap shrink-0">
+                        Read 🌿
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </Link>
+          );
+        })}
       </div>
-      <Link href="/letters" className="text-xs font-medium mt-1 inline-block" style={{ color: "#4A6FA5" }}>
-        See all letters →
-      </Link>
-    </div>
+    </>
   );
 }
 
@@ -571,9 +634,9 @@ export default function Dashboard() {
               "The rituals you tend now become<br />the traditions you'll remember."
             </p>
             <div className="mt-8 space-y-3 w-full">
-              <Link href="/letters" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#4A6FA5]/30 rounded-2xl font-medium hover:bg-[#4A6FA5]/5 transition-all animate-glow-breathe hover:-translate-y-0.5 active:translate-y-0 duration-200">
+              <Link href="/letters" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#6B8F71]/30 rounded-2xl font-medium hover:bg-[#6B8F71]/5 transition-all animate-glow-breathe hover:-translate-y-0.5 active:translate-y-0 duration-200">
                 <p className="font-semibold">📮 Send a Letter</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every two weeks</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every week</p>
               </Link>
               <Link href="/tradition/new" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#C17F24]/30 rounded-2xl font-medium hover:bg-[#C17F24]/5 transition-all">
                 <p className="font-semibold">🌱 Start a Gathering</p>

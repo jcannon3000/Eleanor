@@ -73,14 +73,6 @@ export default function ReadLetter() {
   const isOwnLetter = letter?.authorEmail === userEmail;
   const hasWrittenThisPeriod = data?.currentPeriod?.hasWrittenThisPeriod ?? false;
 
-  // Compute recipient names for salutation
-  const recipientNames = data?.members
-    ?.filter((m) => m.email !== letter?.authorEmail)
-    .map((m) => m.name || m.email.split("@")[0]) || [];
-  const salutation = recipientNames.length <= 2
-    ? recipientNames.join(" and ")
-    : recipientNames.slice(0, -1).join(", ") + ", and " + recipientNames[recipientNames.length - 1];
-
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -128,7 +120,7 @@ export default function ReadLetter() {
             style={{
               top: "20px",
               right: "20px",
-              border: "1px solid #4A6FA5",
+              border: "1px solid #6B8F71",
               borderRadius: "50% / 40%",
               padding: "10px 16px",
               transform: "rotate(-8deg)",
@@ -138,7 +130,7 @@ export default function ReadLetter() {
             <span
               className="font-semibold uppercase"
               style={{
-                color: "#4A6FA5",
+                color: "#6B8F71",
                 fontSize: "11px",
                 letterSpacing: "0.08em",
                 lineHeight: 1.3,
@@ -146,7 +138,7 @@ export default function ReadLetter() {
             >
               {letter.postmarkCity}
             </span>
-            <span style={{ color: "#4A6FA5", fontSize: "10px", lineHeight: 1.3 }}>
+            <span style={{ color: "#6B8F71", fontSize: "10px", lineHeight: 1.3 }}>
               {formatShortDate(letter.sentAt)}
             </span>
           </div>
@@ -155,25 +147,10 @@ export default function ReadLetter() {
         {/* Letter metadata */}
         <p
           className="text-[11px] font-semibold uppercase mb-8 pr-24"
-          style={{ color: "#4A6FA5", letterSpacing: "0.1em" }}
+          style={{ color: "#6B8F71", letterSpacing: "0.1em" }}
         >
           {letter.authorName} · Letter {letter.letterNumber} · {formatLetterDate(letter.sentAt)}
         </p>
-
-        {/* Salutation */}
-        {salutation && (
-          <p
-            className="mb-6"
-            style={{
-              color: "#2C1810",
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "19px",
-              lineHeight: "2.1",
-            }}
-          >
-            Dear {salutation},
-          </p>
-        )}
 
         {/* Letter body */}
         <div
@@ -188,17 +165,6 @@ export default function ReadLetter() {
           {letter.content}
         </div>
 
-        {/* Signature */}
-        <p
-          className="mt-8"
-          style={{
-            color: "#2C1810",
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "19px",
-          }}
-        >
-          &mdash; {letter.authorName}
-        </p>
       </div>
 
       {/* Footer */}
@@ -218,7 +184,7 @@ export default function ReadLetter() {
             <Link href={writeUrl}>
               <button
                 className="px-6 py-3 rounded-xl font-semibold text-sm"
-                style={{ backgroundColor: "#4A6FA5", color: "#F7F0E6" }}
+                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
               >
                 Write your letter {"\u{1F4EE}"}
               </button>
