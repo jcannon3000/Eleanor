@@ -292,7 +292,6 @@ router.get(
         .slice(0, 3);
 
       // First unread letter for preview
-      const identifier = auth.userId ? auth.userId : auth.email;
       const firstUnread = letters.find((l) => {
         const readers = (l.readBy as Array<string | number>) || [];
         return !readers.includes(identifier) && l.authorEmail !== auth.email;
