@@ -324,6 +324,12 @@ function FAB() {
             transition={{ duration: 0.15 }}
             className="flex flex-col gap-2 mb-1"
           >
+            <Link href="/letters" onClick={() => setOpen(false)}>
+              <div className="px-4 py-3 bg-card border border-[#4A6FA5]/30 rounded-2xl shadow-lg hover:bg-[#4A6FA5]/5 transition-colors whitespace-nowrap min-w-[210px]">
+                <p className="text-sm font-semibold text-foreground">📮 Plant a Letter</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Exchange letters every two weeks</p>
+              </div>
+            </Link>
             <Link href="/moment/new" onClick={() => setOpen(false)}>
               <div className="px-4 py-3 bg-card border border-[#6B8F71]/30 rounded-2xl shadow-lg hover:bg-[#6B8F71]/5 transition-colors whitespace-nowrap min-w-[210px]">
                 <p className="text-sm font-semibold text-foreground">🌿 Plant a Practice</p>
@@ -332,7 +338,7 @@ function FAB() {
             </Link>
             <Link href="/tradition/new" onClick={() => setOpen(false)}>
               <div className="px-4 py-3 bg-card border border-[#C17F24]/30 rounded-2xl shadow-lg hover:bg-[#C17F24]/5 transition-colors whitespace-nowrap min-w-[210px]">
-                <p className="text-sm font-semibold text-foreground">🌱 Plant a Tradition</p>
+                <p className="text-sm font-semibold text-foreground">🌱 Plant a Gathering</p>
                 <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </div>
             </Link>
@@ -358,6 +364,65 @@ function TimeAnchor({ label }: { label: string }) {
     <div className="flex items-center gap-2 my-4">
       <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">{label}</span>
       <div className="flex-1 h-px bg-border/40" />
+    </div>
+  );
+}
+
+// ─── Letters Section ────────────────────────────────────��────────────────
+
+function LettersSection() {
+  const { user } = useAuth();
+  const { data: correspondences } = useQuery<Array<{
+    id: number;
+    name: string;
+    unreadCount: number;
+    currentPeriod: {
+      hasWrittenThisPeriod: boolean;
+      isLastThreeDays: boolean;
+      membersWritten: Array<{ name: string; hasWritten: boolean }>;
+    };
+  }>>({
+    queryKey: ["/api/letters/correspondences"],
+    queryFn: () => apiRequest("GET", "/api/letters/correspondences"),
+    enabled: !!user,
+  });
+
+  if (!correspondences || correspondences.length === 0) return null;
+
+  // Build action items
+  const items: Array<{ id: number; label: string; type: "unread" | "due" }> = [];
+  for (const c of correspondences) {
+    if (c.unreadCount > 0) {
+      const writer = c.currentPeriod.membersWritten.find(m => m.hasWritten && m.name !== user?.name);
+      items.push({ id: c.id, label: `${writer?.name || "Someone"} wrote`, type: "unread" });
+    } else if (!c.currentPeriod.hasWrittenThisPeriod && c.currentPeriod.isLastThreeDays) {
+      items.push({ id: c.id, label: "Your letter is due", type: "due" });
+    }
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-6 mb-2">
+      <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: "#4A6FA5", letterSpacing: "0.1em" }}>
+        Letters 📮
+      </p>
+      <div className="space-y-2">
+        {items.slice(0, 3).map((item) => (
+          <Link key={item.id} href={`/letters/${item.id}`}>
+            <div className="flex items-center gap-2 py-1.5 cursor-pointer">
+              {item.type === "unread" ? (
+                <span className="text-sm" style={{ color: "#4A6FA5" }}>{item.label} 🌿</span>
+              ) : (
+                <span className="text-sm" style={{ color: "#C17F24" }}>{item.label} 📮</span>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+      <Link href="/letters" className="text-xs font-medium mt-1 inline-block" style={{ color: "#4A6FA5" }}>
+        See all letters →
+      </Link>
     </div>
   );
 }
@@ -488,7 +553,7 @@ export default function Dashboard() {
           </Link>
           <span className="text-muted-foreground/30 text-xs">·</span>
           <Link href="/tradition/new" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
-            🌱 Traditions →
+            🌱 Gatherings →
           </Link>
         </div>
 
@@ -517,7 +582,7 @@ export default function Dashboard() {
                 <p className="text-xs opacity-80 mt-0.5">For when you can't be together</p>
               </Link>
               <Link href="/tradition/new" className="block w-full text-left px-5 py-4 bg-card text-foreground border border-[#C17F24]/30 rounded-2xl font-medium hover:bg-[#C17F24]/5 transition-all">
-                <p className="font-semibold">🌱 Plant a Tradition</p>
+                <p className="font-semibold">🌱 Plant a Gathering</p>
                 <p className="text-xs text-muted-foreground mt-0.5">To bring you together</p>
               </Link>
             </div>
@@ -606,6 +671,9 @@ export default function Dashboard() {
 
           </motion.div>
         )}
+
+        {/* Letters Section */}
+        <LettersSection />
 
         {/* Prayer Requests */}
         <PrayerSection />

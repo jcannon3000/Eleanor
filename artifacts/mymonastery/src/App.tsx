@@ -56,6 +56,11 @@ import MomentJoin from "./pages/moment-join";
 import TraditionNew from "./pages/tradition-new";
 import AppleMusicAuth from "./pages/apple-music-auth";
 import MorningPrayerPage from "./pages/morning-prayer";
+import LettersPage from "./pages/Letters/LettersPage";
+import CorrespondencePage from "./pages/Letters/CorrespondencePage";
+import WriteLetter from "./pages/Letters/WriteLetter";
+import ReadLetter from "./pages/Letters/ReadLetter";
+import LetterInvitePage from "./pages/Letters/InvitePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +105,11 @@ function Router() {
       <Route path="/m/:userToken">{(params: { userToken: string }) => <ShortLinkRedirect userToken={params.userToken} />}</Route>
       <Route path="/moment/join/:momentToken" component={MomentJoin} />
       <Route path="/moment/:momentToken/:userToken" component={MomentPostPage} />
+      <Route path="/letters" component={LettersPage} />
+      <Route path="/letters/invite/:token" component={LetterInvitePage} />
+      <Route path="/letters/:id/write" component={WriteLetter} />
+      <Route path="/letters/:id/read/:letterId" component={ReadLetter} />
+      <Route path="/letters/:id" component={CorrespondencePage} />
       <Route path="/people" component={People} />
       <Route path="/people/:email" component={PersonProfile} />
       <Route path="/apple-music-auth" component={AppleMusicAuth} />
