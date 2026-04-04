@@ -121,11 +121,20 @@ export default function WriteLetter() {
     },
   });
 
-  // Polish letter
+  // Polish letter with undo/redo
   const [isPolishing, setIsPolishing] = useState(false);
-  const [showPolishDone, setShowPolishDone] = useState(false);
+  const [originalBeforePolish, setOriginalBeforePolish] = useState<string | null>(null);
+  const [cachedPolished, setCachedPolished] = useState<string | null>(null);
+  const [polishState, setPolishState] = useState<"idle" | "polished" | "undone">("idle");
 
   async function handlePolish() {
+    // Redo: if undone and content matches original, swap back without API call
+    if (polishState === "undone" && cachedPolished && content === originalBeforePolish) {
+      setContent(cachedPolished);
+      setPolishState("polished");
+      return;
+    }
+
     if (!content.trim() || isPolishing) return;
     setIsPolishing(true);
     try {
@@ -136,14 +145,22 @@ export default function WriteLetter() {
         { content: content.trim(), recipientName },
       );
       if (result.polished) {
+        setOriginalBeforePolish(content);
+        setCachedPolished(result.polished);
         setContent(result.polished);
-        setShowPolishDone(true);
-        setTimeout(() => setShowPolishDone(false), 3000);
+        setPolishState("polished");
       }
     } catch {
       // Silent fail — user keeps their original
     } finally {
       setIsPolishing(false);
+    }
+  }
+
+  function handleUndoPolish() {
+    if (originalBeforePolish !== null) {
+      setContent(originalBeforePolish);
+      setPolishState("undone");
     }
   }
 
@@ -186,7 +203,7 @@ export default function WriteLetter() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FAF6F0" }}>
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 flex items-center justify-between">
+      <div className="px-6 pt-6 pb-2 flex items-center justify-between">
         <button onClick={handleBack} className="text-sm text-muted-foreground hover:text-[#2C1810] transition-colors">
           &larr;
         </button>
@@ -212,6 +229,32 @@ export default function WriteLetter() {
           )}
         </div>
       </div>
+
+      {/* Polish bar */}
+      {wordCount >= 20 && (
+        <div className="px-6 pb-3 flex items-center gap-2">
+          {polishState === "polished" && (
+            <button
+              onClick={handleUndoPolish}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+              style={{ color: "#9a9390" }}
+            >
+              Undo polish
+            </button>
+          )}
+          <button
+            onClick={handlePolish}
+            disabled={isPolishing}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50"
+            style={{
+              borderColor: polishState === "polished" ? "#6B8F71" : "#4A6FA5",
+              color: isPolishing ? "#9a9390" : polishState === "polished" ? "#6B8F71" : "#4A6FA5",
+            }}
+          >
+            {isPolishing ? "Polishing..." : polishState === "undone" ? "Redo polish" : polishState === "polished" ? "Polished \u2713" : "Polish \u2728"}
+          </button>
+        </div>
+      )}
 
       {/* Writing area */}
       <div className="flex-1 px-6 relative">
@@ -254,20 +297,13 @@ export default function WriteLetter() {
               {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
             </span>
             <div className="flex items-center gap-2">
-              {wordCount >= 20 && (
-                <button
-                  onClick={handlePolish}
-                  disabled={isPolishing}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50"
-                  style={{
-                    borderColor: "#4A6FA5",
-                    color: isPolishing ? "#9a9390" : "#4A6FA5",
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  {isPolishing ? "Polishing..." : showPolishDone ? "Polished \u2713" : "Polish \u2728"}
-                </button>
-              )}
+              <button
+                onClick={() => { saveDraft(); }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors"
+                style={{ borderColor: "#e8e2d9", color: "#9a9390" }}
+              >
+                Save draft
+              </button>
               <button
                 onClick={() => setConfirmSend(true)}
                 disabled={!canSend}
