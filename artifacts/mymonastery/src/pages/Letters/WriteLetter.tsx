@@ -68,15 +68,19 @@ export default function WriteLetter() {
   }, [content]);
 
   // Save draft
+  const [draftError, setDraftError] = useState(false);
+
   const saveDraft = useCallback(async () => {
     if (!correspondenceId || content === lastSavedRef.current) return;
     try {
       await apiRequest("PUT", `/api/letters/correspondences/${correspondenceId}/draft${tokenParam}`, { content });
       lastSavedRef.current = content;
+      setDraftError(false);
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
-    } catch {
-      // Silent fail for draft save
+    } catch (err) {
+      console.error("Draft save failed:", err);
+      setDraftError(true);
     }
   }, [correspondenceId, content, tokenParam]);
 
@@ -301,9 +305,12 @@ export default function WriteLetter() {
               <button
                 onClick={() => { saveDraft(); }}
                 className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors"
-                style={{ borderColor: "#e8e2d9", color: "#9a9390" }}
+                style={{
+                  borderColor: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#e8e2d9",
+                  color: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#9a9390",
+                }}
               >
-                Save draft
+                {draftError ? "Save failed" : showSaved ? "Saved \u2713" : "Save draft"}
               </button>
               <button
                 onClick={() => setConfirmSend(true)}
