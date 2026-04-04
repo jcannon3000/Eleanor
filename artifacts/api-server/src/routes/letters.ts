@@ -774,9 +774,10 @@ Rules:
         response.content[0].type === "text" ? response.content[0].text : content;
 
       res.json({ polished });
-    } catch (err) {
-      console.error("Failed to polish letter:", err);
-      res.status(500).json({ error: "Failed to polish letter" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Failed to polish letter:", msg, err);
+      res.status(500).json({ error: `Failed to polish letter: ${msg}` });
     }
   }),
 );

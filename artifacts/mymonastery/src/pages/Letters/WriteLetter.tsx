@@ -154,9 +154,10 @@ export default function WriteLetter() {
         setContent(result.polished);
         setPolishState("polished");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Polish failed:", err);
-      alert("Polish isn't working right now. Check that the server has deployed.");
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Polish failed: ${msg}`);
     } finally {
       setIsPolishing(false);
     }
