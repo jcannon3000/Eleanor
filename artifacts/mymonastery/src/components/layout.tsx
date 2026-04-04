@@ -39,17 +39,6 @@ export function Layout({ children }: { children: ReactNode }) {
           {user && (
             <nav className="flex items-center gap-1">
               <Link
-                href="/letters"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  location.startsWith("/letters")
-                    ? "text-[#4A6FA5] bg-[#4A6FA5]/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-              >
-                <span className="text-sm">📮</span>
-                Letters
-              </Link>
-              <Link
                 href="/people"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   location.startsWith("/people")
