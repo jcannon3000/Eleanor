@@ -11,12 +11,8 @@ import { getOfficeDay } from "../lib/liturgicalCalendar";
 
 const router = Router();
 
-// GET /office/morning
+// GET /office/morning — public, no auth required (liturgical content is same for all users)
 router.get("/office/morning", async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-
   let date: Date;
   try {
     date = req.query.date
@@ -28,9 +24,10 @@ router.get("/office/morning", async (req, res) => {
   }
 
   try {
+    const userId = (req.user as { id: number } | undefined)?.id ?? 0;
     const { slides, officeDay, fromCache } = await assembleMorningPrayer(
       date,
-      (req.user as { id: number }).id,
+      userId,
     );
 
     return res.json({
