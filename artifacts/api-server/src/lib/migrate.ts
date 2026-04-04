@@ -400,6 +400,71 @@ export async function migrate() {
       )
     `);
 
+    // ── Eleanor Letters tables ────────────────────────────────────────────────
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS correspondences (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_by_user_id INTEGER REFERENCES users(id),
+        frequency TEXT NOT NULL DEFAULT 'fortnightly',
+        group_type TEXT NOT NULL,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS correspondence_members (
+        id SERIAL PRIMARY KEY,
+        correspondence_id INTEGER NOT NULL REFERENCES correspondences(id),
+        user_id INTEGER REFERENCES users(id),
+        email TEXT NOT NULL,
+        name TEXT,
+        invite_token TEXT NOT NULL UNIQUE,
+        joined_at TIMESTAMPTZ,
+        last_letter_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS letters (
+        id SERIAL PRIMARY KEY,
+        correspondence_id INTEGER NOT NULL REFERENCES correspondences(id),
+        author_user_id INTEGER REFERENCES users(id),
+        author_email TEXT NOT NULL,
+        author_name TEXT NOT NULL,
+        content TEXT NOT NULL,
+        letter_number INTEGER NOT NULL,
+        period_number INTEGER NOT NULL,
+        period_start_date DATE NOT NULL,
+        sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        read_by JSONB NOT NULL DEFAULT '[]',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS letter_drafts (
+        id SERIAL PRIMARY KEY,
+        correspondence_id INTEGER NOT NULL REFERENCES correspondences(id),
+        author_user_id INTEGER REFERENCES users(id),
+        author_email TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        period_start_date DATE NOT NULL,
+        last_saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (correspondence_id, author_email, period_start_date)
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS letter_reminders (
+        id SERIAL PRIMARY KEY,
+        correspondence_id INTEGER NOT NULL REFERENCES correspondences(id),
+        member_email TEXT NOT NULL,
+        period_start_date DATE NOT NULL,
+        sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (correspondence_id, member_email, period_start_date)
+      )
+    `);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
