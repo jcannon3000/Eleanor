@@ -8,6 +8,7 @@
 import { Router } from "express";
 import { assembleMorningPrayer } from "../lib/assembleMorningPrayer";
 import { getOfficeDay } from "../lib/liturgicalCalendar";
+import { seedBcpTexts } from "../seeds/bcpTexts";
 
 const router = Router();
 
@@ -154,6 +155,22 @@ router.post("/office/morning/prefetch", async (req, res) => {
   } catch (err) {
     console.error("Morning Prayer prefetch failed:", err);
     return res.status(500).json({ error: "Prefetch failed" });
+  }
+});
+
+// POST /office/seed — one-time BCP texts seed (internal)
+router.post("/office/seed", async (req, res) => {
+  const internalKey = req.headers["x-internal-key"];
+  if (!internalKey || internalKey !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    const result = await seedBcpTexts();
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("BCP seed failed:", err);
+    return res.status(500).json({ error: "Seed failed", detail: String(err) });
   }
 });
 

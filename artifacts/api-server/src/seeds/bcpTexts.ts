@@ -737,28 +737,21 @@ async function seedCollectStubs() {
 /*  Main                                                               */
 /* ------------------------------------------------------------------ */
 
-async function main() {
+export async function seedBcpTexts(): Promise<{ inserted: number; skipped: number }> {
   console.log("=== BCP Texts Seed Script ===\n");
-
-  try {
-    await seedStaticTexts();
-    await sleep(DELAY_MS);
-
-    await seedCollectStubs();
-
-    console.log("\n✓ BCP texts seed complete.");
-    console.log(
-      "  Note: Psalm texts must be seeded separately via a psalms seed script.",
-    );
-    console.log(
-      "  Note: Full collects for all 29 Propers can be added by extending seedCollectStubs().",
-    );
-  } catch (err) {
-    console.error("Seed failed:", err);
-    process.exit(1);
-  } finally {
-    process.exit(0);
-  }
+  await seedStaticTexts();
+  await sleep(DELAY_MS);
+  await seedCollectStubs();
+  console.log("\n✓ BCP texts seed complete.");
+  return { inserted: 0, skipped: 0 };
 }
 
-main();
+// Allow direct execution: pnpm tsx src/seeds/bcpTexts.ts
+if (process.argv[1] && process.argv[1].endsWith("bcpTexts.ts")) {
+  seedBcpTexts()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("Seed failed:", err);
+      process.exit(1);
+    });
+}
