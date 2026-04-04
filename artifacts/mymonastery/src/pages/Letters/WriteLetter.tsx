@@ -43,7 +43,7 @@ export default function WriteLetter() {
   const [confirmSend, setConfirmSend] = useState(false);
   const [errorState, setErrorState] = useState<{ message: string; nextPeriodStart?: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastSavedRef = useRef("");
 
   // Fetch correspondence details
