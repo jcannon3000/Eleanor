@@ -362,6 +362,44 @@ export async function migrate() {
     // Password-based auth
     await run(client, `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`);
 
+    // ── Daily Office tables ──────────────────────────────────────────────────
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS bcp_texts (
+        id SERIAL PRIMARY KEY,
+        text_key TEXT NOT NULL UNIQUE,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        bcp_reference TEXT,
+        content TEXT NOT NULL,
+        season_restriction TEXT,
+        metadata JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS scripture_cache (
+        id SERIAL PRIMARY KEY,
+        reference TEXT NOT NULL,
+        cache_date DATE NOT NULL,
+        nrsv_text TEXT NOT NULL,
+        fetched_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (reference, cache_date)
+      )
+    `);
+    await run(client, `
+      CREATE TABLE IF NOT EXISTS morning_prayer_cache (
+        id SERIAL PRIMARY KEY,
+        cache_date DATE NOT NULL UNIQUE,
+        liturgical_year INTEGER NOT NULL,
+        liturgical_season TEXT NOT NULL,
+        proper_number INTEGER,
+        feast_name TEXT,
+        slides_json JSONB NOT NULL,
+        assembled_at TIMESTAMPTZ DEFAULT NOW(),
+        assembled_by_user_id INTEGER REFERENCES users(id)
+      )
+    `);
+
     // Verify shared_moments columns exist
     const colCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
