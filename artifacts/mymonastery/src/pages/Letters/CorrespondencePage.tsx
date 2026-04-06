@@ -177,12 +177,12 @@ export default function CorrespondencePage() {
     <Layout>
       <div className="flex flex-col w-full pb-24">
         {/* Back */}
-        <Link
-          href="/letters"
-          className="text-sm text-muted-foreground hover:text-[#2C1810] mb-4 inline-block transition-colors"
+        <button
+          onClick={() => setLocation("/letters")}
+          className="text-sm text-muted-foreground hover:text-[#2C1810] mb-4 inline-block transition-colors text-left"
         >
           &larr; Letters
-        </Link>
+        </button>
 
         {/* Header */}
         <h1
