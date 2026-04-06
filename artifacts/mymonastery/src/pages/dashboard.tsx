@@ -396,23 +396,25 @@ function LettersSection() {
             .map((m) => m.name || m.email.split("@")[0])
             .join(", ");
 
-          const needsWrite = !c.currentPeriod.hasWrittenThisPeriod;
-          const isDue = needsWrite && c.currentPeriod.isLastThreeDays;
-          const hasUnread = c.unreadCount > 0;
+          const iWrote = c.currentPeriod.membersWritten.find(m => m.name === user?.name)?.hasWritten ?? false;
+          const theyWrote = c.currentPeriod.membersWritten.find(m => m.name !== user?.name)?.hasWritten ?? false;
+          const allWritten = c.currentPeriod.membersWritten.every(m => m.hasWritten);
+          const isDue = !iWrote && c.currentPeriod.isLastThreeDays;
 
           let statusText = "";
           let statusColor = "#6B8F71";
-          if (hasUnread) {
-            const writer = c.currentPeriod.membersWritten.find(m => m.hasWritten && m.name !== user?.name);
-            statusText = `${writer?.name || "Someone"} wrote you a letter`;
-          } else if (needsWrite) {
-            const written = c.currentPeriod.membersWritten.filter(m => m.hasWritten).length;
-            statusText = `${written} of ${c.currentPeriod.membersWritten.length} written this week`;
-            if (isDue) statusColor = "#C17F24";
+          if (allWritten) {
+            statusText = "All caught up \u{1F338}";
+          } else if (iWrote && !theyWrote) {
+            statusText = `To ${otherMembers}`;
+            statusColor = "#9a9390";
+          } else if (theyWrote && !iWrote) {
+            statusText = `From ${otherMembers}`;
           } else {
-            const allWritten = c.currentPeriod.membersWritten.every((m) => m.hasWritten);
-            statusText = allWritten ? "All letters in this week" : "Waiting for others...";
+            statusText = `To ${otherMembers}`;
+            statusColor = "#9a9390";
           }
+          if (isDue) statusColor = "#C17F24";
 
           // Border color: amber if due, green otherwise
           const borderColor = isDue ? "#C17F24" : "#6B8F71";

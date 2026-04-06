@@ -87,32 +87,32 @@ function PostmarkStamp({ city, date, rotation = -8 }: { city: string; date: stri
 function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; userName: string }) {
   const { currentPeriod } = item;
 
-  // Status text
-  let statusText = "";
-  let statusColor = "#9a9390";
-  if (!currentPeriod.hasWrittenThisPeriod) {
-    if (currentPeriod.isLastThreeDays) {
-      statusText = "Write your letter \u{1F4EE}";
-      statusColor = "#C17F24";
-    }
-  } else {
-    const allWritten = currentPeriod.membersWritten.every((m) => m.hasWritten);
-    if (allWritten) {
-      statusText = "All letters in \u{1F338}";
-      statusColor = "#6B8F71";
-    } else {
-      const waiting = currentPeriod.membersWritten.find(
-        (m) => !m.hasWritten && m.name !== userName,
-      );
-      statusText = `Waiting for ${waiting?.name || "others"}... \u{1F33F}`;
-      statusColor = "#6B8F71";
-    }
-  }
-
   const otherMembers = item.members
     .filter((m) => m.name !== userName)
     .map((m) => m.name || m.email?.split("@")[0])
     .join(", ");
+
+  const iWrote = currentPeriod.membersWritten.find((m) => m.name === userName)?.hasWritten ?? false;
+  const theyWrote = currentPeriod.membersWritten.find((m) => m.name !== userName)?.hasWritten ?? false;
+  const allWritten = currentPeriod.membersWritten.every((m) => m.hasWritten);
+
+  // Status text
+  let statusText = "";
+  let statusColor = "#9a9390";
+  if (allWritten) {
+    statusText = "All caught up \u{1F338}";
+    statusColor = "#6B8F71";
+  } else if (iWrote && !theyWrote) {
+    statusText = `To ${otherMembers}`;
+    statusColor = "#9a9390";
+  } else if (theyWrote && !iWrote) {
+    statusText = `From ${otherMembers}`;
+    statusColor = "#6B8F71";
+  } else {
+    // Nobody written yet
+    statusText = `To ${otherMembers}`;
+    statusColor = "#9a9390";
+  }
 
   return (
     <Link href={`/letters/${item.id}`}>
