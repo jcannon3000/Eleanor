@@ -150,20 +150,6 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
           </div>
         </div>
 
-        {/* Postmark stamps */}
-        {item.recentPostmarks.length > 0 && (
-          <div className="flex justify-end gap-2 mt-3 -mr-2">
-            {item.recentPostmarks.slice(0, 2).map((pm, i) => (
-              <PostmarkStamp
-                key={i}
-                city={pm.city}
-                date={pm.sentAt}
-                rotation={i === 0 ? -8 : 6}
-              />
-            ))}
-          </div>
-        )}
-
         {/* Unread letter preview */}
         {item.unreadPreview && (
           <div
@@ -175,12 +161,6 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
               borderRadius: "0 4px 4px 0",
             }}
           >
-            <p
-              className="text-[11px] font-semibold uppercase mb-1"
-              style={{ color: "#6B8F71", letterSpacing: "0.08em" }}
-            >
-              {item.unreadPreview.authorName} wrote {item.unreadPreview.postmarkCity ? `from ${item.unreadPreview.postmarkCity}` : ""} {"\u{1F33F}"}
-            </p>
             <p className="text-[15px]" style={{ color: "#2C1810" }}>
               {item.unreadPreview.content}{item.unreadPreview.content.length >= 120 ? "..." : ""}
             </p>
@@ -193,28 +173,12 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
           </div>
         )}
 
-        {/* Status row */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-3">
-            {currentPeriod.membersWritten.map((m) => (
-              <span key={m.name} className="flex items-center gap-1 text-[13px]">
-                <span
-                  className="inline-block w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: m.hasWritten ? "#6B8F71" : "transparent",
-                    border: `1.5px solid #6B8F71`,
-                  }}
-                />
-                <span style={{ color: "#2C1810" }}>{m.name}</span>
-              </span>
-            ))}
-          </div>
-          {statusText && (
-            <span className="text-[13px]" style={{ color: statusColor }}>
-              {statusText}
-            </span>
-          )}
-        </div>
+        {/* Status */}
+        {statusText && (
+          <p className="text-[13px] mt-3" style={{ color: statusColor }}>
+            {statusText}
+          </p>
+        )}
       </motion.div>
     </Link>
   );
