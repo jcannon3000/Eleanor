@@ -96,23 +96,18 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
   const theyWrote = currentPeriod.membersWritten.find((m) => m.name !== userName)?.hasWritten ?? false;
   const allWritten = currentPeriod.membersWritten.every((m) => m.hasWritten);
 
-  // Status text
-  let statusText = "";
+  // Last letter info from most recent postmark
+  const lastPostmark = item.recentPostmarks[0] ?? null;
+  const lastLetterDate = lastPostmark ? formatShortDate(lastPostmark.sentAt) : null;
+  const lastLetterDirection = lastPostmark
+    ? (lastPostmark.authorName === userName ? `To ${otherMembers}` : `From ${otherMembers}`)
+    : null;
+
+  // Status line (when no letters yet)
+  const noLetters = !lastPostmark;
   let statusColor = "#9a9390";
-  if (allWritten) {
-    statusText = "All caught up \u{1F338}";
-    statusColor = "#6B8F71";
-  } else if (iWrote && !theyWrote) {
-    statusText = `To ${otherMembers}`;
-    statusColor = "#9a9390";
-  } else if (theyWrote && !iWrote) {
-    statusText = `From ${otherMembers}`;
-    statusColor = "#6B8F71";
-  } else {
-    // Nobody written yet
-    statusText = `To ${otherMembers}`;
-    statusColor = "#9a9390";
-  }
+  if (allWritten) statusColor = "#6B8F71";
+  else if (theyWrote && !iWrote) statusColor = "#6B8F71";
 
   return (
     <Link href={`/letters/${item.id}`}>
@@ -126,59 +121,22 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
           borderRadius: "4px",
           borderLeft: "3px solid #6B8F71",
           boxShadow: "0 2px 8px rgba(44, 24, 16, 0.06)",
-          padding: "24px",
-          marginBottom: "20px",
+          padding: "16px 20px",
+          marginBottom: "12px",
         }}
       >
-        {/* Top row */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[18px] font-bold truncate" style={{ color: "#2C1810" }}>
-              {otherMembers}
-            </p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p
-              className="text-[10px] font-semibold uppercase"
-              style={{ color: "#6B8F71", letterSpacing: "0.08em" }}
-            >
-              Letter {currentPeriod.periodNumber}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {formatPeriodRange(currentPeriod.periodStart, currentPeriod.periodEnd)}
-            </p>
-          </div>
-        </div>
+        <p className="text-[16px] font-semibold" style={{ color: "#2C1810" }}>
+          Correspondence with {otherMembers}
+        </p>
+        <p className="text-[13px] mt-1" style={{ color: statusColor }}>
+          {noLetters
+            ? "No letters yet"
+            : allWritten
+            ? `Last letter · ${lastLetterDate} · ${lastLetterDirection} · All caught up \u{1F338}`
+            : `Last letter · ${lastLetterDate} · ${lastLetterDirection}`
+          }
+        </p>
 
-        {/* Unread letter preview */}
-        {item.unreadPreview && (
-          <div
-            className="mt-3"
-            style={{
-              backgroundColor: "#F7F0E6",
-              borderLeft: "2px solid #6B8F71",
-              padding: "12px 16px",
-              borderRadius: "0 4px 4px 0",
-            }}
-          >
-            <p className="text-[15px]" style={{ color: "#2C1810" }}>
-              {item.unreadPreview.content}{item.unreadPreview.content.length >= 120 ? "..." : ""}
-            </p>
-            <p
-              className="text-[12px] font-medium mt-2 text-right"
-              style={{ color: "#6B8F71" }}
-            >
-              Read letter &rarr;
-            </p>
-          </div>
-        )}
-
-        {/* Status */}
-        {statusText && (
-          <p className="text-[13px] mt-3" style={{ color: statusColor }}>
-            {statusText}
-          </p>
-        )}
       </motion.div>
     </Link>
   );
