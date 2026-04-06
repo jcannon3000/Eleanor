@@ -134,10 +134,7 @@ function CorrespondenceCard({ item, userName }: { item: CorrespondenceItem; user
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[18px] font-bold truncate" style={{ color: "#2C1810" }}>
-              {item.name}
-            </p>
-            <p className="text-[14px] text-muted-foreground truncate">
-              with {otherMembers}
+              {otherMembers}
             </p>
           </div>
           <div className="text-right flex-shrink-0">
@@ -359,7 +356,7 @@ export default function LettersPage() {
                   >
                     <p className="text-lg font-semibold">Write your letter {"\u{1F4EE}"}</p>
                     <p className="text-sm opacity-80 mt-1">
-                      {needsLetter.name} · Letter {needsLetter.currentPeriod.periodNumber}
+                      {needsLetter.members.filter(m => m.name !== userName).map(m => m.name || m.email?.split("@")[0]).join(", ")} · Letter {needsLetter.currentPeriod.periodNumber}
                     </p>
                   </div>
                 </Link>

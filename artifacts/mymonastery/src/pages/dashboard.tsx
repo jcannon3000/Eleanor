@@ -434,11 +434,8 @@ function LettersSection() {
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="min-w-0 flex-1">
                       <span className="text-base font-semibold leading-tight" style={{ color: "#2C1810" }}>
-                        📮 {c.name}
+                        📮 {otherMembers}
                       </span>
-                      <p className="text-sm text-muted-foreground">
-                        with {otherMembers}
-                      </p>
                     </div>
                     <span
                       className="text-[10px] font-semibold uppercase shrink-0"
