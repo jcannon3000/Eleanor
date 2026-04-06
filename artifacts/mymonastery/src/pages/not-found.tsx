@@ -1,23 +1,24 @@
-import { Link } from "wouter";
-import { Sprout } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function NotFound() {
+  const [, setLocation] = useLocation();
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen w-full flex items-center justify-center px-4" style={{ background: "#FAF6F0" }}>
       <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-full bg-primary/8 flex items-center justify-center mx-auto mb-6">
-          <Sprout size={28} strokeWidth={1} className="text-primary/50" />
-        </div>
-        <h1 className="font-serif text-3xl text-foreground mb-3">Lost in the garden</h1>
-        <p className="text-muted-foreground mb-8 leading-relaxed">
-          This path doesn't lead anywhere. Let Eleanor guide you back.
+        <div className="text-5xl mb-6">📮</div>
+        <h1 className="text-2xl font-bold mb-3" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+          Lost in the post
+        </h1>
+        <p className="text-base mb-8" style={{ color: "#9a9390" }}>
+          This path doesn't lead anywhere. Let Phoebe guide you back.
         </p>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:shadow-lg transition-all"
+        <button
+          onClick={() => setLocation("/dashboard")}
+          className="px-6 py-3 rounded-xl font-semibold text-sm"
+          style={{ background: "#4A6FA5", color: "#fff" }}
         >
-          Back to Your Garden
-        </Link>
+          Back to Phoebe
+        </button>
       </div>
     </div>
   );

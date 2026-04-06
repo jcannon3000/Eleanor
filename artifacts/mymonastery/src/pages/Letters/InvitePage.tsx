@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 
 interface InviteInfo {
   correspondenceName: string;
   creatorName: string;
-  groupType: string;
+  type: string;
   memberCount: number;
   letterCount: number;
   alreadyJoined: boolean;
@@ -20,7 +19,6 @@ export default function LetterInvitePage() {
   const [data, setData] = useState<InviteInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,11 +29,10 @@ export default function LetterInvitePage() {
     if (!inviteToken) return;
     async function load() {
       try {
-        const res = await fetch(`/api/letters/invite/${inviteToken}`);
-        if (res.status === 404) {
-          setNotFound(true);
-          return;
-        }
+        // Try new phoebe endpoint first, fall back to legacy
+        let res = await fetch(`/api/phoebe/invite/${inviteToken}`);
+        if (res.status === 404) res = await fetch(`/api/letters/invite/${inviteToken}`);
+        if (res.status === 404) { setNotFound(true); return; }
         if (!res.ok) throw new Error("Failed");
         const d: InviteInfo = await res.json();
         setData(d);
@@ -54,17 +51,24 @@ export default function LetterInvitePage() {
     if (!name.trim() || !email.trim()) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/letters/invite/${inviteToken}/accept`, {
+      let res = await fetch(`/api/phoebe/invite/${inviteToken}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),
       });
+      if (!res.ok) {
+        res = await fetch(`/api/letters/invite/${inviteToken}/accept`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+        });
+      }
       if (!res.ok) throw new Error("Failed");
       const result = await res.json();
       setCorrespondenceId(result.correspondenceId);
       setAccepted(true);
     } catch {
-      // show nothing special, just let them retry
+      // silent — user can retry
     } finally {
       setIsSubmitting(false);
     }
@@ -72,21 +76,26 @@ export default function LetterInvitePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAF6F0" }}>
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#FAF6F0" }}>
+        <div className="w-6 h-6 rounded-full border-2 border-[#4A6FA5] border-t-transparent animate-spin" />
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#FAF6F0" }}>
-        <p className="text-base text-muted-foreground">This invitation is no longer valid.</p>
+      <div className="min-h-screen flex items-center justify-center px-6 text-center" style={{ background: "#FAF6F0" }}>
+        <div>
+          <p className="text-4xl mb-4">📮</p>
+          <p className="text-base" style={{ color: "#6b6460" }}>This invitation is no longer valid.</p>
+        </div>
       </div>
     );
   }
 
   if (!data) return null;
+
+  const isOneToOne = data.type === "one_to_one";
 
   if (accepted) {
     const writeUrl = correspondenceId
@@ -96,39 +105,37 @@ export default function LetterInvitePage() {
       ? `/letters/${correspondenceId}?token=${inviteToken}`
       : "/";
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: "#FAF6F0" }}>
-        <div className="text-5xl mb-6">{"\u{1F4EE}"}</div>
-        <p className="text-lg font-semibold mb-2" style={{ color: "#2C1810" }}>
-          You're in. {"\u{1F33F}"}
-        </p>
-        <p className="text-sm text-muted-foreground mb-2 leading-relaxed">
-          When {data.creatorName} writes you a letter, you'll get
-          a calendar notification with a link to read it.
-        </p>
-        <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-          Write your first letter whenever you're ready. {"\u{1F4EE}"}
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ background: "#FAF6F0" }}>
+        <div className="text-5xl mb-6">📮</div>
+        <h1 className="text-xl font-bold mb-2" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+          You're in. 🌿
+        </h1>
+        <p className="text-sm mb-8 leading-relaxed max-w-sm" style={{ color: "#6b6460" }}>
+          Write whenever you're ready.
         </p>
         <button
           onClick={() => setLocation(writeUrl)}
-          className="px-6 py-3 rounded-xl font-semibold text-sm mb-3"
-          style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
+          className="px-8 py-4 rounded-2xl font-semibold text-base mb-4"
+          style={{ background: "#4A6FA5", color: "#fff" }}
         >
-          Write your first letter {"\u{1F4EE}"}
+          Write your first letter 📮
         </button>
         <button
           onClick={() => setLocation(goUrl)}
-          className="text-sm text-muted-foreground"
+          className="text-sm"
+          style={{ color: "#9a9390" }}
         >
-          or view the correspondence &rarr;
+          View the correspondence →
         </button>
+        <p className="text-xs mt-12" style={{ color: "#9a9390" }}>Be together with Phoebe.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: "#FAF6F0" }}>
-      <div className="max-w-md w-full">
-        <div className="text-5xl mb-8">📮</div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12" style={{ background: "#FAF6F0" }}>
+      <div className="max-w-sm w-full text-center">
+        <div className="text-5xl mb-6">📮</div>
 
         <h1
           className="text-[22px] font-bold mb-4"
@@ -137,57 +144,51 @@ export default function LetterInvitePage() {
           {data.creatorName} wants to stay in touch.
         </h1>
 
-        <p className="text-base text-muted-foreground mb-4 leading-relaxed">
-          {data.creatorName} has invited you to exchange letters on Eleanor.
-          Once every week, you each write one letter. When a letter arrives,
-          you'll get a calendar notification with a link to read it.
-          Then write back when you're ready. A simple practice of staying close.
-        </p>
-
-        <p className="text-base italic mb-6" style={{ color: "#6B8F71" }}>
-          {data.correspondenceName}
+        <p className="text-base mb-8 leading-relaxed" style={{ color: "#6b6460" }}>
+          {isOneToOne
+            ? `You've been invited to exchange letters — one every two weeks, alternating. You write, they respond, you write back. A conversation with room to breathe.`
+            : `You've been invited to share weekly updates in ${data.correspondenceName}. Once a week, everyone shares what's been happening. 50 words or more.`
+          }
         </p>
 
         {data.letterCount > 0 && (
-          <p className="text-sm text-muted-foreground mb-6">
-            {data.letterCount} letter{data.letterCount !== 1 ? "s have" : " has"} already been written.
+          <p className="text-sm mb-6" style={{ color: "#9a9390" }}>
+            {data.letterCount} letter{data.letterCount !== 1 ? "s" : ""} already written.
           </p>
         )}
 
-        {/* Form */}
-        <div className="space-y-4 text-left mb-6">
-          <div>
-            <label className="block text-sm text-muted-foreground mb-1">What should we call you?</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#6B8F71] transition-colors"
-              style={{ color: "#2C1810" }}
-              placeholder="Your name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-muted-foreground mb-1">Your email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white border border-[#e8e2d9] text-base focus:outline-none focus:border-[#6B8F71] transition-colors"
-              style={{ color: "#2C1810" }}
-              placeholder="you@email.com"
-            />
-          </div>
+        <div className="space-y-3 text-left mb-6">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            className="w-full px-4 py-3.5 rounded-xl text-sm focus:outline-none"
+            style={{ background: "#fff", border: "1px solid #D6CAB8", color: "#2C1810" }}
+          />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Your email"
+            className="w-full px-4 py-3.5 rounded-xl text-sm focus:outline-none"
+            style={{ background: "#fff", border: "1px solid #D6CAB8", color: "#2C1810" }}
+          />
         </div>
 
         <button
           onClick={handleAccept}
           disabled={!name.trim() || !email.includes("@") || isSubmitting}
-          className="w-full py-3.5 rounded-2xl text-base font-semibold transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
+          className="w-full py-4 rounded-2xl text-base font-semibold disabled:opacity-40 transition-opacity"
+          style={{ background: "#4A6FA5", color: "#fff" }}
         >
-          {isSubmitting ? "Accepting..." : "Accept and start writing"}
+          {isSubmitting ? "Accepting..." : "Accept and start writing 📮"}
         </button>
+
+        <p className="text-xs mt-10" style={{ color: "#9a9390" }}>
+          No account needed. Just your words. 🌿<br />
+          Be together with Phoebe.
+        </p>
       </div>
     </div>
   );

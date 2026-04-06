@@ -7,11 +7,9 @@ import peopleRouter from "./people";
 import contactsRouter from "./contacts";
 import scheduleRouter from "./schedule";
 import inviteRouter from "./invite";
-import momentsRouter from "./moments";
 import prayerRouter from "./prayer";
-import appleMusicRouter from "./appleMusic";
-import officeRouter from "./office";
 import lettersRouter from "./letters";
+import phoebeRouter from "./phoebe";
 
 const router: IRouter = Router();
 
@@ -23,10 +21,8 @@ router.use(peopleRouter);
 router.use(contactsRouter);
 router.use(scheduleRouter);
 router.use(inviteRouter);
-router.use(momentsRouter);
 router.use(prayerRouter);
-router.use(appleMusicRouter);
-router.use(officeRouter);
 router.use(lettersRouter);
+router.use(phoebeRouter);
 
 export default router;

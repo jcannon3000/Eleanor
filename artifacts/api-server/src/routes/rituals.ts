@@ -99,18 +99,31 @@ router.post("/rituals", async (req, res): Promise<void> => {
   const schedulingToken = randomUUID();
   const location = parsed.data.location?.trim() || null;
 
+  const body = parsed.data as typeof parsed.data & {
+    rhythm?: string;
+    hasIntercession?: boolean;
+    hasFasting?: boolean;
+    intercessionIntention?: string | null;
+    fastingDescription?: string | null;
+  };
+
   const [ritual] = await db
     .insert(ritualsTable)
     .values({
-      name: parsed.data.name,
-      description: parsed.data.description ?? null,
-      frequency: parsed.data.frequency,
-      dayPreference: parsed.data.dayPreference ?? null,
-      participants: parsed.data.participants ?? [],
-      intention: parsed.data.intention ?? null,
+      name: body.name,
+      description: body.description ?? null,
+      frequency: body.frequency,
+      dayPreference: body.dayPreference ?? null,
+      participants: body.participants ?? [],
+      intention: body.intention ?? null,
       location,
-      ownerId: parsed.data.ownerId,
+      ownerId: body.ownerId,
       scheduleToken: schedulingToken,
+      rhythm: body.rhythm ?? "fortnightly",
+      hasIntercession: body.hasIntercession ?? false,
+      hasFasting: body.hasFasting ?? false,
+      intercessionIntention: body.intercessionIntention ?? null,
+      fastingDescription: body.fastingDescription ?? null,
     })
     .returning();
 
@@ -534,14 +547,14 @@ router.patch("/rituals/:id/proposed-times", async (req, res): Promise<void> => {
       }
 
       lines.push(`${ritual.name} · ${freqLabel}`);
-      lines.push(`Tended with Eleanor 🌿`);
+      lines.push(`Tended with Phoebe 🌿`);
       lines.push("");
       lines.push("View this tradition →");
       lines.push(scheduleUrl);
       lines.push("");
       lines.push("──────────────────────");
       lines.push("");
-      lines.push("Eleanor helps recurring gatherings actually happen.");
+      lines.push("Phoebe helps recurring gatherings actually happen.");
       lines.push("Check your email for your personal invite link to respond.");
 
       const description = lines.join("\n");

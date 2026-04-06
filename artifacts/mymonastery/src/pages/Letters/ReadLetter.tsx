@@ -23,12 +23,14 @@ interface LetterData {
 interface CorrespondenceDetail {
   id: number;
   name: string;
+  groupType: string;
   members: Array<{
     id: number;
     name: string | null;
     email: string;
   }>;
   letters: LetterData[];
+  myTurn: boolean;
   currentPeriod: {
     hasWrittenThisPeriod: boolean;
     periodNumber: number;
@@ -62,16 +64,28 @@ export default function ReadLetter() {
   const tokenParam = token ? `?token=${token}` : "";
 
   const { data } = useQuery<CorrespondenceDetail>({
-    queryKey: [`/api/letters/correspondences/${correspondenceId}`],
-    queryFn: () =>
-      apiRequest("GET", `/api/letters/correspondences/${correspondenceId}${tokenParam}`),
+    queryKey: [`/api/phoebe/correspondences/${correspondenceId}`],
+    queryFn: async () => {
+      try {
+        return await apiRequest("GET", `/api/phoebe/correspondences/${correspondenceId}${tokenParam}`);
+      } catch {
+        return await apiRequest("GET", `/api/letters/correspondences/${correspondenceId}${tokenParam}`);
+      }
+    },
     enabled: !!correspondenceId && (!!user || !!token),
   });
 
   const letter = data?.letters?.find((l) => l.id === Number(letterId));
   const userEmail = user?.email || "";
   const isOwnLetter = letter?.authorEmail === userEmail;
+  const isOneToOne = data?.groupType === "one_to_one";
   const hasWrittenThisPeriod = data?.currentPeriod?.hasWrittenThisPeriod ?? false;
+  const myTurn = data?.myTurn ?? false;
+
+  const otherMembers = data?.members
+    .filter((m) => m.email !== userEmail)
+    .map((m) => m.name || m.email.split("@")[0])
+    .join(", ") ?? "";
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -79,8 +93,8 @@ export default function ReadLetter() {
 
   if (!letter) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FDFAF5" }}>
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FAF6F0" }}>
+        <p style={{ color: "#9a9390" }}>Loading...</p>
       </div>
     );
   }
@@ -89,23 +103,24 @@ export default function ReadLetter() {
   const writeUrl = `/letters/${correspondenceId}/write${tokenParam}`;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#FDFAF5" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#FAF6F0" }}>
       {/* Header */}
       <div className="px-6 pt-8 pb-4 max-w-[600px] mx-auto">
-        <Link
-          href={backUrl}
-          className="text-sm text-muted-foreground hover:text-[#2C1810] transition-colors"
+        <button
+          onClick={() => setLocation(backUrl)}
+          className="text-sm"
+          style={{ color: "#9a9390" }}
         >
-          &larr; Back
-        </Link>
+          ← Back
+        </button>
       </div>
 
       {/* Letter paper */}
       <div
         className="max-w-[560px] mx-auto relative"
         style={{
-          backgroundColor: "#FDFAF5",
-          boxShadow: "inset 0 0 0 1px rgba(44,24,16,0.06), 0 4px 24px rgba(44,24,16,0.08)",
+          backgroundColor: "#FAF6F0",
+          boxShadow: "inset 0 0 0 1px rgba(74,111,165,0.1), 0 4px 24px rgba(44,24,16,0.08)",
           padding: "48px 32px",
           borderRadius: "2px",
           marginLeft: "auto",
@@ -114,13 +129,13 @@ export default function ReadLetter() {
         }}
       >
         {/* Postmark stamp — top right */}
-        {letter.postmarkCity && (
+        {letter.postmarkCity && isOneToOne && (
           <div
             className="absolute flex flex-col items-center justify-center"
             style={{
               top: "20px",
               right: "20px",
-              border: "1px solid #6B8F71",
+              border: "1.5px solid #4A6FA5",
               borderRadius: "50% / 40%",
               padding: "10px 16px",
               transform: "rotate(-8deg)",
@@ -129,16 +144,11 @@ export default function ReadLetter() {
           >
             <span
               className="font-semibold uppercase"
-              style={{
-                color: "#6B8F71",
-                fontSize: "11px",
-                letterSpacing: "0.08em",
-                lineHeight: 1.3,
-              }}
+              style={{ color: "#4A6FA5", fontSize: "11px", letterSpacing: "0.08em", lineHeight: 1.3 }}
             >
               {letter.postmarkCity}
             </span>
-            <span style={{ color: "#6B8F71", fontSize: "10px", lineHeight: 1.3 }}>
+            <span style={{ color: "#4A6FA5", fontSize: "10px", lineHeight: 1.3 }}>
               {formatShortDate(letter.sentAt)}
             </span>
           </div>
@@ -147,17 +157,29 @@ export default function ReadLetter() {
         {/* Letter metadata */}
         <p
           className="text-[11px] font-semibold uppercase mb-8 pr-24"
-          style={{ color: "#6B8F71", letterSpacing: "0.1em" }}
+          style={{ color: "#9a9390", letterSpacing: "0.1em" }}
         >
-          {letter.authorName} · Letter {letter.letterNumber} · {formatLetterDate(letter.sentAt)}
+          {letter.authorName}
+          {" · "}
+          {isOneToOne ? `Letter ${letter.letterNumber}` : `Update ${letter.letterNumber}`}
+          {letter.postmarkCity ? ` · ${letter.postmarkCity}` : ""}
+          {" · "}
+          {formatLetterDate(letter.sentAt)}
         </p>
+
+        {/* Salutation */}
+        {isOneToOne && (
+          <p className="text-base italic mb-6" style={{ color: "#9a9390", fontFamily: "Georgia, serif" }}>
+            Dear {isOwnLetter ? otherMembers : (user?.name || "Friend")},
+          </p>
+        )}
 
         {/* Letter body */}
         <div
           className="whitespace-pre-wrap"
           style={{
             color: "#2C1810",
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: isOneToOne ? "Georgia, serif" : "'Space Grotesk', sans-serif",
             fontSize: "19px",
             lineHeight: "2.1",
           }}
@@ -165,30 +187,34 @@ export default function ReadLetter() {
           {letter.content}
         </div>
 
+        {/* Signature */}
+        {isOneToOne && (
+          <p className="text-base italic mt-6" style={{ color: "#9a9390", fontFamily: "Georgia, serif" }}>
+            — {letter.authorName}
+          </p>
+        )}
       </div>
 
       {/* Footer */}
       <div className="max-w-[560px] mx-auto px-6 pt-8 pb-16 text-center">
-        <p className="text-[13px] text-muted-foreground">
-          Received {formatLetterDate(letter.sentAt)}
+        <p className="text-[13px]" style={{ color: "#9a9390" }}>
+          {formatLetterDate(letter.sentAt)}
           {letter.postmarkCity ? ` · ${letter.postmarkCity}` : ""}
-          {" \u{1F33F}"}
         </p>
 
         {/* Write back prompt */}
-        {!isOwnLetter && !hasWrittenThisPeriod && (
+        {!isOwnLetter && myTurn && !hasWrittenThisPeriod && (
           <div className="mt-8">
-            <p className="text-[15px] italic mb-4" style={{ color: "#6B8F71" }}>
-              Your turn to write. {"\u{1F33F}"}
+            <p className="text-[15px] italic mb-4" style={{ color: "#4A6FA5" }}>
+              {isOneToOne ? "Your turn to write. 📮" : "Share your update. 📮"}
             </p>
-            <Link href={writeUrl}>
-              <button
-                className="px-6 py-3 rounded-xl font-semibold text-sm"
-                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
-              >
-                Write your letter {"\u{1F4EE}"}
-              </button>
-            </Link>
+            <button
+              onClick={() => setLocation(writeUrl)}
+              className="px-6 py-3 rounded-xl font-semibold text-sm"
+              style={{ backgroundColor: "#4A6FA5", color: "#fff" }}
+            >
+              {isOneToOne ? "Write your letter 📮" : "Share your update 📮"}
+            </button>
           </div>
         )}
       </div>

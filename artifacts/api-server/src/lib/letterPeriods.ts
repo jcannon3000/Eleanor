@@ -1,9 +1,13 @@
 /**
- * Period calculation helpers for Eleanor Letters.
+ * Period calculation helpers for Phoebe Letters.
  *
  * A "period" is a 7-day window (Monday–Sunday) anchored to the
  * correspondence's startedAt date. Period 1 begins on the first
  * Monday on or after startedAt.
+ *
+ * ONE-TO-ONE ALTERNATING RULE:
+ *   Odd periods  → creator's turn
+ *   Even periods → member's turn
  */
 
 const PERIOD_DAYS = 7;
@@ -125,4 +129,39 @@ export function formatPeriodStartDateString(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+/**
+ * Returns whose turn it is in a one-to-one correspondence.
+ * Odd period → creator; even period → member.
+ */
+export function getWhoseTurn(
+  correspondenceStartedAt: Date,
+  referenceDate: Date,
+): "creator" | "member" {
+  const n = getPeriodNumber(correspondenceStartedAt, referenceDate);
+  return n % 2 === 1 ? "creator" : "member";
+}
+
+/**
+ * Returns full period info for a correspondence.
+ */
+export function getCurrentPeriodInfo(
+  correspondenceStartedAt: Date,
+  referenceDate: Date,
+  type: "one_to_one" | "group",
+) {
+  const periodStart = getPeriodStart(correspondenceStartedAt, referenceDate);
+  const periodEnd = getPeriodEnd(periodStart);
+  const periodNumber = getPeriodNumber(correspondenceStartedAt, referenceDate);
+
+  return {
+    periodNumber,
+    periodStart,
+    periodEnd,
+    periodLabel: formatPeriodLabel(periodStart, periodEnd),
+    periodStartStr: formatPeriodStartDateString(periodStart),
+    whoseTurn: type === "one_to_one" ? getWhoseTurn(correspondenceStartedAt, referenceDate) : ("everyone" as const),
+    isLastThreeDays: isInLastThreeDays(periodStart, referenceDate),
+  };
 }

@@ -2,6 +2,7 @@ import { google } from "googleapis";
 
 // Send emails via Gmail API using the scheduler account (eleanorscheduler@gmail.com)
 // Reuses the same OAuth refresh token as calendar events.
+// Note: the Gmail account address is eleanorscheduler@ but the display name is Phoebe.
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(
@@ -43,10 +44,10 @@ function encodeMimeMessage(options: {
   text: string;
 }): string {
   const { to, subject, html, text } = options;
-  const boundary = "EleanorBoundary";
+  const boundary = "PhoebeBoundary";
   const message = [
     `To: ${to}`,
-    `From: Eleanor <eleanorscheduler@gmail.com>`,
+    `From: Phoebe <eleanorscheduler@gmail.com>`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -78,7 +79,7 @@ export async function sendMagicLinkEmail(
     return false;
   }
 
-  const subject = isNewUser ? "Welcome to Eleanor — sign in" : "Your Eleanor sign-in link";
+  const subject = isNewUser ? "Welcome to Phoebe — sign in" : "Your Phoebe sign-in link";
 
   const html = `
 <!DOCTYPE html>
@@ -96,7 +97,7 @@ export async function sendMagicLinkEmail(
             <td>
               <!-- Logo -->
               <div style="margin-bottom:28px;">
-                <span style="font-size:22px;font-weight:700;color:#2d2a26;letter-spacing:-0.5px;">🌱 Eleanor</span>
+                <span style="font-size:22px;font-weight:700;color:#2d2a26;letter-spacing:-0.5px;">🌱 Phoebe</span>
               </div>
 
               <!-- Headline -->
@@ -104,18 +105,18 @@ export async function sendMagicLinkEmail(
                 ${isNewUser ? "Welcome — here's your sign-in link" : "Here's your sign-in link"}
               </h1>
               <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.6;">
-                Click below to sign in to Eleanor. This link expires in 1 hour.
+                Click below to sign in to Phoebe. This link expires in 1 hour.
               </p>
 
               <!-- Button -->
               <a href="${magicLink}" style="display:inline-block;background:#4a7c59;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:600;letter-spacing:-0.2px;">
-                Sign in to Eleanor →
+                Sign in to Phoebe →
               </a>
 
               <!-- Note -->
               <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
                 ${isNewUser
-                  ? `Calendar invites from Eleanor will be sent to <strong>${to}</strong>.`
+                  ? `Calendar invites from Phoebe will be sent to <strong>${to}</strong>.`
                   : `Signing in as <strong>${to}</strong>.`
                 }
                 If you didn't request this, you can ignore it.
@@ -131,13 +132,13 @@ export async function sendMagicLinkEmail(
   `.trim();
 
   const text = [
-    isNewUser ? "Welcome to Eleanor!" : "Your Eleanor sign-in link",
+    isNewUser ? "Welcome to Phoebe!" : "Your Phoebe sign-in link",
     "",
     "Click this link to sign in (expires in 1 hour):",
     magicLink,
     "",
     isNewUser
-      ? `Calendar invites from Eleanor will be sent to ${to}.`
+      ? `Calendar invites from Phoebe will be sent to ${to}.`
       : `Signing in as ${to}.`,
     "",
     "If you didn't request this, you can ignore this email.",

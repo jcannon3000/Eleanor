@@ -1,624 +1,435 @@
-import { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 
-/* ─── constants ─────────────────────────────────────────────────────────────── */
-
-const STEP_LABELS = ["Type", "Name", "Who", "Rhythm", "Goal", "When"] as const;
-const TOTAL_STEPS = STEP_LABELS.length;
-
-const TYPE_OPTIONS = [
-  { value: "coffee", emoji: "\u2615", label: "Coffee", tagline: "Share your first cup, again and again" },
-  { value: "meal", emoji: "\uD83C\uDF7D\uFE0F", label: "A Meal", tagline: "The table is the oldest gathering place" },
-  { value: "walk", emoji: "\uD83D\uDEB6", label: "A Walk", tagline: "Move together on a regular day" },
-  { value: "run", emoji: "\uD83C\uDFC3", label: "A Run", tagline: "Keep the pace, keep the commitment" },
-  { value: "custom", emoji: "\uD83C\uDF31", label: "Something else", tagline: "Name your own tradition" },
+const TEMPLATE_OPTIONS = [
+  { value: "coffee", emoji: "☕", label: "Coffee", tagline: "Share your first cup, again and again" },
+  { value: "meal", emoji: "🍽️", label: "A Meal", tagline: "The table is the oldest gathering place" },
+  { value: "walk", emoji: "🚶", label: "A Walk", tagline: "Move together on a regular day" },
+  { value: "book_club", emoji: "📚", label: "Book Club", tagline: "Read together, think together" },
+  { value: "custom", emoji: "🌿", label: "Something else", tagline: "Name your own gathering" },
 ];
 
 const RHYTHM_OPTIONS = [
-  { value: "weekly", label: "Every week", tagline: "A weekly rhythm" },
-  { value: "biweekly", label: "Every two weeks", tagline: "A fortnightly ritual" },
-  { value: "monthly", label: "Once a month", tagline: "A monthly anchor" },
+  { value: "weekly", emoji: "📅", label: "Every week", tagline: "A weekly commitment" },
+  { value: "fortnightly", emoji: "📅", label: "Every two weeks", tagline: "A fortnightly rhythm" },
+  { value: "monthly", emoji: "📅", label: "Once a month", tagline: "A monthly anchor" },
 ];
 
-const GOAL_OPTIONS = [
-  { months: 1, emoji: "\uD83C\uDF31", label: "One month", phase: "Taking root" },
-  { months: 3, emoji: "\uD83C\uDF3F", label: "Three months", phase: "Growing" },
-  { months: 6, emoji: "\uD83C\uDF38", label: "Six months", phase: "In bloom" },
-  { months: 0, emoji: "\uD83C\uDF3E", label: "Ongoing", phase: "" },
-];
-
-const GATHERINGS_PER_MONTH: Record<string, number> = { weekly: 4, biweekly: 2, monthly: 1 };
-
-const FREQ_LABEL: Record<string, string> = {
-  weekly: "every week",
-  biweekly: "every two weeks",
-  monthly: "once a month",
+const stepVariants = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 },
 };
 
-const PLANT_FRAMES = ["\uD83C\uDF31", "\uD83C\uDF3F", "\uD83C\uDF3F", "\uD83C\uDF3E", "\uD83C\uDF3F", "\uD83C\uDF31"];
-
-function formatDateHuman(val: string): string {
-  if (!val) return "";
-  try {
-    return format(new Date(val), "EEEE, MMMM d · h:mm a");
-  } catch {
-    return val;
-  }
-}
-
-function localDateStr(daysFromNow: number, hours: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  d.setHours(hours, 0, 0, 0);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(hours).padStart(2, "0")}:00`;
-}
-
-/* ─── small components ──────────────────────────────────────────────────────── */
-
-function ProgressBar({ step, goBack }: { step: number; goBack: () => void }) {
-  return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-[#6B8F71] font-medium">
-          Step {step} of {TOTAL_STEPS} — {STEP_LABELS[step - 1]}
-        </span>
-        {step > 1 && (
-          <button onClick={goBack} className="text-xs text-[#2C1810]/50 hover:text-[#2C1810]">
-            ← Back
-          </button>
-        )}
-      </div>
-      <div className="w-full h-1 bg-[#e8d5b8] rounded-full">
-        <div
-          className="h-full bg-[#C17F24] rounded-full transition-all duration-300"
-          style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ContinueButton({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
-  return (
-    <div className="flex justify-end mt-8">
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40 animate-glow-breathe-amber disabled:animate-none"
-      >
-        Continue →
-      </button>
-    </div>
-  );
-}
-
-function PlantingScreen({ name, firstNames, error, onRetry }: { name: string; firstNames: string; error: string; onRetry: () => void }) {
-  const [frame, setFrame] = useState(0);
-  const [stalled, setStalled] = useState(false);
-  useEffect(() => {
-    const id = setInterval(() => setFrame((f) => (f + 1) % PLANT_FRAMES.length), 600);
-    return () => clearInterval(id);
-  }, []);
-  useEffect(() => {
-    const t = setTimeout(() => setStalled(true), 12000);
-    return () => clearTimeout(t);
-  }, []);
-  const showError = error || stalled;
-  return (
-    <div className="min-h-screen bg-[#2C1810] flex flex-col items-center justify-center px-6">
-      <div className="text-7xl mb-6" key={frame}>{PLANT_FRAMES[frame]}</div>
-      <h1 className="font-serif text-2xl text-[#F7F0E6] text-center mb-2">
-        {showError ? "Hmm, something didn't take root" : `Planting ${name || "your tradition"}…`}
-      </h1>
-      {!showError && firstNames && (
-        <p className="text-[#F7F0E6]/50 text-sm text-center">Sending invites to {firstNames}</p>
-      )}
-      {showError && (
-        <div className="mt-4 text-center">
-          <p className="text-[#F7F0E6]/50 text-sm mb-4">{error || "This is taking longer than expected."}</p>
-          <button
-            onClick={onRetry}
-            className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors"
-          >
-            ← Go back and try again
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── main ──────────────────────────────────────────────────────────────────── */
+type Step = 1 | 2 | 3 | 4;
 
 export default function TraditionNew() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const [step, setStep] = useState(1);
-  const [type, setType] = useState("custom");
+  const [step, setStep] = useState<Step>(1);
+  const [template, setTemplate] = useState("");
   const [name, setName] = useState("");
   const [selectedPeople, setSelectedPeople] = useState<{ name: string; email: string }[]>([]);
   const [newPeople, setNewPeople] = useState<{ name: string; email: string }[]>([{ name: "", email: "" }]);
-  const [frequency, setFrequency] = useState("");
-  const [goalMonths, setGoalMonths] = useState<number | null>(null);
-  const [firstPick, setFirstPick] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(10, 0, 0, 0);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T10:00`;
-  });
-  const [alt1, setAlt1] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(18, 0, 0, 0);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T18:00`;
-  });
-  const [alt2, setAlt2] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 5); d.setHours(10, 0, 0, 0);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T10:00`;
-  });
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState("");
-
-  const [editingSlot, setEditingSlot] = useState<null | "first" | "alt1" | "alt2">(null);
+  const [rhythm, setRhythm] = useState("");
+  const [hasIntercession, setHasIntercession] = useState(false);
+  const [intercessionIntention, setIntercessionIntention] = useState("");
+  const [hasFasting, setHasFasting] = useState(false);
+  const [fastingDescription, setFastingDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (step === 2) nameRef.current?.focus(); }, [step]);
 
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
-  const goNext = () => setStep((s) => s + 1);
-
-  /* focus name input */
-  useEffect(() => {
-    if (step === 2) nameRef.current?.focus();
-  }, [step]);
-
-  /* connections for "Who" step */
   const { data: connectionsData } = useQuery({
     queryKey: ["/api/connections"],
     queryFn: () => apiRequest<{ connections: { name: string; email: string }[] }>("GET", "/api/connections"),
-    enabled: step === 3,
+    enabled: step === 2,
   });
   const connections = connectionsData?.connections ?? [];
 
-  /* helpers */
-  function gatheringsFor(months: number) {
-    const n = (GATHERINGS_PER_MONTH[frequency] ?? 4) * months;
-    return months === 1 ? `${n} gathering${n === 1 ? "" : "s"}` : `~${n} gatherings`;
-  }
-
-  const firstNames = selectedPeople
-    .map((p) => (p.name ? p.name.split(" ")[0] : p.email))
-    .join(", ");
-
-  const hasAtLeastOnePerson =
-    selectedPeople.length > 0 || newPeople.some((p) => p.email.trim() !== "");
-
-  /* toggle existing person */
   function togglePerson(person: { name: string; email: string }) {
     setSelectedPeople((prev) =>
       prev.some((p) => p.email === person.email)
         ? prev.filter((p) => p.email !== person.email)
-        : [...prev, person]
+        : [...prev, person],
     );
   }
 
-  /* merge new people on continue */
-  function continueWho() {
-    const validNew = newPeople.filter((p) => p.email.trim());
+  const allPeople = (() => {
     const merged = [...selectedPeople];
-    for (const np of validNew) {
-      if (!merged.some((p) => p.email === np.email)) merged.push(np);
+    for (const np of newPeople) {
+      if (np.email.trim() && !merged.some((p) => p.email === np.email)) {
+        merged.push(np);
+      }
     }
-    setSelectedPeople(merged);
-    goNext();
+    return merged;
+  })();
+
+  const hasAtLeastOnePerson = allPeople.length > 0;
+
+  function handleTypeSelect(t: string) {
+    setTemplate(t);
+    const option = TEMPLATE_OPTIONS.find((o) => o.value === t);
+    if (!name && option && t !== "custom") {
+      setName(option.label);
+    }
+    setStep(2);
   }
 
-  /* ─── send invites (step 7 auto-fires this) ──────────────────────────────── */
+  function handleWhoNext() {
+    if (!name.trim()) { setError("Give your gathering a name."); return; }
+    if (!hasAtLeastOnePerson) { setError("Add at least one person."); return; }
+    setError("");
+    setStep(3);
+  }
 
-  async function send() {
-    if (!user) {
-      setSendError("Not signed in. Please go back and sign in first.");
-      setStep(6);
-      return;
-    }
-    if (!firstPick) {
-      setSendError("Please pick a time for your first gathering.");
-      setStep(6);
-      return;
-    }
-    setSending(true);
+  async function handleCreate() {
+    if (!user) return;
+    setSubmitting(true);
+    setError("");
     try {
-      const ritual = await apiRequest<{ id: number }>("POST", "/api/rituals", {
-        name,
-        frequency,
-        participants: selectedPeople,
-        intention: TYPE_OPTIONS.find(o => o.value === type)?.tagline ?? `A ${type} tradition worth tending.`,
+      const participants = allPeople.filter((p) => p.email.trim());
+      const result = await apiRequest<{ id: number }>("POST", "/api/rituals", {
+        name: name.trim(),
+        frequency: rhythm,
+        participants,
+        intention: TEMPLATE_OPTIONS.find((o) => o.value === template)?.tagline || `A ${name} gathering.`,
         ownerId: user.id,
         dayPreference: "",
+        rhythm,
+        hasIntercession,
+        hasFasting,
+        intercessionIntention: hasIntercession ? intercessionIntention.trim() : null,
+        fastingDescription: hasFasting ? fastingDescription.trim() : null,
       });
-
-      const times = [
-        new Date(firstPick).toISOString(),
-        ...(alt1 ? [new Date(alt1).toISOString()] : []),
-        ...(alt2 ? [new Date(alt2).toISOString()] : []),
-      ];
-
-      await apiRequest("PATCH", `/api/rituals/${ritual.id}/proposed-times`, {
-        proposedTimes: times,
-      });
-
       qc.invalidateQueries({ queryKey: ["/api/rituals"] });
-      setLocation("/dashboard");
+      setLocation(`/ritual/${result.id}`);
     } catch (err) {
-      console.error("Failed to create tradition", err);
-      setSending(false);
-      setSendError(err instanceof Error ? err.message : "Something went wrong. Try again.");
-      setStep(6); // go back to When step so user can retry
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setSubmitting(false);
     }
   }
 
-  // auto-fire on step 7
-  useEffect(() => {
-    if (step === 7 && !sending && firstPick) send();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
-
-  /* ─── planting screen ─────────────────────────────────────────────────────── */
-
-  if (step === 7) {
-    return <PlantingScreen name={name} firstNames={firstNames} error={sendError} onRetry={() => { setSending(false); setSendError(""); setStep(6); }} />;
-  }
-
-  /* ─── render ──────────────────────────────────────────────────────────────── */
-
   return (
-    <div className="min-h-screen bg-[#FAF6F0] px-4 py-8">
-      <div className="max-w-lg mx-auto">
-        <ProgressBar step={step} goBack={goBack} />
+    <div className="min-h-screen flex flex-col" style={{ background: "#FAF6F0" }}>
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4 flex items-center gap-4">
+        <button
+          onClick={() => step === 1 ? setLocation("/dashboard") : setStep((s) => (s - 1) as Step)}
+          className="text-sm"
+          style={{ color: "#9a9390" }}
+        >
+          ← {step === 1 ? "Dashboard" : "Back"}
+        </button>
+        <div className="flex-1 flex gap-1.5">
+          {[1, 2, 3, 4].map((s) => (
+            <div
+              key={s}
+              className="h-1 flex-1 rounded-full transition-colors duration-300"
+              style={{ background: s <= step ? "#C17F24" : "#D6CAB8" }}
+            />
+          ))}
+        </div>
+      </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-[#C17F24]/15 p-6 md:p-8">
+      <div className="flex-1 px-6 pt-4 pb-24 max-w-lg mx-auto w-full">
+        <AnimatePresence mode="wait">
 
-          {/* ── 1  Type ── */}
+          {/* Step 1 — What */}
           {step === 1 && (
-            <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">What will you tend together?</h1>
-              <p className="text-[#2C1810]/50 text-sm italic mb-6">Recurring gatherings are where belonging forms.</p>
-              <div className="flex flex-col gap-3">
-                {TYPE_OPTIONS.map((o) => (
+            <motion.div key="s1" variants={stepVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2 }}>
+              <h1 className="text-2xl font-bold mb-2" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+                What will you gather for? ⛪
+              </h1>
+              <p className="text-sm mb-8" style={{ color: "#9a9390" }}>Recurring gatherings are where belonging forms.</p>
+
+              <div className="space-y-3">
+                {TEMPLATE_OPTIONS.map((o) => (
                   <button
                     key={o.value}
-                    onClick={() => { setType(o.value); setName(""); goNext(); }}
-                    className="w-full text-left p-4 rounded-2xl border border-[#e8d5b8] hover:border-[#C17F24]/50 hover:bg-[#C17F24]/5 transition-all flex items-center gap-4"
+                    onClick={() => handleTypeSelect(o.value)}
+                    className="w-full text-left p-4 rounded-2xl transition-all hover:shadow-md active:scale-[0.99]"
+                    style={{ background: "#fff", border: "1.5px solid rgba(193,127,36,0.25)" }}
                   >
-                    <span className="text-2xl">{o.emoji}</span>
-                    <div>
-                      <div className="font-medium text-[#2C1810]">{o.label}</div>
-                      <div className="text-sm text-[#2C1810]/50">{o.tagline}</div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{o.emoji}</span>
+                      <div>
+                        <p className="font-semibold text-base" style={{ color: "#2C1810" }}>{o.label}</p>
+                        <p className="text-sm" style={{ color: "#9a9390" }}>{o.tagline}</p>
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* ── 2  Name ── */}
+          {/* Step 2 — Name + Who */}
           {step === 2 && (
-            <div>
-              <p className="text-xs text-[#C17F24] font-medium tracking-widest uppercase mb-3">Start a Tradition</p>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">What do you want to call it?</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-6">Give your tradition a simple, clear name.</p>
-              <input
-                ref={nameRef}
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Morning Coffee"
-                className="w-full text-2xl font-serif bg-transparent border-b-2 border-[#C17F24]/40 focus:border-[#C17F24] outline-none py-3 text-[#2C1810] placeholder:text-[#2C1810]/30"
-              />
-              <ContinueButton disabled={!name.trim()} onClick={goNext} />
-            </div>
-          )}
+            <motion.div key="s2" variants={stepVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2 }}>
+              <h1 className="text-2xl font-bold mb-6" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+                Who are you gathering with? ⛪
+              </h1>
 
-          {/* ── 3  Who ── */}
-          {step === 3 && (
-            <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">Who do you want to do this with?</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-5">Pick people and propose times — they'll say which works.</p>
-
-              {/* chips */}
-              {selectedPeople.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {selectedPeople.map((p) => (
-                    <button
-                      key={p.email}
-                      onClick={() => togglePerson(p)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium"
-                      style={{ backgroundColor: "#C17F24", color: "#F7F0E6" }}
-                    >
-                      {p.name ? p.name.split(" ")[0] : p.email}
-                      <span className="opacity-70 text-xs">×</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* existing connections */}
-              {connections.length > 0 && (
-                <div className="flex flex-col gap-2 mb-5">
-                  {connections.map((person) => {
-                    const sel = selectedPeople.some((p) => p.email === person.email);
-                    return (
-                      <button
-                        key={person.email}
-                        onClick={() => togglePerson(person)}
-                        className={`w-full text-left p-3 rounded-2xl border flex items-center gap-3 transition-all ${
-                          sel ? "border-[#C17F24] bg-[#C17F24]/5" : "border-[#e8d5b8] hover:border-[#C17F24]/30 bg-white"
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold shrink-0 text-sm ${
-                          sel ? "bg-[#C17F24] text-white" : "bg-[#C17F24]/15 text-[#C17F24]"
-                        }`}>
-                          {(person.name || person.email).charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-[#2C1810] text-sm">{person.name || person.email}</div>
-                          {person.name && <div className="text-xs text-[#2C1810]/50 truncate">{person.email}</div>}
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                          sel ? "border-[#C17F24] bg-[#C17F24]" : "border-[#e8d5b8]"
-                        }`}>
-                          {sel && <span className="text-white text-xs">✓</span>}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* divider */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-[#e8d5b8]" />
-                <span className="text-xs text-[#2C1810]/40 uppercase tracking-widest">or invite someone new</span>
-                <div className="flex-1 h-px bg-[#e8d5b8]" />
+              {/* Name */}
+              <div className="mb-6">
+                <label className="text-xs font-semibold uppercase tracking-widest mb-2 block" style={{ color: "#C17F24" }}>
+                  Name this gathering
+                </label>
+                <input
+                  ref={nameRef}
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Morning Coffee, Sunday Dinner"
+                  className="w-full px-4 py-3.5 rounded-xl text-base focus:outline-none"
+                  style={{ background: "#fff", border: "1.5px solid #D6CAB8", color: "#2C1810" }}
+                />
               </div>
 
-              {/* new person rows */}
-              <div className="flex flex-col gap-4">
-                {newPeople.map((entry, i) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    <div className="flex-1 flex flex-col gap-2">
-                      <input
-                        type="text"
-                        value={entry.name}
-                        onChange={(e) => setNewPeople((p) => { const c = [...p]; c[i] = { ...c[i], name: e.target.value }; return c; })}
-                        placeholder="Name (optional)"
-                        className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] placeholder:text-[#2C1810]/30 focus:outline-none focus:border-[#C17F24]/60"
-                      />
+              {/* Existing connections */}
+              {connections.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#9a9390" }}>People you know</p>
+                  <div className="space-y-2">
+                    {connections.map((person) => {
+                      const sel = selectedPeople.some((p) => p.email === person.email);
+                      return (
+                        <button
+                          key={person.email}
+                          onClick={() => togglePerson(person)}
+                          className="w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all"
+                          style={{
+                            background: sel ? "rgba(193,127,36,0.08)" : "#fff",
+                            border: `1.5px solid ${sel ? "#C17F24" : "#D6CAB8"}`,
+                          }}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
+                            style={{ background: sel ? "#C17F24" : "#EDE6D9", color: sel ? "#fff" : "#2C1810" }}
+                          >
+                            {(person.name || person.email).charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium" style={{ color: "#2C1810" }}>{person.name || person.email}</p>
+                            {person.name && <p className="text-xs truncate" style={{ color: "#9a9390" }}>{person.email}</p>}
+                          </div>
+                          {sel && <span style={{ color: "#C17F24" }}>✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* New people */}
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#9a9390" }}>
+                  {connections.length > 0 ? "Or invite someone new" : "Who's coming?"}
+                </p>
+                <div className="space-y-4">
+                  {newPeople.map((entry, i) => (
+                    <div key={i}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={entry.name}
+                          onChange={(e) => setNewPeople((p) => { const c = [...p]; c[i] = { ...c[i], name: e.target.value }; return c; })}
+                          placeholder="Name (optional)"
+                          className="flex-1 px-3 py-2.5 rounded-xl text-sm focus:outline-none"
+                          style={{ background: "#fff", border: "1px solid #D6CAB8", color: "#2C1810" }}
+                        />
+                        {newPeople.length > 1 && (
+                          <button onClick={() => setNewPeople((p) => p.filter((_, j) => j !== i))} className="text-lg px-1" style={{ color: "#9a9390" }}>×</button>
+                        )}
+                      </div>
                       <input
                         type="email"
                         value={entry.email}
                         onChange={(e) => setNewPeople((p) => { const c = [...p]; c[i] = { ...c[i], email: e.target.value }; return c; })}
                         placeholder="Email address"
-                        className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] placeholder:text-[#2C1810]/30 focus:outline-none focus:border-[#C17F24]/60"
+                        className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none"
+                        style={{ background: "#fff", border: "1px solid #D6CAB8", color: "#2C1810" }}
                       />
                     </div>
-                    {newPeople.length > 1 && (
-                      <button onClick={() => setNewPeople((p) => p.filter((_, j) => j !== i))} className="mt-2 text-[#2C1810]/30 hover:text-[#2C1810]/60 text-lg">×</button>
-                    )}
-                  </div>
-                ))}
-                <button onClick={() => setNewPeople((p) => [...p, { name: "", email: "" }])} className="text-[#C17F24] text-sm text-left hover:underline">
-                  + Add another person
-                </button>
+                  ))}
+                  <button
+                    onClick={() => setNewPeople((p) => [...p, { name: "", email: "" }])}
+                    className="text-sm font-medium"
+                    style={{ color: "#C17F24" }}
+                  >
+                    + Add another person
+                  </button>
+                </div>
               </div>
 
-              <ContinueButton disabled={!hasAtLeastOnePerson} onClick={continueWho} />
-            </div>
+              {error && <p className="text-sm mb-4" style={{ color: "#C17F24" }}>{error}</p>}
+
+              <button
+                onClick={handleWhoNext}
+                className="w-full py-4 rounded-2xl text-base font-semibold"
+                style={{ background: "#C17F24", color: "#fff" }}
+              >
+                Continue →
+              </button>
+            </motion.div>
           )}
 
-          {/* ── 4  Rhythm ── */}
-          {step === 4 && (
-            <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">How often do you want to gather?</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-6">Your commitment to each other — Eleanor handles the rest.</p>
-              <div className="flex flex-col gap-3">
+          {/* Step 3 — Rhythm */}
+          {step === 3 && (
+            <motion.div key="s3" variants={stepVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2 }}>
+              <h1 className="text-2xl font-bold mb-2" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+                How often will you gather? ⛪
+              </h1>
+              <p className="text-sm mb-8" style={{ color: "#9a9390" }}>The rhythm is the commitment.</p>
+
+              <div className="space-y-3 mb-8">
                 {RHYTHM_OPTIONS.map((o) => (
                   <button
                     key={o.value}
-                    onClick={() => setFrequency(o.value)}
-                    className={`w-full text-left p-4 rounded-2xl border flex items-center gap-4 transition-all ${
-                      frequency === o.value ? "border-2 border-[#C17F24] bg-[#C17F24]/5" : "border-[#e8d5b8] hover:border-[#C17F24]/30"
-                    }`}
+                    onClick={() => setRhythm(o.value)}
+                    className="w-full text-left p-4 rounded-2xl transition-all"
+                    style={{
+                      background: rhythm === o.value ? "rgba(193,127,36,0.08)" : "#fff",
+                      border: `2px solid ${rhythm === o.value ? "#C17F24" : "rgba(193,127,36,0.2)"}`,
+                    }}
                   >
-                    <div>
-                      <div className="font-medium text-[#2C1810]">{o.label}</div>
-                      <div className="text-sm text-[#2C1810]/50">{o.tagline}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {frequency && (
-                <p className="text-sm text-[#C17F24] italic mt-4">You want to gather {FREQ_LABEL[frequency]}.</p>
-              )}
-              {frequency && <ContinueButton onClick={goNext} />}
-            </div>
-          )}
-
-          {/* ── 5  Goal ── */}
-          {step === 5 && (
-            <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">How far do you want to grow?</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-6">Pick a goal. Eleanor will tend it with you.</p>
-              <div className="flex flex-col gap-3">
-                {GOAL_OPTIONS.map((o) => (
-                  <button
-                    key={o.months}
-                    onClick={() => setGoalMonths(o.months)}
-                    className={`w-full text-left p-4 rounded-2xl border flex items-center gap-4 transition-all ${
-                      goalMonths === o.months ? "border-2 border-[#C17F24] bg-[#C17F24]/5" : "border-[#e8d5b8] hover:border-[#C17F24]/30"
-                    }`}
-                  >
-                    <span className="text-2xl">{o.emoji}</span>
-                    <div>
-                      <div className="font-medium text-[#2C1810]">{o.label}</div>
-                      <div className="text-sm text-[#2C1810]/50">
-                        {o.months === 0 ? "No end date — tend it as long as it grows" : `${o.phase} · ${gatheringsFor(o.months)}`}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{o.emoji}</span>
+                      <div>
+                        <p className="font-semibold" style={{ color: "#2C1810" }}>{o.label}</p>
+                        <p className="text-sm" style={{ color: "#9a9390" }}>{o.tagline}</p>
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
-              {goalMonths !== null && (
-                <p className="text-sm text-[#C17F24] italic mt-4">
-                  {goalMonths === 0
-                    ? "As many gatherings as it takes."
-                    : `${gatheringsFor(goalMonths)} to look forward to.`}
-                </p>
-              )}
-              {goalMonths !== null && <ContinueButton onClick={goNext} />}
-            </div>
+
+              <p className="text-sm italic mb-6 text-center" style={{ color: "#9a9390" }}>
+                Phoebe will find times that work and keep the rhythm going. 🌿
+              </p>
+
+              <button
+                onClick={() => { if (rhythm) setStep(4); }}
+                disabled={!rhythm}
+                className="w-full py-4 rounded-2xl text-base font-semibold disabled:opacity-40 transition-opacity"
+                style={{ background: "#C17F24", color: "#fff" }}
+              >
+                Continue →
+              </button>
+            </motion.div>
           )}
 
-          {/* ── 6  When ── */}
-          {step === 6 && (
-            <div>
-              <h1 className="font-serif text-3xl text-[#2C1810] mb-2">When should you first gather? 🌿</h1>
-              <p className="text-sm text-[#2C1810]/50 mb-6 leading-relaxed">
-                Eleanor will share these options with {firstNames || "your group"} — everyone says which works.
-                More options means more people can bloom.
+          {/* Step 4 — Practices (optional) */}
+          {step === 4 && (
+            <motion.div key="s4" variants={stepVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2 }}>
+              <h1 className="text-2xl font-bold mb-2" style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}>
+                Will you add anything? (optional)
+              </h1>
+              <p className="text-sm mb-8" style={{ color: "#9a9390" }}>
+                Spiritual practices are optional. Skip if they're not right for your group.
               </p>
 
-              <div className="flex flex-col gap-3">
-
-                {/* ── First pick ── large amber card */}
-                <div className="border-2 border-[#C17F24] bg-[#C17F24]/5 rounded-2xl p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[#C17F24] uppercase tracking-widest mb-1.5">Your first pick</p>
-                      {editingSlot === "first" ? (
-                        <input
-                          type="datetime-local"
-                          value={firstPick}
-                          autoFocus
-                          onChange={(e) => { setFirstPick(e.target.value); setEditingSlot(null); }}
-                          onBlur={() => setEditingSlot(null)}
-                          className="w-full border border-[#C17F24]/40 rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]"
-                        />
-                      ) : (
-                        <p className="font-serif text-xl text-[#2C1810]">{formatDateHuman(firstPick)}</p>
-                      )}
-                    </div>
-                    {editingSlot !== "first" && (
-                      <button
-                        onClick={() => setEditingSlot("first")}
-                        className="text-xs text-[#C17F24] hover:underline font-medium flex-shrink-0 mt-1"
-                      >
-                        Edit
-                      </button>
-                    )}
+              {/* Intercession toggle */}
+              <div
+                className="p-5 rounded-2xl mb-4"
+                style={{ background: "#fff", border: "1.5px solid #D6CAB8" }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <p className="font-semibold text-base" style={{ color: "#2C1810" }}>🙏 Intercession</p>
+                    <p className="text-sm" style={{ color: "#9a9390" }}>Pray together for a shared intention</p>
                   </div>
-                </div>
-
-                {/* ── Alt 1 ── */}
-                {alt1 ? (
-                  <div className="border border-[#e8d5b8] bg-white rounded-2xl p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-[#2C1810]/40 uppercase tracking-widest mb-1.5">Backup option</p>
-                        {editingSlot === "alt1" ? (
-                          <input
-                            type="datetime-local"
-                            value={alt1}
-                            autoFocus
-                            onChange={(e) => { setAlt1(e.target.value); setEditingSlot(null); }}
-                            onBlur={() => setEditingSlot(null)}
-                            className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]/60"
-                          />
-                        ) : (
-                          <p className="text-base font-medium text-[#2C1810]">{formatDateHuman(alt1)}</p>
-                        )}
-                      </div>
-                      {editingSlot !== "alt1" && (
-                        <div className="flex items-center gap-3 flex-shrink-0 mt-1">
-                          <button onClick={() => setEditingSlot("alt1")} className="text-xs text-[#C17F24] hover:underline">Edit</button>
-                          <button onClick={() => setAlt1("")} className="text-[#2C1810]/30 hover:text-[#2C1810]/60 text-lg leading-none">×</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
                   <button
-                    onClick={() => setAlt1(localDateStr(3, 18))}
-                    className="w-full border-2 border-dashed border-[#e8d5b8] rounded-2xl p-4 text-[#2C1810]/40 hover:border-[#C17F24]/40 hover:text-[#C17F24] transition-all text-sm flex items-center justify-center gap-2"
+                    onClick={() => setHasIntercession((v) => !v)}
+                    className="w-12 h-6 rounded-full transition-colors relative flex-shrink-0"
+                    style={{ background: hasIntercession ? "#D4896A" : "#D6CAB8" }}
                   >
-                    <span className="text-base leading-none">+</span> Add a backup time
+                    <div
+                      className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform"
+                      style={{ left: hasIntercession ? "calc(100% - 21px)" : "3px" }}
+                    />
                   </button>
+                </div>
+                {hasIntercession && (
+                  <input
+                    type="text"
+                    value={intercessionIntention}
+                    onChange={(e) => setIntercessionIntention(e.target.value)}
+                    placeholder="What will you pray for?"
+                    className="w-full mt-3 px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                    style={{ background: "#FAF6F0", border: "1px solid #D6CAB8", color: "#2C1810" }}
+                    autoFocus
+                  />
                 )}
-
-                {/* ── Alt 2 — only show if alt1 is set ── */}
-                {alt1 && (
-                  alt2 ? (
-                    <div className="border border-[#e8d5b8] bg-white rounded-2xl p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-[#2C1810]/40 uppercase tracking-widest mb-1.5">Second option</p>
-                          {editingSlot === "alt2" ? (
-                            <input
-                              type="datetime-local"
-                              value={alt2}
-                              autoFocus
-                              onChange={(e) => { setAlt2(e.target.value); setEditingSlot(null); }}
-                              onBlur={() => setEditingSlot(null)}
-                              className="w-full border border-[#e8d5b8] rounded-xl px-3 py-2 text-sm text-[#2C1810] bg-white focus:outline-none focus:border-[#C17F24]/60"
-                            />
-                          ) : (
-                            <p className="text-base font-medium text-[#2C1810]">{formatDateHuman(alt2)}</p>
-                          )}
-                        </div>
-                        {editingSlot !== "alt2" && (
-                          <div className="flex items-center gap-3 flex-shrink-0 mt-1">
-                            <button onClick={() => setEditingSlot("alt2")} className="text-xs text-[#C17F24] hover:underline">Edit</button>
-                            <button onClick={() => setAlt2("")} className="text-[#2C1810]/30 hover:text-[#2C1810]/60 text-lg leading-none">×</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setAlt2(localDateStr(5, 10))}
-                      className="w-full border-2 border-dashed border-[#e8d5b8] rounded-2xl p-4 text-[#2C1810]/40 hover:border-[#C17F24]/40 hover:text-[#C17F24] transition-all text-sm flex items-center justify-center gap-2"
-                    >
-                      <span className="text-base leading-none">+</span> Add another option
-                    </button>
-                  )
-                )}
-
               </div>
 
-              <p className="text-xs text-[#2C1810]/40 text-center mt-5">
-                Eleanor will reach out to everyone in your tradition with these times.
-              </p>
-
-              {sendError && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-                  {sendError}
+              {/* Fasting toggle */}
+              <div
+                className="p-5 rounded-2xl mb-8"
+                style={{ background: "#fff", border: "1.5px solid #D6CAB8" }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <p className="font-semibold text-base" style={{ color: "#2C1810" }}>🌿 Fasting</p>
+                    <p className="text-sm" style={{ color: "#9a9390" }}>Keep a fast on the day you gather</p>
+                  </div>
+                  <button
+                    onClick={() => setHasFasting((v) => !v)}
+                    className="w-12 h-6 rounded-full transition-colors relative flex-shrink-0"
+                    style={{ background: hasFasting ? "#6B8F71" : "#D6CAB8" }}
+                  >
+                    <div
+                      className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform"
+                      style={{ left: hasFasting ? "calc(100% - 21px)" : "3px" }}
+                    />
+                  </button>
                 </div>
-              )}
+                {hasFasting && (
+                  <input
+                    type="text"
+                    value={fastingDescription}
+                    onChange={(e) => setFastingDescription(e.target.value)}
+                    placeholder="Describe the fast (optional)"
+                    className="w-full mt-3 px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                    style={{ background: "#FAF6F0", border: "1px solid #D6CAB8", color: "#2C1810" }}
+                  />
+                )}
+              </div>
 
-              <div className="flex justify-end mt-6">
+              {error && <p className="text-sm mb-4" style={{ color: "#C17F24" }}>{error}</p>}
+
+              <button
+                onClick={handleCreate}
+                disabled={submitting}
+                className="w-full py-4 rounded-2xl text-base font-semibold disabled:opacity-50 transition-opacity"
+                style={{ background: "#C17F24", color: "#fff" }}
+              >
+                {submitting ? "Starting..." : "Start this gathering ⛪"}
+              </button>
+
+              {(!hasIntercession && !hasFasting) && (
                 <button
-                  onClick={() => { setSendError(""); goNext(); }}
-                  disabled={!firstPick}
-                  className="bg-[#C17F24] text-white rounded-2xl px-6 py-3 font-medium hover:bg-[#A06B1A] transition-colors disabled:opacity-40 animate-glow-breathe-amber disabled:animate-none"
+                  onClick={handleCreate}
+                  disabled={submitting}
+                  className="w-full mt-3 py-3 text-sm"
+                  style={{ color: "#9a9390" }}
                 >
-                  Send to the group 🌿
+                  Skip — start without practices
                 </button>
-              </div>
-            </div>
+              )}
+            </motion.div>
           )}
 
-        </div>
+        </AnimatePresence>
       </div>
     </div>
   );

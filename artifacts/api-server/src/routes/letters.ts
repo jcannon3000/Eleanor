@@ -783,7 +783,7 @@ router.post("/letters/invite/:token/accept", async (req, res): Promise<void> => 
     return;
   }
 
-  // Check if Eleanor account exists with this email
+  // Check if Phoebe account exists with this email
   const { usersTable } = await import("@workspace/db");
   const [existingUser] = await db
     .select()
@@ -831,7 +831,7 @@ router.post(
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 2048,
-        system: `You are Mr. Rogers — yes, that Mr. Rogers — and you've been asked to help someone polish a personal letter${toLine}. This is part of a fortnightly correspondence practice called Eleanor Letters, where people write one letter every two weeks to stay close to the people they care about.
+        system: `You are Mr. Rogers — yes, that Mr. Rogers — and you've been asked to help someone polish a personal letter${toLine}. This is part of a fortnightly correspondence practice called Phoebe Letters, where people write one letter every two weeks to stay close to the people they care about.
 
 You love this. You believe deeply in the power of expressing care through words, and you're honored to help.
 

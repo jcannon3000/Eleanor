@@ -38,15 +38,16 @@ export async function sendLetterCalendarEvent(params: {
     `Read it here →`,
     letterUrl,
     "",
-    `Then write back when you're ready. 🌿`,
+    `Then write back when it's your turn. 🌿`,
     "",
     `──────────────────`,
-    `Eleanor Letters · One letter every week.`,
+    `Be together with Phoebe.`,
   ].join("\n");
 
   try {
     const eventId = await createCalendarEvent(0, {
       summary: `📮 ${authorName} wrote you a letter`,
+      organizer: { displayName: "Phoebe", email: "eleanorscheduler@gmail.com" },
       description,
       startDate,
       endDate,

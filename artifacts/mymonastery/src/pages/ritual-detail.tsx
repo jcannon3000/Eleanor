@@ -193,7 +193,7 @@ export default function RitualDetail() {
       if (!res.ok) throw new Error("Failed to log");
       const msg = status === "completed"
         ? "Gathering logged. Your tradition grows stronger. 🌱"
-        : "Noted — it happens. Eleanor will keep watch.";
+        : "Noted — it happens. Phoebe will keep watch.";
       toast({ title: msg });
       await fetchTimeline();
       queryClient.invalidateQueries({ queryKey: [`/api/rituals/${ritualId}`] });
@@ -487,7 +487,7 @@ export default function RitualDetail() {
                   <span className="text-lg shrink-0">📅</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-amber-800">Your calendar event was removed</p>
-                    <p className="text-xs text-amber-700/70 mt-0.5">Eleanor can restore it to your Google Calendar.</p>
+                    <p className="text-xs text-amber-700/70 mt-0.5">Phoebe can restore it to your Google Calendar.</p>
                   </div>
                   <button
                     onClick={() => restoreCalendarMutation.mutate()}
@@ -650,7 +650,7 @@ export default function RitualDetail() {
                   </div>
                   <p className="font-medium text-foreground mb-1">No gathering scheduled yet</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Set a time and Eleanor will send calendar invites to your tradition.
+                    Set a time and Phoebe will send calendar invites to your tradition.
                   </p>
                   <Link
                     href={`/ritual/${ritualId}/schedule`}
@@ -1095,7 +1095,7 @@ export default function RitualDetail() {
                 {/* Section 1: Existing connections */}
                 {inviteConnections.length > 0 && (
                   <div className="mb-6">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Already in Eleanor with you</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Already in Phoebe with you</p>
                     <div className="space-y-2">
                       {inviteConnections.map(c => {
                         const already = ritual.participants.some(p => p.email.toLowerCase() === c.email.toLowerCase());

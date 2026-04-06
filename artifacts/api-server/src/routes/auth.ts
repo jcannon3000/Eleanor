@@ -160,7 +160,7 @@ router.get("/auth/scheduler/callback", async (req, res): Promise<void> => {
         <h2>✅ Scheduler account authorized</h2>
         <p>Set this as your <code>SCHEDULER_GOOGLE_REFRESH_TOKEN</code> environment variable on Railway:</p>
         <pre style="background: #f5f5f5; padding: 1rem; border-radius: 8px; word-break: break-all; font-size: 14px;">${refreshToken}</pre>
-        <p style="color: #666; font-size: 14px;">Once set, Eleanor will send all calendar invites from this scheduler account.</p>
+        <p style="color: #666; font-size: 14px;">Once set, Phoebe will send all calendar invites from this scheduler account.</p>
       </body></html>
     `);
   } catch (err) {

@@ -131,7 +131,7 @@ export default function RitualSchedule() {
       });
       toast({
         title: "Options saved 🌿",
-        description: "Eleanor will share these times with your tradition.",
+        description: "Phoebe will share these times with your tradition.",
       });
       setLocation(`/ritual/${ritualId}`);
     } catch {
@@ -206,7 +206,7 @@ export default function RitualSchedule() {
             >
               <div className="bg-card border border-card-border rounded-2xl p-5">
                 <p className="font-medium text-foreground mb-0.5">When will you gather?</p>
-                <p className="text-sm text-muted-foreground mb-3">One time, confirmed. Eleanor will notify everyone.</p>
+                <p className="text-sm text-muted-foreground mb-3">One time, confirmed. Phoebe will notify everyone.</p>
                 <input
                   type="datetime-local"
                   value={fixedTime}
@@ -323,8 +323,8 @@ export default function RitualSchedule() {
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           {mode === "fixed"
-            ? "Eleanor will reach out to everyone in your tradition."
-            : "Eleanor will reach out to your tradition with these options."}
+            ? "Phoebe will reach out to everyone in your tradition."
+            : "Phoebe will reach out to your tradition with these options."}
         </p>
       </div>
     </Layout>

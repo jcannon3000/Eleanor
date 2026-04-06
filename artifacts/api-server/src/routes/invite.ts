@@ -243,7 +243,7 @@ async function updateCalendarEventDescription(opts: {
         : `📌 New: ${newResponse.name} is available ${fmtTime(newResponse.chosenTime)}`
     );
   }
-  lines.push("", "Coordinated by Eleanor · eleanor.app");
+  lines.push("", "Coordinated by Phoebe · phoebe.app");
 
   await updateCalendarEvent(organizerUserId, planned.googleCalendarEventId, {
     description: lines.join("\n"),
@@ -266,7 +266,7 @@ function buildConfirmedDescription(
   lines.push(`Agreed by: ${voterNames.join(", ")}`);
   lines.push("");
   if (ritual.location) lines.push(`📍 ${ritual.location}`);
-  lines.push("", "Coordinated by Eleanor · eleanor.app");
+  lines.push("", "Coordinated by Phoebe · phoebe.app");
   return lines.join("\n");
 }
 

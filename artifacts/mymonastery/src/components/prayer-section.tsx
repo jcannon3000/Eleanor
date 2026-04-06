@@ -146,7 +146,7 @@ export function PrayerSection() {
         aria-expanded={isOpen}
       >
         <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-widest">
-          Held in prayer
+          Prayer Requests 🙏
         </span>
         <div className="flex-1 h-px bg-border/40 mx-2" />
         <span

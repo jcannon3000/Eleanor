@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -17,6 +17,12 @@ export const ritualsTable = pgTable("rituals", {
   confirmedTime: text("confirmed_time"),
   scheduleToken: text("schedule_token"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Phoebe gathering fields
+  rhythm: text("rhythm").notNull().default("fortnightly"),
+  hasIntercession: boolean("has_intercession").notNull().default(false),
+  hasFasting: boolean("has_fasting").notNull().default(false),
+  intercessionIntention: text("intercession_intention"),
+  fastingDescription: text("fasting_description"),
 });
 
 export const insertRitualSchema = createInsertSchema(ritualsTable).omit({ id: true, createdAt: true });

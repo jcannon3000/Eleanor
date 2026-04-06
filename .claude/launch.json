@@ -7,6 +7,13 @@
       "runtimeArgs": ["node_modules/.bin/vite", "--config", "vite.config.ts", "--host", "0.0.0.0"],
       "cwd": "/Users/jeremycannon/Documents/Eleanor/Eleanor/artifacts/mymonastery",
       "port": 5173
+    },
+    {
+      "name": "api-server",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["--enable-source-maps", "./dist/index.mjs"],
+      "cwd": "/Users/jeremycannon/Documents/Eleanor/Eleanor/artifacts/api-server",
+      "port": 3001
     }
   ]
 }

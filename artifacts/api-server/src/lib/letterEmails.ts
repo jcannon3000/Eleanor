@@ -40,10 +40,10 @@ function encodeMimeMessage(options: {
   text: string;
 }): string {
   const { to, subject, html, text } = options;
-  const boundary = "EleanorLettersBoundary";
+  const boundary = "PhoebeLettersBoundary";
   const message = [
     `To: ${to}`,
-    `From: Eleanor <eleanorscheduler@gmail.com>`,
+    `From: Phoebe <eleanorscheduler@gmail.com>`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -79,7 +79,7 @@ function wrapHtml(content: string): string {
           <tr>
             <td>
               <div style="margin-bottom:28px;">
-                <span style="font-size:22px;font-weight:700;color:#2C1810;letter-spacing:-0.5px;">\u{1F4EE} Eleanor Letters</span>
+                <span style="font-size:22px;font-weight:700;color:#2C1810;letter-spacing:-0.5px;">📮 Phoebe</span>
               </div>
               ${content}
             </td>
@@ -117,42 +117,80 @@ export async function sendInvitationEmail(opts: {
   creatorName: string;
   correspondenceName: string;
   inviteUrl: string;
+  type?: "one_to_one" | "group";
 }): Promise<boolean> {
-  const { to, creatorName, correspondenceName, inviteUrl } = opts;
-  const subject = `${creatorName} wants to stay in touch \u2014 Letters \u{1F4EE}`;
+  const { to, creatorName, correspondenceName, inviteUrl, type = "one_to_one" } = opts;
 
+  if (type === "group") {
+    const subject = `${creatorName} invited you to ${correspondenceName}`;
+    const html = wrapHtml(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
+        ${creatorName} invited you to ${correspondenceName}
+      </h1>
+      <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
+        ${creatorName} has invited you to share weekly updates in <em>${correspondenceName}</em> on Phoebe.
+      </p>
+      <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
+        Once a week, everyone shares what's been happening — 50 words or more. A simple practice of staying in each other's lives.
+      </p>
+      <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
+        No account needed. 🌿
+      </p>
+      ${linkButton(inviteUrl, `Accept the invitation →`)}
+      <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
+        Be together with Phoebe.
+      </p>
+    `);
+    const text = [
+      `${creatorName} invited you to ${correspondenceName}`,
+      "",
+      `${creatorName} has invited you to share weekly updates in ${correspondenceName} on Phoebe.`,
+      "",
+      "Once a week, everyone shares what's been happening — 50 words or more. A simple practice of staying in each other's lives.",
+      "",
+      "No account needed. 🌿",
+      "",
+      `Accept the invitation:`,
+      inviteUrl,
+      "",
+      "Be together with Phoebe.",
+    ].join("\n");
+    return sendEmail(to, subject, html, text);
+  }
+
+  const subject = `${creatorName} wants to stay in touch`;
   const html = wrapHtml(`
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
       ${creatorName} wants to stay in touch
     </h1>
     <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
-      ${creatorName} has invited you to exchange letters on Eleanor.
+      ${creatorName} has invited you to exchange letters with them on Phoebe.
     </p>
     <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
-      Once every week, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.
+      Once every two weeks, you each write one letter — sharing what's been happening, what's on your mind, what matters. You write one week. They respond the next. A conversation with room to breathe.
     </p>
     <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
-      A simple practice of staying close. \u{1F33F}
+      No account needed. Just your words. 🌿
     </p>
-    ${linkButton(inviteUrl, `Accept ${creatorName}\u2019s invitation \u2192`)}
+    ${linkButton(inviteUrl, `Accept ${creatorName}'s invitation →`)}
     <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
-      No account needed. Your link is all you need.
+      Be together with Phoebe.
     </p>
   `);
 
   const text = [
     `${creatorName} wants to stay in touch`,
     "",
-    `${creatorName} has invited you to exchange letters on Eleanor.`,
+    `${creatorName} has invited you to exchange letters with them on Phoebe.`,
     "",
-    "Once every week, you each write one letter. When a letter arrives, you\u2019ll get a calendar notification with a link to read it. Then write back when you\u2019re ready.",
+    "Once every two weeks, you each write one letter — sharing what's been happening, what's on your mind, what matters. You write one week. They respond the next. A conversation with room to breathe.",
     "",
-    "A simple practice of staying close. \u{1F33F}",
+    "No account needed. Just your words. 🌿",
     "",
-    `Accept ${creatorName}\u2019s invitation:`,
+    `Accept ${creatorName}'s invitation:`,
     inviteUrl,
     "",
-    "No account needed. Your link is all you need.",
+    "Be together with Phoebe.",
   ].join("\n");
 
   return sendEmail(to, subject, html, text);
@@ -163,31 +201,71 @@ export async function sendNewLetterEmail(opts: {
   authorName: string;
   correspondenceName: string;
   correspondenceUrl: string;
+  postmarkCity?: string;
+  letterDate?: Date;
+  type?: "one_to_one" | "group";
 }): Promise<boolean> {
-  const { to, authorName, correspondenceName, correspondenceUrl } = opts;
-  const subject = `${authorName} has written you a letter \u{1F33F}`;
+  const { to, authorName, correspondenceName, correspondenceUrl, postmarkCity, letterDate, type = "one_to_one" } = opts;
 
+  if (type === "group") {
+    const subject = `${authorName} shared an update 🌿`;
+    const html = wrapHtml(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
+        ${authorName} shared an update
+      </h1>
+      <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
+        ${authorName} has shared their weekly update in <em>${correspondenceName}</em>.
+      </p>
+      ${linkButton(correspondenceUrl, "Read it here →")}
+      <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
+        Be together with Phoebe.
+      </p>
+    `);
+    const text = [
+      `${authorName} shared an update 🌿`,
+      "",
+      `${authorName} has shared their weekly update in ${correspondenceName}.`,
+      "",
+      "Read it here:",
+      correspondenceUrl,
+      "",
+      "Be together with Phoebe.",
+    ].join("\n");
+    return sendEmail(to, subject, html, text);
+  }
+
+  const dateStr = letterDate
+    ? letterDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "";
+  const postmarkLine = postmarkCity ? `Postmarked: ${postmarkCity}${dateStr ? ` · ${dateStr}` : ""}` : "";
+
+  const subject = `${authorName} wrote you a letter 🌿`;
   const html = wrapHtml(`
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
-      ${authorName} has written a letter
+      ${authorName} wrote you a letter
     </h1>
+    ${postmarkLine ? `<p style="margin:0 0 8px;font-size:14px;color:#9a9390;line-height:1.6;">${postmarkLine}</p>` : ""}
     <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
-      ${authorName} has written their letter in <em>${correspondenceName}</em>.
-      <br>Read it, then write back when you\u2019re ready. \u{1F33F}
+      Read it, then write back when it's your turn. 🌿
     </p>
-    ${linkButton(correspondenceUrl, "Read it here \u2192")}
+    ${linkButton(correspondenceUrl, "Read it here →")}
+    <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
+      Be together with Phoebe.
+    </p>
   `);
 
   const text = [
-    `${authorName} has written you a letter \u{1F33F}`,
+    `${authorName} wrote you a letter 🌿`,
     "",
-    `${authorName} has written their letter in ${correspondenceName}.`,
+    postmarkLine,
     "",
     "Read it here:",
     correspondenceUrl,
     "",
-    "Then write back when you\u2019re ready. \u{1F33F}",
-  ].join("\n");
+    "Then write back when it's your turn. 🌿",
+    "",
+    "Be together with Phoebe.",
+  ].filter(l => l !== undefined).join("\n");
 
   return sendEmail(to, subject, html, text);
 }
@@ -197,33 +275,74 @@ export async function sendReminderEmail(opts: {
   correspondenceName: string;
   writeUrl: string;
   periodEnd: string;
+  otherPersonName?: string;
+  type?: "one_to_one" | "group";
 }): Promise<boolean> {
-  const { to, correspondenceName, writeUrl, periodEnd } = opts;
-  const subject = "Your letter is still unwritten \u{1F33F}";
+  const { to, correspondenceName, writeUrl, periodEnd, otherPersonName, type = "one_to_one" } = opts;
 
+  if (type === "group") {
+    const subject = "Share your update this week 🌿";
+    const html = wrapHtml(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
+        Share your update this week
+      </h1>
+      <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
+        You haven't shared your weekly update in <em>${correspondenceName}</em> yet.
+      </p>
+      <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
+        50 words or more. What's been happening?
+      </p>
+      ${linkButton(writeUrl, "Share your update →")}
+      <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
+        Be together with Phoebe.
+      </p>
+    `);
+    const text = [
+      "Share your update this week 🌿",
+      "",
+      `You haven't shared your weekly update in ${correspondenceName} yet.`,
+      "",
+      "50 words or more. What's been happening?",
+      "",
+      "Share your update:",
+      writeUrl,
+      "",
+      "Be together with Phoebe.",
+    ].join("\n");
+    return sendEmail(to, subject, html, text);
+  }
+
+  const subject = "Your letter is waiting to be written 🌿";
   const html = wrapHtml(`
     <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2C1810;line-height:1.3;">
-      Your letter is still unwritten
+      Your letter is waiting to be written
     </h1>
     <p style="margin:0 0 8px;font-size:15px;color:#6b6460;line-height:1.7;">
-      You haven\u2019t written your letter yet in <em>${correspondenceName}</em>.
+      It's your turn to write in <em>${correspondenceName}</em>.
+      ${otherPersonName ? `${otherPersonName} is waiting to hear from you.` : ""}
     </p>
     <p style="margin:0 0 28px;font-size:15px;color:#6b6460;line-height:1.7;">
-      This period closes on ${periodEnd}. If something is on your mind, now is a good time. \u{1F33F}
+      This period closes ${periodEnd}. 🌿
     </p>
-    ${linkButton(writeUrl, "Write your letter \u2192")}
+    ${linkButton(writeUrl, "Write your letter →")}
+    <p style="margin:28px 0 0;font-size:13px;color:#9a9390;line-height:1.6;border-top:1px solid #f0ece6;padding-top:20px;">
+      Be together with Phoebe.
+    </p>
   `);
 
   const text = [
-    "Your letter is still unwritten \u{1F33F}",
+    "Your letter is waiting to be written 🌿",
     "",
-    `You haven\u2019t written your letter yet in ${correspondenceName}.`,
+    `It's your turn to write in ${correspondenceName}.`,
+    otherPersonName ? `${otherPersonName} is waiting to hear from you.` : "",
     "",
-    `This period closes on ${periodEnd}. If something is on your mind, now is a good time. \u{1F33F}`,
+    `This period closes ${periodEnd}. 🌿`,
     "",
     "Write your letter:",
     writeUrl,
-  ].join("\n");
+    "",
+    "Be together with Phoebe.",
+  ].filter(l => l !== undefined).join("\n");
 
   return sendEmail(to, subject, html, text);
 }

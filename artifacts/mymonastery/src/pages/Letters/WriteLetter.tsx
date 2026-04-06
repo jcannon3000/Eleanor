@@ -14,8 +14,10 @@ interface MemberData {
 interface CorrespondenceBasic {
   id: number;
   name: string;
+  groupType: string;
   startedAt: string;
   members: MemberData[];
+  myTurn: boolean;
   currentPeriod: {
     periodNumber: number;
     periodLabel: string;
@@ -43,33 +45,44 @@ export default function WriteLetter() {
   const [confirmSend, setConfirmSend] = useState(false);
   const [errorState, setErrorState] = useState<{ message: string; nextPeriodStart?: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const saveTimerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const lastSavedRef = useRef("");
 
-  // Fetch correspondence details
   const { data: correspondence } = useQuery<CorrespondenceBasic>({
-    queryKey: [`/api/letters/correspondences/${correspondenceId}`],
-    queryFn: () => apiRequest("GET", `/api/letters/correspondences/${correspondenceId}${tokenParam}`),
+    queryKey: [`/api/phoebe/correspondences/${correspondenceId}`],
+    queryFn: async () => {
+      try {
+        return await apiRequest("GET", `/api/phoebe/correspondences/${correspondenceId}${tokenParam}`);
+      } catch {
+        return await apiRequest("GET", `/api/letters/correspondences/${correspondenceId}${tokenParam}`);
+      }
+    },
     enabled: !!correspondenceId && (!!user || !!token),
   });
 
-  // Load draft
   const { data: draft } = useQuery<DraftData | null>({
-    queryKey: [`/api/letters/correspondences/${correspondenceId}/draft`],
-    queryFn: () => apiRequest("GET", `/api/letters/correspondences/${correspondenceId}/draft${tokenParam}`),
+    queryKey: [`/api/phoebe/correspondences/${correspondenceId}/draft`],
+    queryFn: async () => {
+      try {
+        return await apiRequest("GET", `/api/phoebe/correspondences/${correspondenceId}/draft${tokenParam}`);
+      } catch {
+        return await apiRequest("GET", `/api/letters/correspondences/${correspondenceId}/draft${tokenParam}`);
+      }
+    },
     enabled: !!correspondenceId && (!!user || !!token),
   });
 
-  // Pre-fill postmark from member's homeCity
+  const isOneToOne = correspondence?.groupType === "one_to_one";
+  const minWords = isOneToOne ? 100 : 50;
+
+  // Pre-fill postmark from homeCity
   useEffect(() => {
     if (!correspondence || !user || postmarkCity) return;
     const me = correspondence.members?.find((m) => m.email === user.email);
-    if (me?.homeCity) {
-      setPostmarkCity(me.homeCity);
-    }
+    if (me?.homeCity) setPostmarkCity(me.homeCity);
   }, [correspondence, user]);
 
-  // Populate from draft on load
+  // Load draft
   useEffect(() => {
     if (draft?.content && !content) {
       setContent(draft.content);
@@ -85,181 +98,151 @@ export default function WriteLetter() {
     }
   }, [content]);
 
-  // Save draft
-  const [draftError, setDraftError] = useState(false);
-
   const saveDraft = useCallback(async () => {
     if (!correspondenceId || content === lastSavedRef.current) return;
     try {
-      await apiRequest("PUT", `/api/letters/correspondences/${correspondenceId}/draft${tokenParam}`, { content });
+      await apiRequest("PUT", `/api/phoebe/correspondences/${correspondenceId}/draft${tokenParam}`, { content })
+        .catch(() => apiRequest("PUT", `/api/letters/correspondences/${correspondenceId}/draft${tokenParam}`, { content }));
       lastSavedRef.current = content;
-      setDraftError(false);
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (err) {
       console.error("Draft save failed:", err);
-      setDraftError(true);
     }
   }, [correspondenceId, content, tokenParam]);
 
-  // Auto-save every 30 seconds
   useEffect(() => {
     if (saveTimerRef.current) clearInterval(saveTimerRef.current);
     saveTimerRef.current = setInterval(saveDraft, 30000);
-    return () => {
-      if (saveTimerRef.current) clearInterval(saveTimerRef.current);
-    };
+    return () => { if (saveTimerRef.current) clearInterval(saveTimerRef.current); };
   }, [saveDraft]);
 
-  // Save on unmount
-  useEffect(() => {
-    return () => { saveDraft(); };
-  }, [saveDraft]);
+  useEffect(() => { return () => { saveDraft(); }; }, [saveDraft]);
 
-  // Send letter
   const sendMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", `/api/letters/correspondences/${correspondenceId}/letters${tokenParam}`, {
+      apiRequest("POST", `/api/phoebe/correspondences/${correspondenceId}/letters${tokenParam}`, {
         content: content.trim(),
-        postmarkCity: postmarkCity.trim(),
-      }),
+        postmarkCity: isOneToOne ? postmarkCity.trim() : undefined,
+      }).catch(() =>
+        apiRequest("POST", `/api/letters/correspondences/${correspondenceId}/letters${tokenParam}`, {
+          content: content.trim(),
+          postmarkCity: isOneToOne ? postmarkCity.trim() : undefined,
+        })
+      ),
     onSuccess: () => {
       setLocation(`/letters/${correspondenceId}${tokenParam}`);
     },
     onError: (err: Error) => {
       try {
         const parsed = JSON.parse(err.message);
-        if (parsed.error === "already_written_this_period") {
-          setErrorState({
-            message: "Your letter for this period has already been sent.",
-            nextPeriodStart: parsed.nextPeriodStart,
-          });
+        if (parsed.error === "already_written" || parsed.error === "already_written_this_period") {
+          setErrorState({ message: "You've already written this period.", nextPeriodStart: parsed.nextPeriodStart });
+        } else if (parsed.error === "not_your_turn") {
+          setErrorState({ message: parsed.message || "It's not your turn yet.", nextPeriodStart: parsed.nextPeriodStart });
         } else {
-          setErrorState({ message: "Something went wrong. Tap to try again." });
+          setErrorState({ message: parsed.error || "Something went wrong." });
         }
       } catch {
-        setErrorState({ message: "Something went wrong. Tap to try again." });
+        setErrorState({ message: "Something went wrong. Try again." });
       }
       setConfirmSend(false);
     },
   });
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-  const canSend = wordCount >= 100 && wordCount <= 1000 && !sendMutation.isPending;
+  const canSend = wordCount >= minWords && !sendMutation.isPending;
+
+  const otherMembers = correspondence?.members
+    .filter((m) => m.email !== user?.email)
+    .map((m) => m.name || m.email.split("@")[0])
+    .join(", ") ?? "";
 
   function handleSendClick() {
-    if (!postmarkCity.trim()) {
-      setPostmarkError(true);
-      return;
-    }
+    if (isOneToOne && !postmarkCity.trim()) { setPostmarkError(true); return; }
     setPostmarkError(false);
     setConfirmSend(true);
   }
 
-  // Back navigation with confirmation
   function handleBack() {
-    if (content.trim() && content !== lastSavedRef.current) {
-      saveDraft();
-    }
+    if (content.trim() && content !== lastSavedRef.current) saveDraft();
     setLocation(`/letters/${correspondenceId}${tokenParam}`);
   }
 
-  const userEmail = user?.email || "";
-
   if (errorState) {
     return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
-        style={{ backgroundColor: "#FAF6F0" }}
-      >
-        <p className="text-base mb-2" style={{ color: "#2C1810" }}>
-          {errorState.message}
-        </p>
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" style={{ background: "#FAF6F0" }}>
+        <p className="text-4xl mb-4">📮</p>
+        <p className="text-base mb-2" style={{ color: "#2C1810" }}>{errorState.message}</p>
         {errorState.nextPeriodStart && (
-          <p className="text-sm text-muted-foreground mb-6">
-            You can write again on {errorState.nextPeriodStart}.
-          </p>
+          <p className="text-sm mb-6" style={{ color: "#9a9390" }}>Next period starts {errorState.nextPeriodStart}.</p>
         )}
-        <button
-          onClick={() => setLocation(`/letters/${correspondenceId}${tokenParam}`)}
-          className="text-sm font-medium"
-          style={{ color: "#6B8F71" }}
-        >
-          &larr; Back to letters
+        <button onClick={() => setLocation(`/letters/${correspondenceId}${tokenParam}`)} className="text-sm font-medium" style={{ color: "#4A6FA5" }}>
+          ← Back to letters
         </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FAF6F0" }}>
-      {/* Header */}
-      <div className="px-6 pt-6 pb-2 flex items-center justify-between">
-        <button onClick={handleBack} className="text-sm text-muted-foreground hover:text-[#2C1810] transition-colors">
-          &larr;
-        </button>
+    <div className="min-h-screen flex flex-col" style={{ background: "#FAF6F0" }}>
+      {/* Minimal header */}
+      <div className="px-6 pt-6 pb-3 flex items-center justify-between">
+        <button onClick={handleBack} className="text-sm" style={{ color: "#9a9390" }}>←</button>
         <div className="text-center">
-          <p className="text-[13px] text-muted-foreground">{correspondence?.name}</p>
+          <p className="text-[13px]" style={{ color: "#9a9390" }}>{correspondence?.name}</p>
           {correspondence?.currentPeriod && (
-            <p className="text-[13px]" style={{ color: "#6B8F71" }}>
-              Letter {correspondence.currentPeriod.periodNumber} · {correspondence.currentPeriod.periodLabel}
+            <p className="text-[13px] font-medium" style={{ color: "#4A6FA5" }}>
+              {isOneToOne ? `Letter ${correspondence.currentPeriod.periodNumber}` : `Week ${correspondence.currentPeriod.periodNumber}`}
+              {" · "}{correspondence.currentPeriod.periodLabel}
             </p>
           )}
         </div>
-        <div className="w-8" />
+        <div className="w-6" />
       </div>
 
-      {/* Action bar */}
+      {/* Bottom action bar (fixed) */}
       <div
-        className="px-6 pb-3 border-b"
-        style={{ borderColor: "#e8e2d9" }}
+        className="px-6 py-3"
+        style={{ borderBottom: "1px solid #EDE6D9" }}
       >
         {!confirmSend ? (
           <div className="flex items-center justify-between">
-            <span className="text-[13px]" style={{ color: wordCount < 100 ? "#9a9390" : wordCount > 1000 ? "#C17F24" : "#6B8F71" }}>
+            <span className="text-[13px]" style={{ color: wordCount < minWords ? "#9a9390" : "#6B8F71" }}>
               {wordCount} word{wordCount !== 1 ? "s" : ""}
-              {wordCount > 0 && wordCount < 100 && <span className="text-muted-foreground"> · {100 - wordCount} to go</span>}
-              {wordCount > 1000 && <span> · {wordCount - 1000} over</span>}
+              {!isOneToOne && wordCount < minWords && (
+                <span style={{ color: "#C17F24" }}> · {minWords - wordCount} to go</span>
+              )}
             </span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => { saveDraft(); }}
-                className="px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors"
-                style={{
-                  borderColor: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#e8e2d9",
-                  color: draftError ? "#C17F24" : showSaved ? "#6B8F71" : "#9a9390",
-                }}
-              >
-                {draftError ? "Save failed" : showSaved ? "Saved \u2713" : "Save draft"}
-              </button>
+              {showSaved && (
+                <span className="text-[12px]" style={{ color: "#6B8F71" }}>Saved 🌿</span>
+              )}
               <button
                 onClick={handleSendClick}
                 disabled={!canSend}
-                className="px-4 py-1.5 rounded-xl text-xs font-semibold transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
+                className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40 transition-opacity"
+                style={{ background: "#4A6FA5", color: "#fff" }}
               >
-                Send letter
+                Send 📮
               </button>
             </div>
           </div>
         ) : (
           <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Send your letter? Once sent, it can't be edited.
+            <p className="text-sm mb-3" style={{ color: "#6b6460" }}>
+              Send your {isOneToOne ? "letter" : "update"}? Can't be edited after.
             </p>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => sendMutation.mutate()}
                 disabled={sendMutation.isPending}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: "#6B8F71", color: "#F7F0E6" }}
+                style={{ background: "#4A6FA5", color: "#fff" }}
               >
-                {sendMutation.isPending ? "Sending..." : "Send"}
+                {sendMutation.isPending ? "Sending..." : "Send 📮"}
               </button>
-              <button
-                onClick={() => setConfirmSend(false)}
-                className="text-sm text-muted-foreground hover:text-[#2C1810]"
-              >
+              <button onClick={() => setConfirmSend(false)} className="text-sm" style={{ color: "#9a9390" }}>
                 Keep writing
               </button>
             </div>
@@ -268,52 +251,60 @@ export default function WriteLetter() {
       </div>
 
       {/* Writing area */}
-      <div className="flex-1 px-6 pt-6">
+      <div className="flex-1 px-6 pt-6 pb-8">
+        {isOneToOne && otherMembers && (
+          <p className="text-base italic mb-4" style={{ color: "#9a9390", fontFamily: "Georgia, serif" }}>
+            Dear {otherMembers},
+          </p>
+        )}
+
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
-            setConfirmSend(false);
-          }}
-          placeholder={`What's been on your mind this week?\n\nWhat happened that you want them to know?\n\nWhat are you looking forward to?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as long or as short as feels right.`}
+          onChange={(e) => { setContent(e.target.value); setConfirmSend(false); }}
+          placeholder={isOneToOne
+            ? `What's been happening these past two weeks?\n\nWhat do you want them to know?\nWhat are you carrying?\nWhat made you laugh?\n\nWrite as much or as little as feels right. 🌿`
+            : `What's been happening this week?\n\nA moment, a thought, something you noticed.\n50 words or more. 🌿`
+          }
           className="w-full min-h-[50vh] bg-transparent resize-none focus:outline-none placeholder:italic"
           style={{
             color: "#2C1810",
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: isOneToOne ? "Georgia, serif" : "'Space Grotesk', sans-serif",
             fontSize: "18px",
-            lineHeight: "2.0",
-            caretColor: "#6B8F71",
+            lineHeight: "2.1",
+            caretColor: "#4A6FA5",
           }}
         />
 
-        {/* Postmark field */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-base">{"\u{1F4EE}"}</span>
-            <span className="text-[13px]" style={{ color: "#9a9390" }}>Writing from:</span>
+        {isOneToOne && user?.name && (
+          <p className="text-base italic mt-2" style={{ color: "#9a9390", fontFamily: "Georgia, serif" }}>
+            — {user.name}
+          </p>
+        )}
+
+        {/* Postmark field — one_to_one only */}
+        {isOneToOne && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-1">
+              <span>📮</span>
+              <span className="text-[13px]" style={{ color: "#9a9390" }}>Writing from:</span>
+            </div>
+            <input
+              type="text"
+              value={postmarkCity}
+              onChange={(e) => { setPostmarkCity(e.target.value); if (e.target.value.trim()) setPostmarkError(false); }}
+              placeholder="City (e.g. New York, London)"
+              className="w-full px-3 py-2 rounded-lg text-[15px] focus:outline-none transition-colors"
+              style={{
+                color: "#2C1810",
+                background: "transparent",
+                border: postmarkError ? "1px solid #C17F24" : "1px solid #EDE6D9",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            />
+            {postmarkError && <p className="text-[13px] mt-1" style={{ color: "#C17F24" }}>Where are you writing from? 🌿</p>}
           </div>
-          <input
-            type="text"
-            value={postmarkCity}
-            onChange={(e) => {
-              setPostmarkCity(e.target.value);
-              if (e.target.value.trim()) setPostmarkError(false);
-            }}
-            placeholder="City (e.g. New York, London)"
-            className="w-full px-3 py-2 rounded-lg bg-transparent text-[15px] focus:outline-none transition-colors"
-            style={{
-              color: "#2C1810",
-              border: postmarkError ? "1px solid #C17F24" : "1px solid #e8e2d9",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          />
-          {postmarkError && (
-            <p className="text-[13px] mt-1" style={{ color: "#C17F24" }}>
-              Where are you writing from? {"\u{1F33F}"}
-            </p>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

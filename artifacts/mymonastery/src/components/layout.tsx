@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useAuth, useLogout } from "@/hooks/useAuth";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { LogOut, ChevronDown, Sprout, Users } from "lucide-react";
+import { LogOut, ChevronDown, Users } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -28,16 +28,33 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className="absolute top-0 left-0 right-0 z-10 px-6 md:px-8 py-6 md:py-8 flex justify-between items-center">
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-              <Sprout size={20} strokeWidth={1.5} />
-            </div>
-            <span className="font-serif text-xl font-bold text-foreground group-hover:text-primary transition-colors" style={{ letterSpacing: "-0.025em" }}>
-              Eleanor
+            <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors" style={{ letterSpacing: "-0.025em", fontFamily: "'Space Grotesk', sans-serif" }}>
+              Phoebe
             </span>
           </Link>
 
           {user && (
             <nav className="flex items-center gap-1">
+              <Link
+                href="/letters"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  location.startsWith("/letters")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+              >
+                📮 Letters
+              </Link>
+              <Link
+                href="/dashboard"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  location === "/dashboard"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+              >
+                ⛪ Gatherings
+              </Link>
               <Link
                 href="/people"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -86,7 +103,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     onClick={() => presenceToggle.mutate(!user.showPresence)}
                     className="w-full flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                   >
-                    <span>Show when I'm here {"\u{1F33F}"}</span>
+                    <span>Show when I'm here 🌿</span>
                     <div className={`w-8 h-[18px] rounded-full transition-colors relative ${user.showPresence ? "bg-[#6B8F71]" : "bg-border"}`}>
                       <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${user.showPresence ? "left-[16px]" : "left-[2px]"}`} />
                     </div>

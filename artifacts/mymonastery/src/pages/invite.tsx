@@ -196,7 +196,7 @@ export default function InvitePage() {
             <Sprout size={28} strokeWidth={1.5} />
           </div>
           <p className="font-serif text-xl font-semibold text-foreground">Sign in to continue</p>
-          <p className="text-sm text-muted-foreground">Create an Eleanor account to respond to this invitation.</p>
+          <p className="text-sm text-muted-foreground">Create an Phoebe account to respond to this invitation.</p>
           <a
             href={`/?redirect=${encodeURIComponent(currentPath)}`}
             className="inline-flex items-center justify-center w-full px-6 py-3.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm transition-opacity hover:opacity-90"
@@ -221,7 +221,7 @@ export default function InvitePage() {
             href="/"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
           >
-            Sign in to Eleanor
+            Sign in to Phoebe
           </a>
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function InvitePage() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Sprout size={14} className="text-primary" strokeWidth={1.5} />
             </div>
-            <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
+            <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Phoebe</span>
           </div>
 
           <motion.div
@@ -460,14 +460,14 @@ export default function InvitePage() {
               </p>
             </div>
 
-            {/* Join Eleanor CTA */}
+            {/* Join Phoebe CTA */}
             <div className="bg-card border border-card-border rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <Sprout size={14} className="text-primary" />
                 <p className="text-sm font-semibold text-foreground">Want to host your own traditions?</p>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Eleanor coordinates recurring gatherings — so the people and traditions you love keep showing up.
+                Phoebe coordinates recurring gatherings — so the people and traditions you love keep showing up.
               </p>
               <a
                 href="/"
@@ -486,12 +486,12 @@ export default function InvitePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto px-4 py-12">
-        {/* Eleanor branding */}
+        {/* Phoebe branding */}
         <div className="flex items-center gap-2 mb-10 justify-center">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Sprout size={14} className="text-primary" strokeWidth={1.5} />
           </div>
-          <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Eleanor</span>
+          <span className="font-serif text-sm font-bold text-muted-foreground" style={{ letterSpacing: "-0.025em" }}>Phoebe</span>
         </div>
 
         {/* Ritual header */}
@@ -633,7 +633,7 @@ export default function InvitePage() {
             href="/"
             className="inline-flex items-center gap-2 px-5 py-2.5 border border-border rounded-full text-sm font-medium text-foreground hover:bg-secondary transition-colors"
           >
-            Create your own on Eleanor
+            Create your own on Phoebe
           </a>
         </div>
       </div>
