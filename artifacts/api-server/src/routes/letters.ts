@@ -230,9 +230,12 @@ router.get(
       .select()
       .from(correspondenceMembersTable)
       .where(
-        auth.userId
-          ? eq(correspondenceMembersTable.userId, auth.userId)
-          : eq(correspondenceMembersTable.email, auth.email),
+        and(
+          auth.userId
+            ? eq(correspondenceMembersTable.userId, auth.userId)
+            : eq(correspondenceMembersTable.email, auth.email),
+          sql`archived_at IS NULL`,
+        ),
       );
 
     const correspondenceIds = memberRows.map((m) => m.correspondenceId);
@@ -334,7 +337,39 @@ router.get(
       });
     }
 
+    // Sort: "needs response" (they wrote, I haven't) first, then rest
+    results.sort((a, b) => {
+      const needsResponseA = a.currentPeriod.membersWritten.some(
+        (m: { name: string; hasWritten: boolean }) => m.name !== (auth.email) && m.hasWritten,
+      ) && !a.currentPeriod.hasWrittenThisPeriod ? 1 : 0;
+      const needsResponseB = b.currentPeriod.membersWritten.some(
+        (m: { name: string; hasWritten: boolean }) => m.name !== (auth.email) && m.hasWritten,
+      ) && !b.currentPeriod.hasWrittenThisPeriod ? 1 : 0;
+      return needsResponseB - needsResponseA;
+    });
+
     res.json(results);
+  }),
+);
+
+// ─── ARCHIVE CORRESPONDENCE ──────────────────────────────────────────────────
+
+router.post(
+  "/letters/correspondences/:id/archive",
+  requireSessionAuth(async (req, res, auth) => {
+    const correspondenceId = parseInt(req.params.id, 10);
+    await db
+      .update(correspondenceMembersTable)
+      .set({ archivedAt: new Date() } as any)
+      .where(
+        and(
+          eq(correspondenceMembersTable.correspondenceId, correspondenceId),
+          auth.userId
+            ? eq(correspondenceMembersTable.userId, auth.userId)
+            : eq(correspondenceMembersTable.email, auth.email),
+        ),
+      );
+    res.json({ ok: true });
   }),
 );
 

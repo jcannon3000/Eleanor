@@ -470,6 +470,7 @@ export async function migrate() {
     await run(client, `ALTER TABLE letters ADD COLUMN IF NOT EXISTS postmark_country TEXT`);
     await run(client, `ALTER TABLE correspondence_members ADD COLUMN IF NOT EXISTS home_city TEXT`);
     await run(client, `ALTER TABLE correspondence_members ADD COLUMN IF NOT EXISTS home_country TEXT`);
+    await run(client, `ALTER TABLE correspondence_members ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`);
 
     // Verify shared_moments columns exist
     const colCheck = await client.query(`

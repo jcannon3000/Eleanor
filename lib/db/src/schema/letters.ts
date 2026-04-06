@@ -25,6 +25,7 @@ export const correspondenceMembersTable = pgTable("correspondence_members", {
   lastLetterAt: timestamp("last_letter_at", { withTimezone: true }),
   homeCity: text("home_city"),
   homeCountry: text("home_country"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

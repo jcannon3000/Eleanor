@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout";
 import { apiRequest } from "@/lib/queryClient";
@@ -124,7 +124,17 @@ export default function CorrespondencePage() {
   });
 
   // Mark letters as read on mount
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const queryClient = useQueryClient();
+
+  const archiveMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/letters/correspondences/${correspondenceId}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/letters/correspondences"] });
+      setLocation("/letters");
+    },
+  });
+
   useEffect(() => {
     if (!correspondenceId || (!user && !token)) return;
     apiRequest(
@@ -176,22 +186,47 @@ export default function CorrespondencePage() {
   return (
     <Layout>
       <div className="flex flex-col w-full pb-24">
-        {/* Back */}
-        <button
-          onClick={() => setLocation("/letters")}
-          className="text-sm text-muted-foreground hover:text-[#2C1810] mb-4 inline-block transition-colors text-left"
-        >
-          &larr; Letters
-        </button>
+        {/* Back row */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setLocation("/letters")}
+            className="text-sm text-muted-foreground hover:text-[#2C1810] transition-colors text-left"
+          >
+            &larr; Letters
+          </button>
+          {!showArchiveConfirm ? (
+            <button
+              onClick={() => setShowArchiveConfirm(true)}
+              className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              Archive
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">Archive this correspondence?</span>
+              <button
+                onClick={() => archiveMutation.mutate()}
+                className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors"
+              >
+                Yes, archive
+              </button>
+              <button
+                onClick={() => setShowArchiveConfirm(false)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Header */}
         <h1
           className="text-2xl font-bold"
           style={{ color: "#2C1810", fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          {data.name}
+          {otherMembers}
         </h1>
-        <p className="text-[14px] text-muted-foreground mb-1">with {otherMembers}</p>
 
         {/* Member postmark cities */}
         {memberCities.length > 0 && (
